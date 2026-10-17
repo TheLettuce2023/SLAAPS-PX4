@@ -63,8 +63,8 @@ Makefile.* text eol=lf
 # SVG treated as an asset (binary) by default.
 *.svg    text eol=lf
 
-# Text files where line endings should be preserved
-*.patch  -text
+# Preserve patch bytes and required context-line whitespace.
+*.patch  -text -whitespace
 
 # Archives
 *.7z     binary

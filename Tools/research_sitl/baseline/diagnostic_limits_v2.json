@@ -1,0 +1,180 @@
+{
+  "schema": "stock-cessna-diagnostic-limits/v2",
+  "revision": 2,
+  "purpose": "diagnostic logged-evidence criteria only; not flight or control limits",
+  "approved_proposal": {
+    "path": "docs/SITL_BASELINE_DIAGNOSTIC_LIMITS_V2_PROPOSAL.md",
+    "sha256": "9c1549b215808dabfbe779c9171f46a426a2ea87e13145fbe5fcdd9aa45b21e6"
+  },
+  "campaign_id": "slaaps-stock-cessna-phase1-acceptance-02",
+  "scenario": {
+    "model_target": "gz_rc_cessna",
+    "sys_autostart": 4003,
+    "run_modes": [
+      "gui",
+      "headless"
+    ],
+    "fresh_px4_and_gazebo_processes_per_run": true,
+    "pinned_parameter_image_per_run": true,
+    "second_operator_repeat_required": true
+  },
+  "interval": {
+    "clock": "PX4 monotonic microseconds",
+    "also_record_utc_bounds": true,
+    "ready_checkpoint_required": [
+      "model_spawned",
+      "preflight_ok",
+      "disarmed_hold",
+      "estimator_tilt_aligned",
+      "estimator_yaw_aligned",
+      "estimator_gnss_aligned",
+      "local_and_global_position_valid",
+      "gnss_3d_fix",
+      "airspeed_source_identified"
+    ],
+    "gui_ready_checkpoint_also_requires_qgc_link": true,
+    "settling_us": 10000000,
+    "score_duration_us": 60000000,
+    "missing_checkpoint_or_full_interval": "incomplete",
+    "invalid_state_during_interval": "fail"
+  },
+  "required_raw_topics_instance_0": [
+    "vehicle_status",
+    "vehicle_local_position",
+    "vehicle_global_position",
+    "vehicle_attitude",
+    "vehicle_imu",
+    "sensor_gps",
+    "sensor_baro",
+    "sensor_mag",
+    "estimator_status_flags",
+    "actuator_motors",
+    "actuator_servos",
+    "airspeed_validated",
+    "differential_pressure",
+    "telemetry_status",
+    "sensor_combined"
+  ],
+  "maximum_logged_gap_us": {
+    "vehicle_attitude": 20000,
+    "vehicle_local_position": 40000,
+    "vehicle_global_position": 40000,
+    "airspeed_validated": 250000,
+    "actuator_motors": 250000,
+    "actuator_servos": 250000,
+    "sensor_gps": 2500000,
+    "sensor_baro": 2500000,
+    "sensor_mag": 2500000,
+    "differential_pressure": 2500000,
+    "estimator_status_flags": 2500000,
+    "telemetry_status": 2500000
+  },
+  "maximum_publication_minus_sample_age_us": {
+    "vehicle_attitude": 8000,
+    "vehicle_local_position": 8000,
+    "vehicle_global_position": 8000
+  },
+  "timestamp_policy": {
+    "sample_when_present": "strictly_increasing",
+    "publication": "nondecreasing",
+    "negative_publication_minus_sample_age": "fail",
+    "missing_required_timestamps_or_raw_stream": "incomplete",
+    "present_invalid_or_backward_timestamps": "fail",
+    "equal_attitude_publication_timestamp": "allow_only_when_both_sample_times_are_distinct_and_increasing_quaternions_finite_both_ages_at_most_8000_us_and_pair_reported",
+    "estimator_status_flags_sample_age": "no_8_ms_limit_delayed_horizon_policy_pending",
+    "synthetic_pressure_zero_sample_exception": {
+      "topic": "differential_pressure",
+      "instance": 0,
+      "device_id": 1377548,
+      "publisher": "sensor_airspeed_sim",
+      "publisher_source_path": "src/modules/simulation/sensor_airspeed_sim/SensorAirspeedSim.cpp",
+      "publisher_source_sha256": "dec9c7bc16d9d01edb7cd0b392a0a03135649c7f0d8dbd9a6b43c50360c5811f",
+      "sample_stream": "all_zero_only",
+      "mixed_zero_nonzero": "fail",
+      "record_zero_count": true,
+      "publication_gap_and_finite_checks": "unchanged",
+      "nonzero_sample_stream": "apply_existing_order_and_age_rules"
+    }
+  },
+  "validity": {
+    "required_during_interval": [
+      "local_and_global_position_valid",
+      "gnss_3d_fix",
+      "estimator_tilt_yaw_gnss_aligned",
+      "preflight_ok",
+      "disarmed"
+    ],
+    "required_finite_fields": {
+      "vehicle_attitude": [
+        "q[0]",
+        "q[1]",
+        "q[2]",
+        "q[3]"
+      ],
+      "vehicle_local_position": [
+        "x",
+        "y",
+        "z",
+        "vx",
+        "vy",
+        "vz"
+      ],
+      "vehicle_global_position": [
+        "lat",
+        "lon",
+        "alt"
+      ],
+      "sensor_gps": [
+        "latitude_deg",
+        "longitude_deg",
+        "altitude_msl_m"
+      ],
+      "sensor_baro": [
+        "pressure",
+        "temperature"
+      ],
+      "sensor_mag": [
+        "x",
+        "y",
+        "z"
+      ],
+      "airspeed_validated": [
+        "calibrated_airspeed_m_s",
+        "true_airspeed_m_s"
+      ],
+      "differential_pressure": [
+        "differential_pressure_pa"
+      ]
+    },
+    "airspeed_source_during_interval": 1,
+    "startup_airspeed_source_minus_1_and_nonfinite": "allowed_before_readiness_only",
+    "disarmed_actuator_motors_nan": "allowed_as_declared_px4_disarmed_behavior_not_commanded_thrust",
+    "stock_airspeed_provenance": "sensor_airspeed_sim_ground_truth_derived_not_independent_gazebo_sensor",
+    "maximum_logger_dropouts": 0
+  },
+  "gui": {
+    "human_record_requires": [
+      "observation_time",
+      "parameter_loading",
+      "live_attitude",
+      "gps_map_position",
+      "displayed_mode",
+      "mavlink_inspector_traffic",
+      "warnings"
+    ],
+    "comms_lost_while_px4_live": "fail",
+    "comms_lost_only_after_documented_normal_shutdown": "outside_scored_interval",
+    "unknown_warning_timing": "incomplete",
+    "valid_gcs_heartbeat_required": true,
+    "rx_message_count_nondecreasing": true,
+    "maximum_time_without_rx_advance_us": 5000000
+  },
+  "headless": {
+    "qgc_visual_observation_required": false,
+    "telemetry_link_expectation": "declare_separately_in_pre_run_manifest"
+  },
+  "base_approved_proposal": {
+    "path": "docs/SITL_BASELINE_DIAGNOSTIC_LIMITS_PROPOSAL.md",
+    "sha256": "9bc5c087a8330ce10fd8321b3c432888d9dd87478c84751cd61bcc0d614db290"
+  }
+}

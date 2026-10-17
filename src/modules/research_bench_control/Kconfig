@@ -1,0 +1,6 @@
+menuconfig MODULES_RESEARCH_BENCH_CONTROL
+	bool "research_bench_control"
+	default n
+	help
+		Explicitly started servo-only research bench owner. No automatic start,
+		profile, output assignment or arming. Not qualified for physical use.

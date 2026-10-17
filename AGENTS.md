@@ -13,3 +13,9 @@ simulation and Python tooling.
 - **Scoped guidance:** before editing or reviewing, read only the
   `.github/instructions/*.instructions.md` files whose `applyTo` patterns
   match the affected paths, plus any nested `AGENTS.md` along those paths.
+- **Research context:** start with `docs/PROJECT_CONTEXT.md`; use its task
+  index and `docs/RESEARCH_CODE_GRAPH.json` before broad searches. Revalidate
+  changed graph anchors, including untracked files; avoid rereading unchanged
+  context. Update the compact handoff and affected graph when milestones change.
+- **Handoff:** end successful turns with one sentence of codebase state and
+  explicitly state whether clearing history or starting a fresh chat is safe.

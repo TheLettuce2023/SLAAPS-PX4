@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "purpose": "synthetic_fixture_demonstration_only",
+  "profile_input_sha256": "661ab9d9a49fd791111b7e055cedd8ce631bf75979134f58b683da641ab69d82",
+  "body_frame": "FRD",
+  "quantity": "incremental_normalized_moment_about_declared_trim",
+  "axis_abs_bound": [0.1, 0.1, 0.1]
+}

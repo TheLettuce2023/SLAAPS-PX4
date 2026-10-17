@@ -1,0 +1,47 @@
+diff --git a/Tools/research_sitl/stabilized_manual/SyntheticConfiguration.hpp b/Tools/research_sitl/stabilized_manual/SyntheticConfiguration.hpp
+index 16d7f61d71..02377e9d03 100644
+--- a/Tools/research_sitl/stabilized_manual/SyntheticConfiguration.hpp
++++ b/Tools/research_sitl/stabilized_manual/SyntheticConfiguration.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include "FixtureConstants.hpp"
++#include "GeneratedAllocationProfile.hpp"
+ #include <lib/research_stabilized_manual/StabilizedManualControl.hpp>
+ 
+ namespace research_stabilized_fixture
+@@ -51,14 +52,15 @@ inline research_stabilized_manual::Configuration configuration()
+ 	c.fixed_simulated_thrust_n = kFixedThrustN;
+ 
+ 	for (unsigned row = 0; row < 3; ++row) {
+-		for (unsigned col = 0; col < 4; ++col) { c.allocation.effectiveness[row][col] = kEffectiveness[row][col]; }
++		for (unsigned col = 0; col < 4; ++col) { c.allocation.effectiveness[row][col] = generated::kEffectiveness[row][col]; }
+ 	}
+ 
+ 	for (unsigned col = 0; col < 4; ++col) {
+-		c.allocation.minimum[col] = -1.0F;
+-		c.allocation.maximum[col] = 1.0F;
+-		c.allocation.positive_slew_per_s[col] = 5.0F;
+-		c.allocation.negative_slew_per_s[col] = 5.0F;
++		c.allocation.trim[col] = generated::kTrim[col];
++		c.allocation.minimum[col] = generated::kMinimum[col];
++		c.allocation.maximum[col] = generated::kMaximum[col];
++		c.allocation.positive_slew_per_s[col] = generated::kPositiveSlewPerS[col];
++		c.allocation.negative_slew_per_s[col] = generated::kNegativeSlewPerS[col];
+ 	}
+ 
+ 	c.allocation.axis_weight = Vector3f(1.0F, 1.0F, 1.0F);
+diff --git a/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp b/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp
+index d77d7c8106..02e5770935 100644
+--- a/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp
++++ b/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp
+@@ -45,7 +45,8 @@ public:
+ 	static int print_usage(const char *reason = nullptr);
+ 	int print_status() override
+ 	{
+-		PX4_INFO("state=%d ready=%d fault=%d; synthetic SITL only", _state.load(), _ready.load(), _fault.load());
++		PX4_INFO("state=%d ready=%d fault=%d; synthetic SITL only", _state.load(), _ready.load(), _fault.load());
++		PX4_INFO("profile_sha=%s", fixture::generated::kInputSha256);
+ 		return 0;
+ 	}
+ private:

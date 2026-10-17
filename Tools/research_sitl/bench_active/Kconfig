@@ -1,0 +1,4 @@
+menuconfig EXAMPLES_BENCH_ACTIVE_TEST
+	bool "Private capture-only bench integration fixture"
+	default n
+	depends on BOARD_PLATFORM = "posix"

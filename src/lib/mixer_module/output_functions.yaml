@@ -43,6 +43,11 @@ functions:
     IC_Engine_Choke: 452
     IC_Engine_Starter: 453
 
+    Research_Bench:
+      start: 10000
+      count: 4
+      exclude_from_actuator_testing: true
+
     # Add your own here:
     #MyCustomFunction: 10000
 

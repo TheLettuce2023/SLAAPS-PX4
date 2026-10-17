@@ -1,0 +1,496 @@
+CODEX EXECUTION PROMPTS FOR THE CUSTOM RESEARCH VEHICLE
+Prepared 2026-09-16
+
+PURPOSE
+
+This file converts docs/CUSTOM_VEHICLE_SITL_ROADMAP.txt into direct prompts.
+Use gpt-6-astra as the master agent. Use lower-cost agents for bounded research,
+implementation, test, and review work. The master owns architecture, phase gates,
+integration decisions, conflicting findings, and the final report to the user.
+
+The prompts deliberately separate work by file ownership. All agents share the
+same filesystem, so two agents must never edit the same files concurrently.
+Existing uncommitted work belongs to the user and must be preserved.
+
+
+MODEL ROUTING
+
+- gpt-6-astra, high or xhigh: master orchestration, architectural decisions,
+  control-design synthesis, phase-gate decisions, conflict resolution, and
+  final review.
+- gpt-5.6-sol, high: requirements analysis, physics/control design review,
+  evidence assessment, and independent code review.
+- gpt-5.6-terra, high: repository tracing, C/C++ or Python implementation,
+  Gazebo/PX4 integration, test infrastructure, and companion software.
+- gpt-5.6-luna, medium or high: inventory, status collection, documentation
+  scaffolding, deterministic data extraction, and narrow mechanical changes.
+
+For lower-model agents, use fork_turns="none" and include all necessary context
+in the task message. This enables a model override and avoids copying the full
+conversation. Permit no more than three workers at once. Tell workers not to
+spawn more agents unless the master explicitly delegates that authority.
+
+
+PROMPT 0 - ASTRA MASTER ORCHESTRATOR
+
+BEGIN PROMPT
+
+You are the gpt-6-astra master agent for the research-vehicle PX4/Gazebo project
+in the current workspace. Work through docs/CUSTOM_VEHICLE_SITL_ROADMAP.txt in
+phase-gated increments. The vehicle has canard controls, one fixed-axis EDF, no
+thrust vectoring, and no main fixed wing. A Raspberry Pi 4B will issue research
+acceleration requests. PX4 will own estimation, stabilization, allocation, mode
+supervision, actuator output, and command-loss behavior. The purpose is purely
+research; there is no intended interception.
+
+Before taking action:
+1. Read the repository AGENTS.md and the roadmap completely.
+2. Inspect git status and preserve every pre-existing change.
+3. Before editing or reviewing a path, read only the scoped instruction files
+   whose applyTo patterns match it, plus nested AGENTS.md files.
+4. Treat Tools/simulation/gz as a separate Git repository/submodule.
+5. Do not commit, push, open a PR, flash hardware, install packages, or run a
+   powered physical test unless the user explicitly requests that action.
+
+Run the project as gated waves. Start only Wave 1 now unless its artifacts
+already exist and are complete:
+
+Wave 1, parallel and non-overlapping:
+- Spawn requirements_agent with model gpt-5.6-sol, reasoning_effort high,
+  fork_turns none, using Prompt A below.
+- Spawn interface_agent with model gpt-5.6-terra, reasoning_effort high,
+  fork_turns none, using Prompt B below.
+- Spawn baseline_agent with model gpt-5.6-luna, reasoning_effort high,
+  fork_turns none, using Prompt C below.
+
+Do useful local work while workers run: inspect their allowed output paths for
+conflicts, assemble the phase-gate checklist, and identify user decisions. Do
+not duplicate their work. Wait for all results, inspect every changed file and
+claim, and run Prompt D yourself as the Wave 1 gate review.
+
+Subsequent waves:
+- Wave 2: evidence/test specification and model-ownership decision. Run Prompt E.
+- Wave 3: Gazebo plant (Prompt F) and companion prototype (Prompt G) may run in
+  parallel only after their respective inputs are approved.
+- Wave 4: controller architecture (Prompt H) is reviewed by Astra before any
+  controller implementation (Prompt I).
+- Wave 5: integration/regression (Prompt J), independent review (Prompt K), and
+  compile-only Pixhawk portability (Prompt L). Do not run parallel simulator
+  builds until worktree-specific WSL mount/cache paths are established.
+
+At every phase gate:
+- Distinguish facts, measurements, assumptions, and inferences.
+- Reject invented physical values and claims unsupported by evidence.
+- Verify the complete acceleration path, not merely message reception.
+- Keep simulator ground truth out of operational controller inputs.
+- Require one publisher/owner per command stage and explicit normalized-output
+  semantics at the control allocator.
+- Preserve the stock gz_rc_cessna baseline.
+- Summarize completed artifacts, verification, failures, open decisions, and the
+  exact gate that permits the next wave.
+
+Use lower agents for bounded work and Astra for synthesis. If a task is blocked
+by missing physical measurements, record the blocker, continue independent
+work, and ask the user only for the minimum measurements or decision required.
+Do not declare the project complete until the roadmap definition of done is met.
+
+END PROMPT
+
+
+PROMPT A - REQUIREMENTS AND PHYSICAL FEASIBILITY
+Recommended agent: gpt-5.6-sol, reasoning_effort high, fork_turns none.
+Allowed output: docs/RESEARCH_VEHICLE_REQUIREMENTS.md only.
+
+BEGIN PROMPT
+
+You are requirements_agent. Do not spawn subagents. In the current PX4 workspace,
+read AGENTS.md, docs/CUSTOM_VEHICLE_SITL_ROADMAP.txt,
+docs/SITL_ARCHITECTURE.md, and docs/SITL_WSL_SETUP.md. Inspect other files only
+when needed to verify an existing project statement. Preserve all existing work.
+
+Create docs/RESEARCH_VEHICLE_REQUIREMENTS.md. Capture the confirmed research
+objective: a canard-controlled body with one fixed-axis EDF, no thrust vectoring,
+no main fixed wing, and acceleration requests from a Raspberry Pi 4B. Organize:
+- confirmed facts;
+- required vehicle geometry and independent actuator definitions;
+- mass, CG, inertia, propulsion, servo, sensor, power, launch, and recovery data;
+- requested acceleration semantics and performance requirements;
+- intended speed/attitude envelope and required control authority;
+- assumptions, unknowns, evidence source, uncertainty, and human owner;
+- measurable acceptance criteria that still require project decisions;
+- a feasibility checklist for trim, coupled moments, low-speed control, actuator
+  saturation, and loss of authority.
+
+Do not invent coefficients, dimensions, limits, acceptance values, or test data.
+Explain why each missing input matters and identify which questions block the
+plant, interface, controller, or hardware phases. A no-main-wing design can
+still generate body and canard aerodynamic force; avoid classifying behavior
+solely by PX4's standard vehicle names.
+
+Use apply_patch for the new file. Do not edit firmware, model assets, the
+roadmap, or existing project documents. Check the rendered structure and report
+the created file, key blockers, and the smallest set of questions the master
+should ask the user next.
+
+END PROMPT
+
+
+PROMPT B - ACCELERATION INTERFACE AND PX4 SOURCE TRACE
+Recommended agent: gpt-5.6-terra, reasoning_effort high, fork_turns none.
+Allowed output: docs/ACCELERATION_INTERFACE.md only.
+
+BEGIN PROMPT
+
+You are interface_agent. Do not spawn subagents. Read AGENTS.md, the complete
+roadmap, and matching scoped instructions before reviewing msg/**,
+src/modules/mavlink/**, src/modules/uxrce_dds_client/**, commander, control, or
+flight-mode paths. Preserve all current changes.
+
+Trace both candidate inputs from companion producer to actual PX4 consumer:
+1. MAVLink acceleration fields and offboard mode.
+2. ROS 2/XRCE-DDS trajectory_setpoint and offboard-control signaling.
+
+Create docs/ACCELERATION_INTERFACE.md with file/line evidence for:
+- message units, frames, NaN/unused-field behavior, gravity convention if
+  established, and coordinate conversions;
+- timestamps, liveness, command freshness, mode entry, command ownership,
+  validation, and command-loss behavior;
+- actual controller consumers for the configured fixed-wing path;
+- which acceleration components are implemented versus accepted by transport;
+- normalized vehicle_thrust_setpoint and vehicle_torque_setpoint semantics;
+- gaps for this canard/EDF research vehicle;
+- a decision matrix comparing MAVLink and ROS 2/XRCE-DDS on Pi 4B;
+- one recommended initial transport, clearly marked as a recommendation;
+- an interface-contract template covering frame, gravity, reference point,
+  update rate, deadline, sequence, bounds, acknowledgment/status, and fallback;
+- focused tests needed before implementation.
+
+Do not assume that accepting trajectory_setpoint proves full-vector tracking.
+Do not change messages or source code. Do not make physical-control assumptions
+that require missing vehicle data. Use apply_patch for the document, verify its
+claims against this checkout, and report the main architectural gap to Astra.
+
+END PROMPT
+
+
+PROMPT C - REPRODUCIBLE STOCK BASELINE AND EVIDENCE INVENTORY
+Recommended agent: gpt-5.6-luna, reasoning_effort high, fork_turns none.
+Allowed output: docs/SITL_BASELINE_REPRODUCIBILITY.md only.
+
+BEGIN PROMPT
+
+You are baseline_agent. Do not spawn subagents. Read AGENTS.md, the roadmap,
+docs/SITL_WSL_SETUP.md, docs/SITL_ARCHITECTURE.md, and scripts/sitl/*.sh.
+Perform read-only inspection of repository status, revision, submodules, WSL,
+installed-tool versions, build/cache paths, and existing launch behavior.
+
+Create docs/SITL_BASELINE_REPRODUCIBILITY.md containing:
+- exact observed versions and clearly separated documented-but-unverified values;
+- source, submodule, WSL mount, native cache, build, parameter, and log locations;
+- the stock gz_rc_cessna GUI and headless smoke-test procedures;
+- bridge, telemetry freshness, sensor/estimator, process, and shutdown checks;
+- a run-manifest schema linking every result to revisions and configuration;
+- a signal-provenance table separating Gazebo truth, simulated sensor data,
+  PX4 estimates, MAVLink telemetry, and QGC display values;
+- an explicit airspeed/groundspeed provenance check;
+- failure criteria for stale, missing, non-finite, or discontinuous data;
+- concurrency limitations caused by shared WSL mount/cache defaults.
+
+Do not install dependencies, initialize or update submodules, start Gazebo/PX4,
+modify scripts, or clean build outputs. Label runtime steps as procedures rather
+than completed tests. Use apply_patch only for the assigned document. Report
+the file created and anything that prevents a reproducible baseline run.
+
+END PROMPT
+
+
+PROMPT D - ASTRA WAVE 1 GATE REVIEW
+Run directly by the gpt-6-astra master after A, B, and C return.
+
+BEGIN PROMPT
+
+Review docs/RESEARCH_VEHICLE_REQUIREMENTS.md,
+docs/ACCELERATION_INTERFACE.md, and docs/SITL_BASELINE_REPRODUCIBILITY.md against
+docs/CUSTOM_VEHICLE_SITL_ROADMAP.txt and the checked-out source. Inspect diffs;
+do not accept worker summaries without checking their evidence.
+
+Resolve terminology, frames, units, and dependency contradictions. Confirm that
+facts are distinguished from assumptions, message reception from controller
+support, documented values from observed values, and SITL from hardware-in-the-
+loop. Verify that no agent changed files outside its assignment.
+
+Create or update docs/PHASE_GATE_STATUS.md with:
+- pass/incomplete/fail for roadmap Phases 0, 1, and 2;
+- accepted artifacts and exact residual gaps;
+- the minimum user-supplied physical measurements and interface choices needed;
+- decisions Astra can make from evidence and decisions reserved for the user;
+- allowed next assignments and their file ownership.
+
+Use apply_patch. Continue any unblocked planning work. If human input is needed,
+ask one compact, prioritized question set after completing the gate document.
+
+END PROMPT
+
+
+PROMPT E - EVIDENCE FORMAT AND TEST-HARNESS SPECIFICATION
+Recommended agent: gpt-5.6-terra, reasoning_effort high, fork_turns none.
+Allowed output: docs/SITL_TEST_SPECIFICATION.md and isolated tests/tools only if
+the Astra gate explicitly authorizes implementation paths.
+
+BEGIN PROMPT
+
+You are test_spec_agent. Do not spawn subagents. Read accepted Wave 1 documents,
+the roadmap, AGENTS.md, and applicable scoped instructions. Create
+docs/SITL_TEST_SPECIFICATION.md defining a machine-readable run manifest,
+signal-provenance requirements, scenario inputs, scoring outputs, explicit
+incomplete/fail states, and evidence retention.
+
+Specify nominal, boundary, invalid-command, stale-command, connection-loss,
+sensor fault, actuator fault, and parameter-uncertainty cases. Define metric
+formulas for per-axis RMS/peak tracking error, settling, overshoot, command age,
+saturation time, estimator validity, runtime, and deadline misses. Leave numeric
+thresholds as named unresolved requirements unless already approved.
+
+Design bounded execution and cleanup that affects only processes started by the
+harness. Include tests proving malformed or missing logs cannot pass. Preserve
+the existing launcher. Do not implement a simulator runner unless Astra's gate
+explicitly authorizes file paths and acceptance criteria. Report the resulting
+specification and the implementation tasks it unlocks.
+
+END PROMPT
+
+
+PROMPT F - CUSTOM GAZEBO PLANT AND SENSOR MODEL
+Recommended agent: gpt-5.6-terra, reasoning_effort high, fork_turns none.
+Start only after Phase 0 data and model ownership are approved.
+
+BEGIN PROMPT
+
+You are plant_agent. Do not spawn subagents. Before editing, read AGENTS.md,
+the accepted requirements, baseline/evidence specification, roadmap, and the
+scoped simulation instructions. Confirm the assigned model repository/path and
+that every required numeric input has a source or approved provisional range.
+If ownership or essential geometry is missing, complete read-only design work,
+record the blocker, and do not create an invented vehicle model.
+
+Implement a separately named Gazebo research model and open-loop tests. Preserve
+gz_rc_cessna. Treat advanced_plane as a reference for supported mechanisms,
+not as this vehicle's validated physics. Implement only approved rigid-body,
+body/canard aerodynamic, EDF, servo, and sensor behavior. Document coordinate
+frames, signs, units, data source, uncertainty, and plugin assumptions.
+
+Verify mass/inertia sanity, actuator signs, force/moment directions, local-flow
+assumptions, equilibrium/trim cases, timestep sensitivity, servo bounds/rates,
+EDF lag, and sensor placement/rate/noise/latency. Compare open-loop results with
+an independent calculation where specified. Keep controller tuning out of this
+task. Use apply_patch for parent-repository edits. For submodule edits, follow
+the explicitly approved repository workflow and report the exact model commit
+and parent pointer state. Return changed files, verification, limitations, and
+which Phase 3 gate criteria pass.
+
+END PROMPT
+
+
+PROMPT G - DESKTOP AND RASPBERRY PI COMPANION PROTOTYPE
+Recommended agent: gpt-5.6-terra, reasoning_effort high, fork_turns none.
+Start after the acceleration interface is approved.
+
+BEGIN PROMPT
+
+You are companion_agent. Do not spawn subagents. Read AGENTS.md, the approved
+acceleration interface, test specification, and roadmap. Confirm the assigned
+companion application path/repository and selected transport before editing.
+
+Implement a deterministic research command publisher on the development host,
+structured to run unchanged or with minimal platform configuration on Raspberry
+Pi 4B. Publish only the approved fields, units, frames, time/freshness metadata,
+and liveness signals. Record every transmitted request and received acceptance
+or status indication. Provide bounded test profiles suitable for interface
+verification; do not implement autonomous target pursuit or actuator control.
+
+Add tests for frame conversion, gravity convention, bounds, non-finite inputs,
+stale data, live-heartbeat-with-stale-command, sequence/order, delay, jitter,
+disconnect, restart, competing source, and reconnect. Keep stabilization and
+actuator ownership on PX4. Do not claim Pi timing results unless run on the Pi;
+provide the exact measurement procedure when hardware is unavailable. Report
+changed files, dependencies, desktop results, Pi results or pending steps, and
+the Phase 5 gate status.
+
+END PROMPT
+
+
+PROMPT H - CONTROL AND ALLOCATION ARCHITECTURE REVIEW
+Recommended agent: gpt-5.6-sol, reasoning_effort high, fork_turns none.
+Design-only. Astra must approve it before Prompt I.
+
+BEGIN PROMPT
+
+You are control_design_agent. Do not spawn subagents. Read AGENTS.md, accepted
+requirements, interface, plant verification, and test specification. Read the
+matching control/source instructions and inspect candidate PX4 modules and
+control-allocation code. Do not modify source code.
+
+Create docs/CONTROL_ARCHITECTURE.md. Compare reuse and extension of existing PX4
+attitude/rate/fixed-wing components with a dedicated research module. Base the
+recommendation on actual plant authority and existing source assumptions.
+Describe:
+- mapping from requested acceleration to feasible force, attitude, thrust, and
+  moment objectives;
+- remaining degrees of freedom and heading/attitude policy;
+- inner-loop structure and scheduling with dynamic pressure/airspeed;
+- canard and EDF allocation, coupled moments, conditioning, and saturation;
+- normalized torque/thrust semantics and parameterization;
+- estimator inputs available on real hardware;
+- integrator, rate/deflection, envelope, invalid-state, mode-transition, and
+  command-loss behavior;
+- single-publisher ownership and startup/module selection;
+- required unit, SIL, SITL, and failure tests;
+- rejected alternatives and evidence needed to reconsider them.
+
+Do not choose gains or coefficients unsupported by the accepted plant. Mark
+unresolved engineering choices. Use apply_patch only for this document and
+return a phase-gate recommendation with the smallest implementation slices.
+
+END PROMPT
+
+
+PROMPT I - PX4 CONTROLLER AND ALLOCATION IMPLEMENTATION
+Recommended agent: gpt-5.6-terra, reasoning_effort high, fork_turns none.
+Start only after Astra approves Prompt H and assigns exact files.
+
+BEGIN PROMPT
+
+You are controller_agent. Do not spawn subagents. Read AGENTS.md, the approved
+control architecture and its dependencies, and every scoped instruction that
+matches the exact assigned source/test paths. Preserve unrelated changes.
+
+Implement only the approved first controller slice. Keep it opt-in through a
+dedicated research airframe/module configuration. Maintain one publisher per
+control stage and use the approved normalized thrust/torque/allocation contract.
+Implement limits, non-finite checks, state/setpoint freshness, saturation and
+anti-windup behavior, mode transitions, and observability required by the design.
+
+Add meaningful unit tests for control math and focused integration tests for
+signs, limits, unavailable directions, ill-conditioned allocation, and command
+loss. Do not add placeholder physics, guessed gains, or silent fallbacks. Run
+formatting required by AGENTS.md for changed C/C++ and the targeted tests/builds
+appropriate to the slice. Do not commit unless requested. Report changed files,
+test output, parameter assumptions, performance not yet demonstrated, and the
+next approved slice. Astra must review the diff before another slice begins.
+
+END PROMPT
+
+
+PROMPT J - INTEGRATION AND QUANTITATIVE REGRESSION
+Recommended agent: gpt-5.6-terra, reasoning_effort high, fork_turns none.
+Start after nominal plant, interface, companion, and controller gates pass.
+
+BEGIN PROMPT
+
+You are integration_test_agent. Do not spawn subagents. Read all accepted phase
+artifacts and applicable instructions. Use only approved integration paths and
+scenario thresholds. Preserve the stock Cessna baseline and existing launcher.
+
+Integrate the separately verified components. Implement bounded automated runs,
+owned-process cleanup, run manifests, log validation, and scoring described in
+the test specification. Cover nominal, boundary, invalid/stale command, link
+loss, sensor/actuator failure, and approved uncertainty sweeps. Separate model,
+estimator, transport, controller, and display failures in reports. Test the
+checker with intentionally missing, stale, non-finite, and inconsistent data.
+
+Do not run concurrent simulator builds through the shared default WSL mount or
+cache. If parallel runs are required, first use reviewed unique mount/cache and
+port configuration. Report exact commands, archived evidence locations, pass/
+fail/incomplete cases, repeatability limits, and Phase 6 gate status. Never
+relax thresholds after seeing results without a separately reviewed requirement
+change.
+
+END PROMPT
+
+
+PROMPT K - INDEPENDENT REVIEW
+Recommended agent: gpt-5.6-sol, reasoning_effort high, fork_turns none.
+Run after each implementation milestone. Review only; do not edit the patch.
+
+BEGIN PROMPT
+
+You are independent_review_agent. Do not spawn subagents. Read AGENTS.md, the
+accepted requirements/design/test artifacts, relevant scoped instructions, and
+the complete proposed diff. Do not modify files.
+
+Review for engineering correctness, PX4 architecture fit, frame/unit/gravity
+errors, timestamp/freshness flaws, competing publishers, normalized-versus-
+physical unit confusion, actuator sign/authority mistakes, hidden ground-truth
+dependencies, unsafe or undefined transitions, false-pass tests, submodule
+reproducibility, and portability to the intended board. Check whether every
+claim has evidence and whether missing physical data is clearly identified.
+
+Return findings ordered by severity with file and line references, the trigger,
+consequence, and a concrete remedy. Separate defects from questions and residual
+limitations. State which phase-gate criteria are met and which are not. Do not
+approve merely because tests pass; assess whether the tests validate the stated
+requirement.
+
+END PROMPT
+
+
+PROMPT L - PIXHAWK 6X PORTABILITY AND BUILD ASSESSMENT
+Recommended agent: gpt-5.6-terra, reasoning_effort high, fork_turns none.
+Start compile checks early after source exists; full gate follows regression.
+
+BEGIN PROMPT
+
+You are platform_agent. Do not spawn subagents. Read AGENTS.md, accepted design
+documents, integration results, and exact board identity. Confirm whether the
+hardware is Pixhawk 6X or 6X-RT; stop the dependent build if this is unresolved.
+
+Use the repository's build-px4 skill for board firmware builds and read its
+SKILL.md completely before acting. Build the correct target without flashing;
+the documented Pixhawk 6X target is px4_fmu-v6x_default. Verify that the custom
+module, parameters, messages, startup configuration, and allocator are included.
+Report firmware size/resource information, build warnings, host-only dependency
+leaks, configuration differences, and any scheduler/I/O assumptions requiring
+hardware measurement.
+
+Assess the available hardware-simulation path separately. Do not infer that the
+current Gazebo Harmonic gz_bridge SITL setup can directly drive Pixhawk hardware.
+Do not flash, connect actuators, or operate propulsion in this task. Stage build
+artifacts only as the build skill prescribes. Report commands, artifact paths,
+revision labels, limitations, and Phase 7 gate status.
+
+END PROMPT
+
+
+PROMPT M - ASTRA MILESTONE SYNTHESIS
+Run directly by the gpt-6-astra master after each wave.
+
+BEGIN PROMPT
+
+Inspect every worker result and current git diff. Re-run focused verification
+where needed. Resolve contradictions using source and accepted evidence. Update
+docs/PHASE_GATE_STATUS.md with artifacts, verification, failures, assumptions,
+user decisions, and the exact next-wave authorization. Keep unrelated local
+changes untouched.
+
+Use lower agents for additional bounded investigation only when the question is
+well specified and has disjoint ownership. Use Astra for architecture changes,
+control-law synthesis, gate decisions, and final integration. End the milestone
+report with: completed; verified; incomplete/blocked; user inputs needed; agents
+to launch next, including their model, prompt letter, and allowed files.
+
+END PROMPT
+
+
+SUGGESTED EXECUTION ORDER
+
+1. Paste Prompt 0 into an Astra master session.
+2. Astra launches A, B, and C concurrently using fork_turns none.
+3. Astra performs D and asks only for the physical data/decisions that block a
+   gate. E can proceed while physical measurements are being collected.
+4. Once approved, run F and G in parallel. H may inspect their accepted outputs,
+   but controller implementation I waits for Astra's design approval.
+5. Run J, then K. Address findings before declaring the integration gate passed.
+6. Run L for compile-only Pixhawk portability; keep flashing and physical tests
+   as separately authorized, human-led activities.
+7. Run M after every wave and continue until the roadmap definition of done is
+   supported by evidence.

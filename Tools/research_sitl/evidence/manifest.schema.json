@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:px4:sitl-software-contract-evidence:1.0.0",
+  "title": "Software-contract evidence manifest (limited first slice)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "run", "registries", "identity", "cases", "artifacts"],
+  "properties": {
+    "schema": {"$ref": "#/$defs/schema_identity"},
+    "run": {"$ref": "#/$defs/run"},
+    "registries": {"$ref": "#/$defs/registries"},
+    "identity": {"$ref": "#/$defs/identity"},
+    "cases": {"type": "array", "items": {"$ref": "#/$defs/case"}},
+    "artifacts": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/artifact"}}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "schema_identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "version", "sha256"],
+      "properties": {
+        "name": {"const": "sitl_software_contract_evidence"},
+        "version": {"const": "1.0.0"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "run": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "profile", "result"],
+      "properties": {
+        "id": {"$ref": "#/$defs/text"},
+        "profile": {"const": "software_contract"},
+        "result": {"enum": ["pass", "fail", "incomplete", "not_run"]}
+      }
+    },
+    "registry_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {"path": {"$ref": "#/$defs/text"}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "registries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirements"],
+      "properties": {"requirements": {"$ref": "#/$defs/registry_ref"}}
+    },
+    "dirty_file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {"path": {"$ref": "#/$defs/text"}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "host_source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "dirty", "dirty_files"],
+      "properties": {
+        "path": {"$ref": "#/$defs/text"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "dirty": {"type": "boolean"},
+        "dirty_files": {"type": "array", "items": {"$ref": "#/$defs/dirty_file"}}
+      }
+    },
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_sha256", "checker_sha256", "host_sources"],
+      "properties": {
+        "schema_sha256": {"$ref": "#/$defs/digest"},
+        "checker_sha256": {"$ref": "#/$defs/digest"},
+        "host_sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/host_source"}}
+      }
+    },
+    "case": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "execution", "claimed_result"],
+      "properties": {
+        "id": {"$ref": "#/$defs/text"},
+        "execution": {"enum": ["executed", "not_run"]},
+        "claimed_result": {"enum": ["pass", "fail", "incomplete", "not_run"]}
+      }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "kind", "sha256", "byte_count", "complete"],
+      "properties": {
+        "path": {"$ref": "#/$defs/text"},
+        "kind": {"enum": ["raw_input", "raw_output", "fixture_expected"]},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "byte_count": {"type": "integer", "minimum": 1},
+        "complete": {"const": true}
+      }
+    }
+  },
+  "description": "The checker directly enforces this deliberately small schema; it does not implement a general JSON Schema engine."
+}

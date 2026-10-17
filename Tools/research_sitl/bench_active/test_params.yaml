@@ -1,0 +1,117 @@
+# Private SITL bank only; no output driver or board defaults are configured.
+module_name: bench_active_test
+parameters:
+- group: Private bench verification
+  definitions:
+    PWM_MAIN_MIN1:
+      description: {short: Synthetic MAIN MIN channel 1}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX1:
+      description: {short: Synthetic MAIN MAX channel 1}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT1:
+      description: {short: Synthetic MAIN CENT channel 1}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS1:
+      description: {short: Synthetic MAIN DIS channel 1}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL1:
+      description: {short: Synthetic MAIN FAIL channel 1}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN2:
+      description: {short: Synthetic MAIN MIN channel 2}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX2:
+      description: {short: Synthetic MAIN MAX channel 2}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT2:
+      description: {short: Synthetic MAIN CENT channel 2}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS2:
+      description: {short: Synthetic MAIN DIS channel 2}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL2:
+      description: {short: Synthetic MAIN FAIL channel 2}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN3:
+      description: {short: Synthetic MAIN MIN channel 3}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX3:
+      description: {short: Synthetic MAIN MAX channel 3}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT3:
+      description: {short: Synthetic MAIN CENT channel 3}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS3:
+      description: {short: Synthetic MAIN DIS channel 3}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL3:
+      description: {short: Synthetic MAIN FAIL channel 3}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN4:
+      description: {short: Synthetic MAIN MIN channel 4}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX4:
+      description: {short: Synthetic MAIN MAX channel 4}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT4:
+      description: {short: Synthetic MAIN CENT channel 4}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS4:
+      description: {short: Synthetic MAIN DIS channel 4}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL4:
+      description: {short: Synthetic MAIN FAIL channel 4}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC1:
+      description: {short: Private disabled AUX fixture channel 1}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC2:
+      description: {short: Private disabled AUX fixture channel 2}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC3:
+      description: {short: Private disabled AUX fixture channel 3}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC4:
+      description: {short: Private disabled AUX fixture channel 4}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC5:
+      description: {short: Private disabled AUX fixture channel 5}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC6:
+      description: {short: Private disabled AUX fixture channel 6}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC7:
+      description: {short: Private disabled AUX fixture channel 7}
+      type: int32
+      default: 0
+    PWM_AUX_FUNC8:
+      description: {short: Private disabled AUX fixture channel 8}
+      type: int32
+      default: 0

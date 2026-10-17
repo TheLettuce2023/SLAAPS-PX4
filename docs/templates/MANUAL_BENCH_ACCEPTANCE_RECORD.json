@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "scope": "servo_only_wind_tunnel",
+  "baseline": {
+    "path": "",
+    "sha256": ""
+  },
+  "requirements": {
+    "integrated_firmware": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Source-bound linked bench owner/output path and resource report",
+      "evidence": []
+    },
+    "software_regression": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Strict host, sanitizer, SITL and Pixhawk 6X evidence for that source",
+      "evidence": []
+    },
+    "output_fault_contract": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Reviewed startup, shutdown, owner failure, loss and reboot output behavior",
+      "evidence": []
+    },
+    "source_identity": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Exact QGC build/gamepad calibration and observed TELEM1 MAVLink identity",
+      "evidence": []
+    },
+    "timing": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Measured link age/queueing and scheduler gaps against approved limits",
+      "evidence": []
+    },
+    "canard_calibration": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "MAIN1-4 labels, TED arrows, reversal, angle/PWM pairs and coupled mix verification",
+      "evidence": []
+    },
+    "power": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Installed BEC topology, rail voltage and simultaneous loaded current/temperature",
+      "evidence": []
+    },
+    "load_envelope": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Finite approved maximum wind and demonstrated holding/slew capability",
+      "evidence": []
+    },
+    "independent_stop": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Independent stop circuit, residual-wind restraint and restart inhibition",
+      "evidence": []
+    },
+    "edf_isolation": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Physical EDF energy isolation and inhibited AUX4",
+      "evidence": []
+    },
+    "unpowered_output_capture": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Servos disconnected: scope captures of boot, commands and all fault cases",
+      "evidence": []
+    },
+    "physical_test_review": {
+      "status": "missing",
+      "reviewer": "",
+      "reviewed_utc": "",
+      "summary": "Named test authority review of powered no-wind and staged wind results",
+      "evidence": []
+    }
+  }
+}

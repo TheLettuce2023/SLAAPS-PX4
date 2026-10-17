@@ -1,0 +1,86 @@
+diff --git a/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp b/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp
+index d77d7c8106..4a2004f14d 100644
+--- a/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp
++++ b/Tools/research_sitl/stabilized_manual/StabilizedManualSITL.cpp
+@@ -10,6 +10,7 @@
+ #include <uORB/topics/actuator_armed.h>
+ #include <uORB/topics/vehicle_attitude.h>
+ #include <uORB/topics/vehicle_angular_velocity.h>
++#include <uORB/topics/sensor_gyro.h>
+ #include <uORB/topics/sensor_selection.h>
+ #include <uORB/topics/estimator_status.h>
+ #include <uORB/topics/estimator_status_flags.h>
+@@ -54,10 +55,12 @@ private:
+ 	bool publish(uint64_t now, bool enabled, const Report &report);
+ 	void revoke(uint64_t now, Status reason);
+ 	void event(uint64_t now, const char *action, Status reason);
+-	void log(uint64_t now, const StateSample &sample, const ManualSample &manual, const Report &report);
++	void log(uint64_t now, const StateSample &sample, const ManualSample &manual, const Report &report,
++		 const sensor_gyro_s &gyro, bool gyro_copied, unsigned gyro_updates);
+ 	uORB::Subscription _manual{ORB_ID(manual_control_setpoint)};
+ 	uORB::Subscription _attitude{ORB_ID(vehicle_attitude)};
+ 	uORB::Subscription _rates{ORB_ID(vehicle_angular_velocity)};
++	uORB::Subscription _gyro{ORB_ID(sensor_gyro)};
+ 	uORB::Subscription _selection{ORB_ID(sensor_selection)};
+ 	uORB::Subscription _estimator{ORB_ID(estimator_status)};
+ 	uORB::Subscription _flags{ORB_ID(estimator_status_flags)};
+@@ -116,7 +119,8 @@ void StabilizedManualSITL::event(uint64_t now, const char *action, Status reason
+ 		(unsigned long long)_session, action, _state.load(), static_cast<int>(reason));
+ }
+ 
+-void StabilizedManualSITL::log(uint64_t now, const StateSample &sample, const ManualSample &manual, const Report &report)
++void StabilizedManualSITL::log(uint64_t now, const StateSample &sample, const ManualSample &manual,
++			       const Report &report, const sensor_gyro_s &gyro, bool gyro_copied, unsigned gyro_updates)
+ {
+ 	fprintf(_log, "%llu,%d,%llu,%llu,%llu,%llu,%u,%u,%u,%u,%u",
+ 		(unsigned long long)now, static_cast<int>(_owner.state()),
+@@ -142,7 +146,9 @@ void StabilizedManualSITL::log(uint64_t now, const StateSample &sample, const Ma
+ 
+ 	for (float control : report.allocation.command) { fprintf(_log, ",%.9g", (double)control); }
+ 
+-	fprintf(_log, ",%.9g\n", (double)report.fixed_simulated_thrust_n);
++	fprintf(_log, ",%.9g,%llu,%llu,%u,%u,%u\n", (double)report.fixed_simulated_thrust_n,
++		(unsigned long long)gyro.timestamp, (unsigned long long)gyro.timestamp_sample,
++		gyro.device_id, (unsigned)gyro_copied, gyro_updates);
+ }
+ 
+ void StabilizedManualSITL::Run()
+@@ -168,6 +174,20 @@ void StabilizedManualSITL::Run()
+ 	estimator_status_s estimator{};
+ 	estimator_status_flags_s flags{};
+ 	actuator_armed_s armed{};
++	// sensor_gyro is queued. Drain unread samples so this private diagnostic
++	// observes the newest gyro before the rate copy and evaluation clock.
++	// Neither this read nor its CSV fields changes owner eligibility.
++	sensor_gyro_s gyro{};
++	bool gyro_copied = false;
++	unsigned gyro_updates = 0;
++
++	for (; gyro_updates < sensor_gyro_s::ORB_QUEUE_LENGTH && _gyro.updated(); ++gyro_updates) {
++		if (!_gyro.update(&gyro)) { break; }
++
++		gyro_copied = true;
++	}
++
++	if (!gyro_copied) { gyro_copied = _gyro.copy(&gyro); }
+ 	const bool have = _manual.copy(&manual_message) && _attitude.copy(&attitude)
+ 			  && _rates.copy(&rates) && _selection.copy(&selection)
+ 			  && _estimator.copy(&estimator) && _flags.copy(&flags) && _armed.copy(&armed);
+@@ -242,7 +262,7 @@ void StabilizedManualSITL::Run()
+ 
+ 	_last_cycle_time = now;
+ 	_state.store(static_cast<int>(_owner.state()));
+-	log(now, sample, manual, report);
++	log(now, sample, manual, report, gyro, gyro_copied, gyro_updates);
+ }
+ 
+ bool StabilizedManualSITL::profileValid()
+@@ -300,7 +320,7 @@ int StabilizedManualSITL::task_spawn(int argc, char *argv[])
+ 	setvbuf(instance->_events, nullptr, _IOLBF, 0);
+ 
+ 	fprintf(instance->_log,
+-		"time,state,att_time,att_sample,rate_time,rate_sample,gyro_id,accel_id,reset,sysid,compid,manual_time,manual_sample,instance,manual_valid,roll,pitch,yaw,qw,qx,qy,qz,rw,rx,ry,rz,wx,sx,mx,ax,ix,bx,ex,px,nx,wy,sy,my,ay,iy,by,ey,py,ny,wz,sz,mz,az,iz,bz,ez,pz,nz,u0,u1,u2,u3,thrust\n");
++		"time,state,att_time,att_sample,rate_time,rate_sample,gyro_id,accel_id,reset,sysid,compid,manual_time,manual_sample,instance,manual_valid,roll,pitch,yaw,qw,qx,qy,qz,rw,rx,ry,rz,wx,sx,mx,ax,ix,bx,ex,px,nx,wy,sy,my,ay,iy,by,ey,py,ny,wz,sz,mz,az,iz,bz,ez,pz,nz,u0,u1,u2,u3,thrust,gyro_time,gyro_sample,gyro_device_id,gyro_copy,gyro_drained_updates\n");
+ 	fprintf(instance->_events, "time,session,action,state,status\n");
+ 	desc.object.store(instance);
+ 	desc.task_id = task_id_is_work_queue;

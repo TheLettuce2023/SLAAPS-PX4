@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "created": "2026-09-27",
+  "status": "packaging_only_physical_acceptance_blocked",
+  "source_directory": "docs/vehicle_geometry/GAZEBO FILES",
+  "sources": {
+    "model.sdf": "7ab3a524b8f7815ca893f63611b5e41f741096bb7e3f10716d2c0f5c5afa00ed",
+    "frame_fixed.stl": "6656ab3ba5aafd07b0c273391b00065e7acf3f9d260ce46a4b960f42fee74228",
+    "fin_airfoil.stl": "b7693a3be244fb1fe439309b701cdf24e8d38f0a7ef02170c00261eeb29fac4b",
+    "edf_rotor.stl": "5760555497a1911754ca3a61659d1ff22b91f77ae34f278dc5d81b61911dba80"
+  },
+  "artifacts": {
+    "model.sdf": "a90644454080c2eba006cb29050d28a2e70fde5be33cafeae1185d7d844afa6d",
+    "model.config": "03a7127a3e71e92d32e4cc596a40d435c061634d928589b4c43d87863e04044a",
+    "meshes/frame_fixed.stl": "6656ab3ba5aafd07b0c273391b00065e7acf3f9d260ce46a4b960f42fee74228",
+    "meshes/fin_airfoil.stl": "b7693a3be244fb1fe439309b701cdf24e8d38f0a7ef02170c00261eeb29fac4b",
+    "meshes/edf_rotor.stl": "5760555497a1911754ca3a61659d1ff22b91f77ae34f278dc5d81b61911dba80",
+    "intake_report.json": "379ae2472ed8d92fda052a25db862ce4f238392a38ccd8c02354f154933f0c01",
+    "README.md": "7ffa2c6d49e3e84e0c7382498591fb8058d99a2a7bf7d30491a9b5c8737655b4",
+    "sdformat_validation.txt": "902a004198e3175c1c20b3bb2a29f9d41364256dce237a190528db802a5df245"
+  },
+  "transformations": [
+    "model name net_interceptor -> research_vehicle",
+    "six mesh URI prefixes -> model://research_vehicle/meshes/",
+    "copy three mesh files byte-for-byte into meshes/",
+    "add model.config; preserve all source physical values"
+  ],
+  "verification": {
+    "source_hashes_match_G1": true,
+    "normalized_SDF_elements_identical": true,
+    "mesh_hashes_identical": true,
+    "unresolved_mesh_uris": 0,
+    "remaining_intake_errors": [
+      "base_link: inertia violates physical triangle/second-moment constraints"
+    ],
+    "declared_mass_kg": 3.291336999999999,
+    "provisional_all_up_mass_kg": 3.041337,
+    "sdformat": {
+      "command": "gz sdf -k models/research_vehicle/model.sdf",
+      "exit_code": 255,
+      "result": "rejected_invalid_base_inertia",
+      "report": "sdformat_validation.txt"
+    }
+  },
+  "not_performed": [
+    "simulation launch",
+    "physics correction",
+    "plugin qualification",
+    "physical operations"
+  ]
+}

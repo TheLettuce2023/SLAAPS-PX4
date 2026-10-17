@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<mavlink>
+  <version>3</version>
+  <dialect>0</dialect>
+  <messages>
+    <message id="200010" name="RESEARCH_DIAGNOSTIC_REQUEST">
+      <description>Local C1E diagnostic request payload. This message is not an authentication mechanism.</description>
+      <field type="uint64_t" name="native_run_id">Native process run identity.</field>
+      <field type="uint64_t" name="owner_lifetime_id">Diagnostic owner lifetime identity.</field>
+      <field type="uint64_t" name="controller_instance_id">Controller instance identity.</field>
+      <field type="uint64_t" name="source_id">Guidance source identity.</field>
+      <field type="uint64_t" name="transport_session_id">Transport experiment session binding; not an established admission session.</field>
+      <field type="uint64_t" name="request_sequence">Request sequence within the transport session.</field>
+      <field type="uint64_t" name="expected_transition_epoch">Expected native state transition epoch.</field>
+      <field type="uint64_t" name="producer_monotonic_us">Producer creation time in microseconds.</field>
+      <field type="uint64_t" name="producer_expiry_monotonic_us">Producer expiry time in microseconds.</field>
+      <field type="uint64_t" name="clock_mapping_epoch">Zero explicitly means no qualified clock map.</field>
+      <field type="float" name="acceleration_x_frd_m_s2">Diagnostic FRD x acceleration demand in m/s^2.</field>
+      <field type="float" name="acceleration_y_frd_m_s2">Diagnostic FRD y acceleration demand in m/s^2.</field>
+      <field type="float" name="acceleration_z_frd_m_s2">Diagnostic FRD z acceleration demand in m/s^2.</field>
+      <field type="uint32_t" name="protocol_version">Protocol version 0x00010000.</field>
+      <field type="uint8_t" name="domain">Diagnostic domain discriminator; value 1.</field>
+      <field type="uint8_t" name="profile">Native diagnostic profile discriminator; value 1.</field>
+      <field type="uint8_t" name="target_system">Nonzero target system ID.</field>
+      <field type="uint8_t" name="target_component">Nonzero target component ID.</field>
+      <field type="uint8_t" name="frame">Body FRD frame; value 1.</field>
+      <field type="uint8_t" name="quantity">Inertial acceleration; value 1.</field>
+      <field type="uint8_t" name="reference_point">Center of gravity; value 1.</field>
+      <field type="uint8_t" name="flags">Reserved flags; value 0.</field>
+      <field type="uint8_t[4]" name="reserved">Four zero bytes.</field>
+    </message>
+    <message id="200011" name="RESEARCH_DIAGNOSTIC_STATUS">
+      <description>Local C1E negative-only diagnostic status payload. It does not prove source truth or execution origin.</description>
+      <field type="uint64_t" name="native_run_id">Native process run identity.</field>
+      <field type="uint64_t" name="owner_lifetime_id">Diagnostic owner lifetime identity.</field>
+      <field type="uint64_t" name="controller_instance_id">Controller instance identity.</field>
+      <field type="uint64_t" name="source_id">Guidance source identity.</field>
+      <field type="uint64_t" name="transport_session_id">Transport experiment session binding; not an established admission session.</field>
+      <field type="uint64_t" name="request_sequence">Correlated request sequence; nonzero.</field>
+      <field type="uint64_t" name="status_sequence">Status sequence; nonzero.</field>
+      <field type="uint64_t" name="transition_epoch">Native state transition epoch; nonzero.</field>
+      <field type="uint64_t" name="source_sequence">Committed native source sequence; nonzero.</field>
+      <field type="uint64_t" name="state_generation">Native physical state generation; nonzero.</field>
+      <field type="uint64_t" name="arrival_native_us">Packet arrival time in native microseconds.</field>
+      <field type="uint64_t" name="evaluation_native_us">Evaluation time in native microseconds.</field>
+      <field type="uint64_t" name="source_checked_native_us">Latest checked native source time in microseconds.</field>
+      <field type="uint64_t" name="clock_mapping_epoch">Zero explicitly means no qualified clock map.</field>
+      <field type="uint32_t" name="protocol_version">Protocol version 0x00010000.</field>
+      <field type="uint16_t" name="reason">Mapped negative reason code 1 through 8.</field>
+      <field type="uint8_t" name="domain">Diagnostic domain discriminator; value 1.</field>
+      <field type="uint8_t" name="profile">Native diagnostic profile discriminator; value 1.</field>
+      <field type="uint8_t" name="execution_origin">1 synthetic native contract; 2 native POSIX SITL.</field>
+      <field type="uint8_t" name="outcome">1 rejected; 2 closed.</field>
+      <field type="uint8_t" name="arm_state">1 disarmed; 2 armed.</field>
+      <field type="uint8_t" name="raw_nav_state">Pinned native navigation state.</field>
+      <field type="uint8_t" name="research_mode_state">Must be zero (NotSelected).</field>
+      <field type="uint8_t" name="selector_state">Must be zero (Disabled).</field>
+      <field type="uint8_t" name="estimator_valid">Must be zero.</field>
+      <field type="uint8_t" name="clock_map_valid">Must be zero.</field>
+      <field type="uint8_t" name="eligible_for_control">Must be zero.</field>
+      <field type="uint8_t" name="flags">Reserved flags; value 0.</field>
+      <field type="uint8_t" name="target_system">Nonzero target system ID.</field>
+      <field type="uint8_t" name="target_component">Nonzero target component ID.</field>
+      <field type="uint8_t[4]" name="reserved">Four zero bytes.</field>
+    </message>
+  </messages>
+</mavlink>

@@ -1,0 +1,69 @@
+cmake_minimum_required(VERSION 3.16)
+
+set(RESEARCH_ACTUATOR_COMMAND_SOURCES
+	AuthorityAnalysis.cpp
+	BenchControlOwner.cpp
+	BenchOutputLease.cpp
+	CommandLimiter.cpp
+	ControlPipeline.cpp
+	ControlRuntimeOwner.cpp
+	EffectivenessModel.cpp
+	ManualControlInput.cpp
+)
+
+if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+	px4_add_library(research_actuator_command
+		${RESEARCH_ACTUATOR_COMMAND_SOURCES}
+		Px4ControlRuntime.cpp
+		Px4BenchControlRuntime.cpp
+		Px4ManualControlInput.cpp
+	)
+	target_include_directories(research_actuator_command PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+	return()
+endif()
+
+project(research_actuator_command LANGUAGES CXX)
+
+include(CTest)
+
+add_library(research_actuator_command ${RESEARCH_ACTUATOR_COMMAND_SOURCES})
+target_compile_features(research_actuator_command PUBLIC cxx_std_17)
+target_include_directories(research_actuator_command PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(BUILD_TESTING)
+	add_executable(research_manual_snapshot_test ManualSnapshotTest.cpp)
+	target_link_libraries(research_manual_snapshot_test PRIVATE research_actuator_command)
+	add_test(NAME research_manual_snapshot_test COMMAND research_manual_snapshot_test)
+
+	add_executable(research_bench_output_test BenchOutputLeaseTest.cpp)
+	target_link_libraries(research_bench_output_test PRIVATE research_actuator_command)
+	add_test(NAME research_bench_output_test COMMAND research_bench_output_test)
+
+	add_executable(research_bench_control_owner_test BenchControlOwnerTest.cpp)
+	target_link_libraries(research_bench_control_owner_test PRIVATE research_actuator_command)
+	add_test(NAME research_bench_control_owner_test COMMAND research_bench_control_owner_test)
+
+	add_executable(research_actuator_command_test CommandLimiterTest.cpp)
+	target_link_libraries(research_actuator_command_test PRIVATE research_actuator_command)
+	add_test(NAME research_actuator_command_test COMMAND research_actuator_command_test)
+
+	add_executable(research_effectiveness_model_test EffectivenessModelTest.cpp)
+	target_link_libraries(research_effectiveness_model_test PRIVATE research_actuator_command)
+	add_test(NAME research_effectiveness_model_test COMMAND research_effectiveness_model_test)
+
+	add_executable(research_authority_analysis_test AuthorityAnalysisTest.cpp)
+	target_link_libraries(research_authority_analysis_test PRIVATE research_actuator_command)
+	add_test(NAME research_authority_analysis_test COMMAND research_authority_analysis_test)
+
+	add_executable(research_control_pipeline_test ControlPipelineTest.cpp)
+	target_link_libraries(research_control_pipeline_test PRIVATE research_actuator_command)
+	add_test(NAME research_control_pipeline_test COMMAND research_control_pipeline_test)
+
+	add_executable(research_control_runtime_owner_test ControlRuntimeOwnerTest.cpp)
+	target_link_libraries(research_control_runtime_owner_test PRIVATE research_actuator_command)
+	add_test(NAME research_control_runtime_owner_test COMMAND research_control_runtime_owner_test)
+
+	add_executable(research_manual_control_input_test ManualControlInputTest.cpp)
+	target_link_libraries(research_manual_control_input_test PRIVATE research_actuator_command)
+	add_test(NAME research_manual_control_input_test COMMAND research_manual_control_input_test)
+endif()

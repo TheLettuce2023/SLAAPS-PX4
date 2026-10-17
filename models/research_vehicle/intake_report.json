@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "source": "models/research_vehicle/model.sdf",
+  "model": "research_vehicle",
+  "errors": [
+    "base_link: inertia violates physical triangle/second-moment constraints"
+  ],
+  "warnings": [
+    "Structural checks only: geometry, units, aerodynamic/actuator coefficients and sensor behavior require provenance and independent validation."
+  ],
+  "links": [
+    {
+      "name": "base_link",
+      "mass": 3.041337
+    },
+    {
+      "name": "elevon_top",
+      "mass": 0.05
+    },
+    {
+      "name": "elevon_bottom",
+      "mass": 0.05
+    },
+    {
+      "name": "rudder_left",
+      "mass": 0.05
+    },
+    {
+      "name": "rudder_right",
+      "mass": 0.05
+    },
+    {
+      "name": "prop",
+      "mass": 0.05
+    }
+  ],
+  "total_declared_mass": 3.291336999999999,
+  "mesh_references": [
+    {
+      "uri": "model://research_vehicle/meshes/frame_fixed.stl",
+      "resolved": "models/research_vehicle/meshes/frame_fixed.stl",
+      "exists": true
+    },
+    {
+      "uri": "model://research_vehicle/meshes/fin_airfoil.stl",
+      "resolved": "models/research_vehicle/meshes/fin_airfoil.stl",
+      "exists": true
+    },
+    {
+      "uri": "model://research_vehicle/meshes/fin_airfoil.stl",
+      "resolved": "models/research_vehicle/meshes/fin_airfoil.stl",
+      "exists": true
+    },
+    {
+      "uri": "model://research_vehicle/meshes/fin_airfoil.stl",
+      "resolved": "models/research_vehicle/meshes/fin_airfoil.stl",
+      "exists": true
+    },
+    {
+      "uri": "model://research_vehicle/meshes/fin_airfoil.stl",
+      "resolved": "models/research_vehicle/meshes/fin_airfoil.stl",
+      "exists": true
+    },
+    {
+      "uri": "model://research_vehicle/meshes/edf_rotor.stl",
+      "resolved": "models/research_vehicle/meshes/edf_rotor.stl",
+      "exists": true
+    }
+  ],
+  "plugins": [
+    {
+      "filename": "gz-sim-lift-drag-system",
+      "name": "gz::sim::systems::LiftDrag"
+    },
+    {
+      "filename": "gz-sim-lift-drag-system",
+      "name": "gz::sim::systems::LiftDrag"
+    },
+    {
+      "filename": "gz-sim-lift-drag-system",
+      "name": "gz::sim::systems::LiftDrag"
+    },
+    {
+      "filename": "gz-sim-lift-drag-system",
+      "name": "gz::sim::systems::LiftDrag"
+    },
+    {
+      "filename": "gz-sim-multicopter-motor-model-system",
+      "name": "gz::sim::systems::MulticopterMotorModel"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "imu_sensor",
+      "type": "imu"
+    }
+  ],
+  "readiness": "blocked",
+  "sha256": "a90644454080c2eba006cb29050d28a2e70fde5be33cafeae1185d7d844afa6d"
+}

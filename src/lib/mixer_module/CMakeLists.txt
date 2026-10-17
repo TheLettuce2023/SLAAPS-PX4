@@ -64,6 +64,9 @@ set_property(GLOBAL APPEND PROPERTY PX4_MODULE_CONFIG_FILES ${CMAKE_CURRENT_SOUR
 set_property(GLOBAL APPEND PROPERTY PX4_MODULE_CONFIG_FILES ${CMAKE_CURRENT_SOURCE_DIR}/params.yaml)
 
 add_dependencies(mixer_module output_functions_header)
+if(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
+	target_link_libraries(mixer_module PRIVATE research_actuator_command)
+endif()
 target_compile_options(mixer_module PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
 target_include_directories(mixer_module PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 

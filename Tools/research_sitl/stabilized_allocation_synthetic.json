@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "profile_kind": "synthetic_fixture",
+  "provenance": {
+    "cad": {
+      "reference": "Tools/research_sitl/stabilized_manual/world.sdf.in",
+      "sha256": "d8872fa8cbc7a687079f0c69c6f19f33e764bd6d2b6fa57028f7549cf673f8aa"
+    },
+    "canard_moments": {
+      "reference": "Tools/research_sitl/stabilized_manual/FixtureConstants.hpp",
+      "sha256": "19716d2146d1545b3273db122affc22ff2f4304ee848e2ae98731717e55c2396"
+    },
+    "servo_calibration": {
+      "reference": "Tools/research_sitl/stabilized_manual/FixtureConstants.hpp",
+      "sha256": "19716d2146d1545b3273db122affc22ff2f4304ee848e2ae98731717e55c2396"
+    },
+    "edf_condition": {
+      "reference": "Tools/research_sitl/stabilized_manual/FixtureConstants.hpp",
+      "sha256": "19716d2146d1545b3273db122affc22ff2f4304ee848e2ae98731717e55c2396"
+    }
+  },
+  "condition": {
+    "body_frame": "FRD",
+    "airflow_mps": 20.0,
+    "alpha_rad": 0.0,
+    "beta_rad": 0.0,
+    "edf_thrust_n": 10.0,
+    "canard_wash_mps": [0.0, 0.0, 0.0, 0.0]
+  },
+  "rigid_body": {
+    "mass_kg": 1.0,
+    "cg_m_frd": [0.0, 0.0, 0.0],
+    "inertia_kg_m2_frd": [
+      [0.03, 0.0, 0.0],
+      [0.0, 0.08, 0.0],
+      [0.0, 0.0, 0.08]
+    ]
+  },
+  "moment_scale_nm": [0.4, 0.4, 0.4],
+  "canards": [
+    {
+      "id": "synthetic_0",
+      "trim_command": 0.0,
+      "minimum_command": -1.0,
+      "maximum_command": 1.0,
+      "positive_slew_per_s": 5.0,
+      "negative_slew_per_s": 5.0,
+      "deflection_rad_per_normalized_command_at_trim": 0.22689280275926285,
+      "deflection_slope_uncertainty_rad_per_command": 0.0,
+      "moment_derivative_nm_per_rad_frd": [0.44073676548524865, 0.44073676548524865, 0.44073676548524865],
+      "moment_derivative_uncertainty_nm_per_rad": [0.0, 0.0, 0.0],
+      "loaded_lag_time_constant_s": 0.05,
+      "loaded_command_latency_s": 0.0
+    },
+    {
+      "id": "synthetic_1",
+      "trim_command": 0.0,
+      "minimum_command": -1.0,
+      "maximum_command": 1.0,
+      "positive_slew_per_s": 5.0,
+      "negative_slew_per_s": 5.0,
+      "deflection_rad_per_normalized_command_at_trim": 0.22689280275926285,
+      "deflection_slope_uncertainty_rad_per_command": 0.0,
+      "moment_derivative_nm_per_rad_frd": [-0.44073676548524865, 0.44073676548524865, -0.44073676548524865],
+      "moment_derivative_uncertainty_nm_per_rad": [0.0, 0.0, 0.0],
+      "loaded_lag_time_constant_s": 0.05,
+      "loaded_command_latency_s": 0.0
+    },
+    {
+      "id": "synthetic_2",
+      "trim_command": 0.0,
+      "minimum_command": -1.0,
+      "maximum_command": 1.0,
+      "positive_slew_per_s": 5.0,
+      "negative_slew_per_s": 5.0,
+      "deflection_rad_per_normalized_command_at_trim": 0.22689280275926285,
+      "deflection_slope_uncertainty_rad_per_command": 0.0,
+      "moment_derivative_nm_per_rad_frd": [0.44073676548524865, -0.44073676548524865, -0.44073676548524865],
+      "moment_derivative_uncertainty_nm_per_rad": [0.0, 0.0, 0.0],
+      "loaded_lag_time_constant_s": 0.05,
+      "loaded_command_latency_s": 0.0
+    },
+    {
+      "id": "synthetic_3",
+      "trim_command": 0.0,
+      "minimum_command": -1.0,
+      "maximum_command": 1.0,
+      "positive_slew_per_s": 5.0,
+      "negative_slew_per_s": 5.0,
+      "deflection_rad_per_normalized_command_at_trim": 0.22689280275926285,
+      "deflection_slope_uncertainty_rad_per_command": 0.0,
+      "moment_derivative_nm_per_rad_frd": [-0.44073676548524865, -0.44073676548524865, 0.44073676548524865],
+      "moment_derivative_uncertainty_nm_per_rad": [0.0, 0.0, 0.0],
+      "loaded_lag_time_constant_s": 0.05,
+      "loaded_command_latency_s": 0.0
+    }
+  ]
+}

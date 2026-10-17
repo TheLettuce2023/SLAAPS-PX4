@@ -1,0 +1,399 @@
+CUSTOM RESEARCH VEHICLE SITL DEVELOPMENT ROADMAP
+Prepared by Codex | 2026-09-16
+Status: Planning artifact; no vehicle firmware or model changed by this task.
+
+1. OBJECTIVE AND CONFIRMED SCOPE
+
+Develop a Gazebo/PX4 simulator for a research vehicle with canard controls,
+one fixed-axis EDF, no thrust vectoring, and no main fixed wing. A Raspberry
+Pi 4B sends acceleration requests; PX4 executes the control software. Rebuild
+the tested flight-software source for Pixhawk 6X and validate progressively
+against real measurements.
+
+The user confirmed purely research use and no intended interception. That
+clarification supersedes the older interceptor wording in the architecture
+notes for purposes of this roadmap.
+
+Success means repeatable acceleration tracking within a physically supported
+envelope, with traceable model uncertainty, quantitative test results, and
+hardware evidence. It does not mean merely opening Gazebo, displaying plausible
+QGC speeds, compiling firmware, or matching an unvalidated simulation.
+
+2. CURRENT BASELINE AND ARCHITECTURE
+
+Inspected project context:
+- Branch: slaaps-sitl; previously inspected PX4 revision e880f1cd79.
+- Project notes: Ubuntu 24.04 under WSL2, Gazebo Harmonic/Sim 8.
+- Baseline: gz_rc_cessna, airframe autostart 4003.
+- Launcher: scripts/sitl/run_fixed_wing_sitl.sh.
+- Setup and architecture: docs/SITL_WSL_SETUP.md, docs/SITL_ARCHITECTURE.md.
+- Models: Tools/simulation/gz is a separate Git submodule.
+- QGroundControl runs on Windows and receives PX4 MAVLink telemetry.
+- Preserve existing local changes and the stock Cessna regression baseline.
+
+The notes report a verified baseline; this planning session has not repeated
+runtime tests. Windows-side build directory contents do not prove whether a
+binary exists, because the launcher uses native-WSL build/cache bind mounts.
+
+Recommended responsibilities:
+Pi research sequencer -> validated acceleration interface -> PX4 control and
+allocation -> simulated actuators -> Gazebo physics/sensors -> PX4 estimator.
+QGC provides operator displays and interaction; an independent evaluator uses
+simulator truth and recorded estimates to score the test.
+
+Keep stabilization, actuator ownership, and command-loss response on PX4.
+A missing Gazebo GUI does not imply the physics server stopped. Distinguish
+simulator truth, synthetic measurements, estimator outputs, and QGC displays.
+Groundspeed, physical airspeed, and synthetic airspeed are different quantities.
+
+Reuse flight-software SOURCE between SITL and hardware. A Linux SITL binary
+cannot be flashed onto Pixhawk. Gazebo physics/models remain on the host;
+the companion application runs separately on the Pi.
+
+3. DEVELOPMENT PRINCIPLES
+
+- Establish physical feasibility before tuning. Canards require adequate local
+  airflow. Do not assume EDF flow reaches them without geometric evidence.
+- One fixed-axis thrust source and aerodynamic surfaces do not imply arbitrary
+  instantaneous force and moment authority in every direction.
+- Define acceleration semantics before implementing transport or control:
+  inertial acceleration and accelerometer specific force differ by gravity.
+- Use estimated/measured signals available on real hardware in the controller.
+  Reserve simulator ground truth for analysis, diagnostics, and test scoring.
+- Separate software verification from physical validation. Maintain independent
+  validation data and explicitly label provisional model coefficients.
+- Choose the simplest controller justified by the plant. Reuse PX4 components
+  after auditing their assumptions; the airframe description alone does not
+  prove every existing controller must be replaced.
+- Establish measurable acceptance limits before scoring tests. Unknown limits,
+  coefficients, and measurements remain explicit unknowns.
+
+4. PHASED WORK AND EXIT GATES
+
+PHASE 0 -- REQUIREMENTS, DATA, AND FEASIBILITY
+Owner: systems agent + human vehicle engineer.
+Dependencies: user design information.
+
+Deliver:
+- Canard count, independent actuator count, placement, orientation, geometry,
+  linkage/sign conventions, and any passive stabilizing surfaces.
+- Mass, CG, inertia, EDF and servo specifications, sensor layout, and available
+  CAD, measurements, CFD, or test data with provenance and uncertainty.
+- Intended speed/attitude envelope and launch/recovery concept.
+- Assessment of trim, roll/pitch/yaw authority, coupling, and low-speed limits.
+  No main wing does not mean no body/canard aerodynamic forces.
+- Requirements for acceleration tracking, experimental duration, state validity,
+  command latency, operating limits, and loss-of-authority response.
+- An assumptions/unknowns register with a human owner for missing physical data.
+
+Gate: a feasible initial envelope and measurable requirements, or a documented
+physical-design blocker. Agents may organize/analyze supplied data; they cannot
+invent the measurements needed to validate flight.
+
+PHASE 1 -- REPRODUCIBLE STOCK BASELINE AND LOGGING
+Owner: infrastructure agent.
+Dependencies: existing project environment; can overlap Phase 0.
+
+Deliver:
+- Exact PX4/submodule versions, local diffs, dependencies, parameters, and
+  source/build/cache/log locations.
+- Stock Cessna smoke tests for GUI/headless operation, telemetry freshness,
+  bridge status, normal shutdown, and repeatability.
+- Run manifests tying results to executable, model, parameters, scenario,
+  random seed where supported, and logs.
+- Signal inventory identifying units, frame, time base, publisher, and consumer.
+- Offline report checks for missing/stale/non-finite data and time discontinuity.
+- Explicit distinction between sensor-derived and synthetic airspeed.
+
+Gate: another operator reproduces the baseline; malformed or incomplete
+evidence cannot silently become a pass. Do not assume exact determinism across
+machines or simulator versions.
+
+PHASE 2 -- ACCELERATION INTERFACE CONTRACT AND SOURCE TRACE
+Owner: interface agent.
+Dependencies: Phase 0 requirements; can overlap plant work.
+
+Deliver:
+- Decide all-three-axis acceleration versus a subset plus a speed/thrust
+  objective. Define any additional heading/attitude objectives or the policy
+  used to resolve remaining degrees of freedom.
+- Specify units, frame, reference point, gravity convention, clock, validity
+  interval, command sequence, ownership, and status feedback.
+- Document NED/ENU and FRD/FLU conversions where applicable. Distinguish
+  acceleration at the CG from measurement at an offset IMU.
+- Define unused fields, non-finite values, stale/replayed commands, bounds,
+  mode entry/exit, reconnect, and rejection/fallback behavior.
+- Choose one initial transport: MAVLink or ROS 2/XRCE-DDS are candidates.
+  Record the decision and compatible message/dependency versions.
+- Trace reception through actual PX4 consumers and commander mode flags.
+  Acceptance of a message does not establish acceleration-tracking support.
+- Set command rate and deadline using control/link budgets. Treat offboard
+  heartbeat/liveness and freshness of a particular command as separate checks.
+
+Verified seams in this checkout:
+  msg/versioned/TrajectorySetpoint.msg
+    Local NED acceleration in m/s^2; NaN denotes uncontrolled states;
+    jerk is currently for logging only.
+  msg/OffboardControlMode.msg
+  src/modules/mavlink/mavlink_receiver.cpp
+  src/modules/uxrce_dds_client/dds_topics.yaml
+
+The receiver accepts acceleration fields and DDS exposes trajectory_setpoint.
+Do not assume the stock fixed-wing consumer implements the needed full-vector
+tracking. Reuse a message only if its established semantics fit; a custom
+message requires a documented need and matching integration tests.
+
+Gate: approved interface document, complete producer-to-consumer trace, and
+tests for frame/sign/units/time handling and stale requests.
+
+PHASE 3 -- CUSTOM GAZEBO PLANT AND SENSOR MODEL
+Owner: model agent + human dynamics reviewer.
+Dependencies: Phase 0 physical inputs and Phase 1 evidence conventions.
+
+Deliver:
+- A separately named research model and simulation airframe, leaving Cessna
+  runnable. Treat advanced_plane as a plugin/reference example, not as the
+  validated aerodynamics of this vehicle.
+- Rigid-body mass/inertia, body/canard aerodynamics, EDF thrust/lag, and servo
+  limits/rates/dynamics supported by supplied data and uncertainty bounds.
+- Local-flow, actuator-sign, force/moment, equilibrium, and timestep checks
+  using an independent reference calculation where feasible.
+- Sensors representative of planned hardware: location/orientation, sample
+  rate, noise/bias, latency, and dropouts. Decide whether airspeed sensing is
+  needed; the stock model's synthetic airspeed does not settle this question.
+- A plugin decision: reuse existing plugins where their assumptions fit;
+  implement missing physics only with a documented requirement.
+- A validation matrix separating construction/calibration data from independent
+  evidence used to assess the model.
+
+Relevant locations:
+  Tools/simulation/gz/models/advanced_plane/model.sdf
+  Tools/simulation/gz/models/rc_cessna/model.sdf
+  ROMFS/px4fmu_common/init.d-posix/airframes/
+  src/modules/simulation/gz_bridge/
+  src/modules/simulation/gz_plugins/
+
+Decide ownership of custom model assets before edits: a project model repo,
+forked submodule, or explicit external resource path. Record model commits
+and intentionally update the parent submodule pointer when applicable.
+Changing a mesh or hiding a wing visual does not change the force model.
+
+Gate: open-loop plant tests pass, parameter provenance is recorded, and model
+limitations are visible. Controller tuning cannot substitute for correcting
+wrong signs or unsupported physical assumptions.
+
+PHASE 4 -- PX4 RESEARCH CONTROL AND ALLOCATION
+Owner: control agent + independent control-engineering reviewer.
+Dependencies: Phases 0, 2, and 3 gates.
+
+Deliver:
+- A design review comparing reuse of existing PX4 stabilization components
+  against a dedicated module, based on plant and envelope assumptions.
+- Staged development: validate inner-loop stabilization in simulation, then
+  feasible acceleration tracking and envelope/command limiting.
+- A documented mapping from acceleration objectives through stabilization
+  and allocation to the independently actuated canards and single EDF.
+  Choose the actual control law from plant evidence, not this roadmap.
+- Explicit handling of variable authority, coupling, saturation, servo slew,
+  integrator windup, invalid estimates, mode transitions, and command loss.
+- Allocation tests including per-axis signs, ill-conditioned effectiveness,
+  normalized command interpretation, and unavailable control directions.
+- Tested fallback behavior suited to this vehicle. Do not presume stock
+  hover, loiter, return, or landing modes are physically feasible.
+- A dedicated opt-in airframe/module selection with one owner/publisher per
+  command stage. Prevent conflicting stock controllers from publishing outputs.
+- Unit tests, estimator-in-the-loop SITL tests, and authority/limiting telemetry.
+
+Candidate seams to assess:
+  src/modules/fw_att_control/
+  src/modules/fw_rate_control/
+  src/modules/fw_lateral_longitudinal_control/
+  src/modules/control_allocator/VehicleActuatorEffectiveness/
+  src/lib/control_allocation/
+  src/modules/commander/ and startup/build configuration
+
+This checkout's vehicle_torque_setpoint and vehicle_thrust_setpoint use
+NORMALIZED body-axis values. Physical newtons/newton-metres require an explicit
+scaling contract and compatible allocation semantics; do not mix these units.
+
+Gate: stable tracking within the approved envelope; infeasible commands limited
+and reported predictably; transitions and loss-of-authority tests reviewed.
+
+PHASE 5 -- COMPANION IMPLEMENTATION AND PI-IN-THE-LOOP
+Owner: companion agent.
+Dependencies: Phase 2 contract; implementation can overlap Phases 3 and 4.
+
+Deliver:
+- Deterministic desktop research command generator, then the same application
+  on Pi 4B, with configuration and dependency versions recorded.
+- Connection/state handling, command freshness, acceptance/status logging,
+  and reproducible command sequences.
+- Tests for delay, jitter, loss, restart, stale commands with a live heartbeat,
+  competing sources, and reconnection.
+- Measured Pi CPU/scheduling and link behavior at the chosen command rate.
+
+Gate: the physical Pi can drive the integrated host simulator through the
+approved interface and all communication/fallback tests pass.
+Pi-in-the-loop SITL is not Pixhawk-in-the-loop validation.
+
+PHASE 6 -- QUANTITATIVE ROBUSTNESS AND REGRESSION
+Owner: test/evaluation agent + independent reviewer.
+Dependencies: nominal integrated model, controller, and interface.
+
+Deliver:
+- Automated scenarios with bounded runtime and cleanup of owned processes only.
+- Parameter sweeps/Monte Carlo tests over justified uncertainty in mass/CG,
+  inertia, aerodynamics, wind, sensors, actuators, and communication.
+- Per-axis tracking RMS/peak error, settling/overshoot, saturation duration,
+  command age, estimator validity, runtime, and deadline-miss reporting.
+- Nominal, boundary, invalid-command, link-loss, and sensor/actuator-fault cases.
+- Regression comparison that distinguishes software changes from model changes.
+- Test checker verification with deliberately malformed/incomplete logs.
+
+Gate: predeclared numerical thresholds pass across the required cases.
+Tolerances are set by requirements and evidence, not relaxed after seeing
+failures. Limit conclusions to the tested envelope and uncertainty ranges.
+
+PHASE 7 -- PIXHAWK BUILD AND HARDWARE SIMULATION ASSESSMENT
+Owner: platform/integration agent.
+Dependencies: full qualification follows Phase 6; begin compile checks early.
+
+Deliver:
+- Source inventory separating portable flight logic, Gazebo plugins, host
+  tooling, and companion software.
+- Compile-only Pixhawk 6X builds of the same control source and explicit module
+  configuration. Verify actual board: 6X and 6X-RT are different targets.
+- Memory, CPU, scheduling, driver/I/O, and parameter/startup compatibility checks.
+- Versioned firmware/configuration artifacts and a recoverable known-good build.
+- A separately verified hardware-simulation path or a documented compatibility
+  gap. The official HITL guide describes specific Gazebo Classic/jMAVSim paths;
+  current Harmonic gz_bridge SITL does not prove direct Pixhawk compatibility.
+
+The documented Pixhawk 6X target is px4_fmu-v6x_default. Hardware builds should
+follow the repository's build-px4 skill when assigned. Building is distinct
+from authorization to flash or operate hardware.
+
+Gate: board compilation and resource checks pass; required hardware simulation
+coverage and any untested interfaces are explicit.
+
+PHASE 8 -- BENCH AND RESEARCH FLIGHT VALIDATION
+Owner: human test lead, assisted by platform and analysis agents.
+Dependencies: reviewed Phase 6/7 evidence and a defined test procedure.
+
+Deliver:
+- Bench checks of sensors, time bases, servo mapping/direction, mode behavior,
+  and companion disconnect/restart, with propulsion isolated for these checks.
+- Hardware-in-the-loop tests using the verified path, where available.
+- Supervised ground/flight testing through a limited envelope, with explicit
+  entry, abort, recovery, and success criteria appropriate to the vehicle.
+- Independent measured-data comparisons, updated model uncertainty, and
+  rerun regressions after physics or control changes.
+
+Gate: real experimental evidence supports the declared research claims.
+Simulation fidelity and hardware control performance are separately evaluated.
+
+5. CODEX ASSIGNMENTS AND DEPENDENCIES
+
+First assignments (can proceed with disjoint output files):
+A -- Requirements/feasibility: Phase 0.
+     Output: docs/RESEARCH_VEHICLE_REQUIREMENTS.md and missing-data register.
+B -- Interface/source audit: Phase 2.
+     Output: docs/ACCELERATION_INTERFACE.md, transport decision, consumer trace.
+C -- Baseline/evidence: Phase 1.
+     Output: reproducibility report, run-manifest schema, smoke-test procedure.
+
+Follow-on assignments:
+D -- Plant: Phase 3 after A and model repository ownership decision.
+     Own custom model/plugin files and open-loop tests.
+E -- Controller/allocation: Phase 4 after A, B, and D gates.
+     Own assigned controller/allocation code and focused tests.
+F -- Companion: Phase 5 after B; can overlap D/E.
+     Own companion app and communication tests in an agreed repo/path.
+G -- Integration/platform: airframe/startup/build configuration and Phase 7.
+     Begin compile checks early; integrate only reviewed interfaces.
+H -- Evaluation: Phase 6 after integrated nominal behavior.
+     Own scenarios, scorer, evidence archive, and quantitative reports.
+I -- Independent review: each implementation package and milestone.
+     Review correctness, assumptions, false-pass conditions, and residual gaps.
+J -- Human-led experimental validation: Phase 8.
+     Agents support data analysis and documentation; physical tests need people.
+
+With three worker slots, start A/B/C with an integration lead. Then assign
+D/F/test-support work in parallel. E depends on the plant and interface gates.
+Keep shared airframe and build edits under G's ownership to prevent conflicts.
+
+Template for each agent assignment:
+  Objective: one bounded deliverable and its phase.
+  Inputs: accepted requirements, exact source/model versions, supplied data.
+  Allowed files: explicit paths; identify separate submodule ownership.
+  Dependencies: named approved artifacts and unresolved assumptions.
+  Acceptance: numeric limits or artifact checks specified before implementation.
+  Verification: commands, required logs, and expected failure cases.
+  Handoff: changed files, results, assumptions, limitations, and follow-up work.
+  Scope: build/flash/physical-operation permissions appropriate to that task.
+
+Ready-to-use first prompt:
+  Complete assignment A in docs/CUSTOM_VEHICLE_SITL_ROADMAP.txt. Create the
+  requirements and missing-data register from available evidence. Label
+  unknown physical values and acceptance limits explicitly. Identify feasibility
+  questions for the human vehicle engineer. Do not implement a controller or
+  invent coefficients. Read applicable repository instructions and report the
+  exact documents created plus the next required inputs.
+
+Use the same structure for B and C, with their specified outputs. No agents
+have been launched by creation of this roadmap.
+
+6. WORKFLOW, ACCEPTANCE, AND IMMEDIATE NEXT STEPS
+
+Use separate branches/worktrees for parallel implementation. The existing WSL
+launcher shares fixed default mount/cache paths, so establish unique per-worktree
+build/cache/mount configuration before concurrent simulator builds.
+Preserve existing uncommitted changes. Read nested AGENTS.md and only matching
+.github/instructions before edits. Use commit/pr skills for requested commits
+and PRs; format changed C/C++ before committing.
+
+Critical path:
+requirements/feasibility -> plant + interface -> control -> integrated robustness
+-> qualified board build/bench -> measured research flight validation.
+Baseline/logging infrastructure and early board compile checks overlap that path.
+
+Immediate inputs to collect:
+- Canard geometry, count, degrees of actuation, and passive surface geometry.
+- Mass/CG/inertia and what is measured versus CAD-estimated.
+- EDF, ESC, servo, power-system, and sensor specifications/data.
+- Intended speed envelope, launch/recovery approach, and available test evidence.
+- Meaning/frame of requested acceleration, heading/speed objectives, preferred
+  companion language/OS, and planned physical connection.
+
+Start A/B/C now as bounded planning/inventory tasks. Approve their interfaces
+and numerical criteria before assigning plant/controller implementation.
+Track completion by accepted evidence, not code volume. Calendar estimates
+should follow the data inventory; hardware measurement availability is a
+separate dependency from agent coding capacity.
+
+Definition of done:
+Versioned custom physics with documented validation limits, tested Pi command
+interface, portable PX4 control source, quantitative simulation regression,
+verified Pixhawk firmware/configuration, and real bench/flight evidence for
+the declared operating envelope.
+
+7. SOURCES
+
+Local: docs/SITL_WSL_SETUP.md; docs/SITL_ARCHITECTURE.md;
+scripts/sitl/run_fixed_wing_sitl.sh; message and module paths listed above.
+The checked-out source is authoritative for this revision's interfaces.
+
+Official references consulted 2026-09-16:
+PX4 simulation overview:
+https://docs.px4.io/main/en/simulation/
+PX4 HITL support and simulator paths:
+https://docs.px4.io/main/en/simulation/hitl
+Pixhawk 6X hardware/build target:
+https://docs.px4.io/main/en/flight_controller/pixhawk6x
+PX4 Offboard interfaces:
+https://docs.px4.io/main/en/flight_modes/offboard
+PX4 ROS 2 integration/message compatibility:
+https://docs.px4.io/main/en/ros2/user_guide
+
+Online main documentation evolves. Pin implementation decisions and results
+to the actual checkout, model revisions, and installed tools.

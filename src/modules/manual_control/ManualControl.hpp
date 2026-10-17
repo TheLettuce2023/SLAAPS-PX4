@@ -77,8 +77,9 @@ public:
 	int print_status() override;
 
 protected:
-	// protected for testing
-	void processInput(hrt_abstime now);
+	// Tests may supply a fixed time. The live clock, when supplied, is read
+	// only after capturing all candidate inputs (also permits ordering tests).
+	void processInput(hrt_abstime now, hrt_abstime(*clock)() = nullptr);
 	static int8_t navStateFromParam(int32_t param_value);
 
 private:

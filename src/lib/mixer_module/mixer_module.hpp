@@ -47,6 +47,9 @@
 #include "functions/FunctionMotors.hpp"
 #include "functions/FunctionParachute.hpp"
 #include "functions/FunctionServos.hpp"
+#if defined(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
+#include "functions/FunctionBenchServos.hpp"
+#endif
 
 #include <board_config.h>
 #include <drivers/drv_pwm_output.h>

@@ -78,7 +78,7 @@ void ManualControl::Run()
 	perf_begin(_loop_perf);
 	perf_count(_loop_interval_perf);
 
-	processInput(hrt_absolute_time());
+	processInput(0, hrt_absolute_time);
 
 	// reschedule to detect timeouts
 	ScheduleDelayed(200_ms);
@@ -86,7 +86,7 @@ void ManualControl::Run()
 	perf_end(_loop_perf);
 }
 
-void ManualControl::processInput(hrt_abstime now)
+void ManualControl::processInput(hrt_abstime now, hrt_abstime(*clock)())
 {
 	if (_vehicle_status_sub.updated()) {
 		vehicle_status_s vehicle_status;
@@ -108,13 +108,22 @@ void ManualControl::processInput(hrt_abstime now)
 		updateParams();
 	}
 
+	// Snapshot all candidates before reading the live evaluation/publication
+	// clock. Otherwise a concurrent input can have timestamp_sample > now.
+	manual_control_setpoint_s inputs[MAX_MANUAL_INPUT_COUNT] {};
+	bool updated[MAX_MANUAL_INPUT_COUNT] {};
+
+	for (int i = 0; i < MAX_MANUAL_INPUT_COUNT; i++) {
+		updated[i] = _manual_control_input_subs[i].update(&inputs[i]);
+	}
+
+	if (clock) { now = clock(); }
+
 	_selector.updateValidityOfChosenInput(now);
 
 	for (int i = 0; i < MAX_MANUAL_INPUT_COUNT; i++) {
-		manual_control_setpoint_s manual_control_input;
-
-		if (_manual_control_input_subs[i].update(&manual_control_input)) {
-			_selector.updateWithNewInputSample(now, manual_control_input, i);
+		if (updated[i]) {
+			_selector.updateWithNewInputSample(now, inputs[i], i);
 		}
 	}
 

@@ -43,6 +43,7 @@ set(msg_files
 	ActuatorOutputs.msg
 	ActuatorServosTrim.msg
 	ActuatorTest.msg
+	BenchServoCommand.msg
 	AdcReport.msg
 	Airspeed.msg
 	AirspeedWind.msg

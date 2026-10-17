@@ -1,0 +1,6 @@
+Synthetic fixture demonstration demand only.
+
+At the fixture condition (body FRD, prescribed 20 m/s airflow, fixed simulated
+10 N EDF thrust), request a net body-moment box of +/-0.04 N m on each axis.
+The corresponding fixture moment scale is 0.4 N m per normalized moment axis.
+This is neither a SLAAPS vehicle requirement nor a physical acceptance limit.

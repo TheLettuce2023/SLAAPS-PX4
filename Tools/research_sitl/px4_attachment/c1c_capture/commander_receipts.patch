@@ -1,0 +1,159 @@
+diff --git a/src/modules/commander/Commander.cpp b/src/modules/commander/Commander.cpp
+--- a/src/modules/commander/Commander.cpp
++++ b/src/modules/commander/Commander.cpp
+@@ -735,7 +735,13 @@
+ 	}
+ 
+ 	_vehicle_status.armed_time = hrt_absolute_time();
+-	_vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_ARMED;
++#if defined(RESEARCH_C1C_CAPTURE)
++	const research_sitl::state_capture::State c1c_arm_before{_vehicle_status.arming_state, _vehicle_status.nav_state};
++#endif
++	_vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_ARMED;
++#if defined(RESEARCH_C1C_CAPTURE)
++	_state_receipt_capture.transition(c1c_arm_before, _vehicle_status.arming_state, _vehicle_status.nav_state);
++#endif
+ 	_vehicle_status.latest_arming_reason = (uint8_t)calling_reason;
+ 
+ 	mavlink_log_info(&_mavlink_log_pub, "Armed by %s\t", arm_disarm_reason_str(calling_reason));
+@@ -775,8 +781,14 @@
+ 		}
+ 	}
+ 
+-	_vehicle_status.armed_time = 0;
+-	_vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
++	_vehicle_status.armed_time = 0;
++#if defined(RESEARCH_C1C_CAPTURE)
++	const research_sitl::state_capture::State c1c_disarm_before{_vehicle_status.arming_state, _vehicle_status.nav_state};
++#endif
++	_vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
++#if defined(RESEARCH_C1C_CAPTURE)
++	_state_receipt_capture.transition(c1c_disarm_before, _vehicle_status.arming_state, _vehicle_status.nav_state);
++#endif
+ 	_vehicle_status.latest_disarming_reason = (uint8_t)calling_reason;
+ 	_vehicle_status.takeoff_time = 0;
+ 
+@@ -814,7 +826,10 @@
+ 	_vehicle_status.component_id = 1;
+ 	_vehicle_status.system_type = 0;
+ 	_vehicle_status.vehicle_type = vehicle_status_s::VEHICLE_TYPE_UNSPECIFIED;
+-	_vehicle_status.nav_state = _user_mode_intention.get();
++	_vehicle_status.nav_state = _user_mode_intention.get();
++#if defined(RESEARCH_C1C_CAPTURE)
++	_state_receipt_capture.initial(_vehicle_status.arming_state, _vehicle_status.nav_state);
++#endif
+ 	_vehicle_status.nav_state_user_intention = _user_mode_intention.get();
+ 	_vehicle_status.nav_state_timestamp = hrt_absolute_time();
+ 	_vehicle_status.gcs_connection_lost = true;
+@@ -849,8 +864,11 @@
+ 	_auto_disarm_killed.set_hysteresis_time_from(false, 5_s);
+ }
+ 
+-Commander::~Commander()
+-{
++Commander::~Commander()
++{
++#if defined(RESEARCH_C1C_CAPTURE)
++	_state_receipt_capture.finish(_vehicle_status.arming_state, _vehicle_status.nav_state);
++#endif
+ 	perf_free(_loop_perf);
+ 	perf_free(_preflight_check_perf);
+ }
+@@ -2132,7 +2150,10 @@
+ 			send_parachute_command();
+ 		}
+ 
+-		// publish states (armed, control_mode, vehicle_status) at 2 Hz or immediately when changed
++#if defined(RESEARCH_C1C_CAPTURE)
++		_state_receipt_capture.sample(_vehicle_status.arming_state, _vehicle_status.nav_state);
++#endif
++		// publish states (armed, control_mode, vehicle_status) at 2 Hz or immediately when changed
+ 		if ((now >= _vehicle_status.timestamp + 500_ms) || _status_changed || nav_state_or_failsafe_changed
+ 		    || !(_actuator_armed == actuator_armed_prev)) {
+ 
+@@ -2538,18 +2559,30 @@
+ 	_mode_management.setFailsafeState(_failsafe.selectedAction() > FailsafeBase::Action::Warn);
+ 	_vehicle_status.nav_state_user_intention = _mode_management.getNavStateReplacementIfValid(_user_mode_intention.get(),
+ 			false);
+-	_vehicle_status.nav_state =
+-		_mode_management.getNavStateReplacementIfValid(FailsafeBase::modeFromAction(_failsafe.selectedAction(), _user_mode_intention.get()));
++#if defined(RESEARCH_C1C_CAPTURE)
++	const research_sitl::state_capture::State c1c_nav_before{_vehicle_status.arming_state, _vehicle_status.nav_state};
++#endif
++	_vehicle_status.nav_state =
++		_mode_management.getNavStateReplacementIfValid(FailsafeBase::modeFromAction(_failsafe.selectedAction(), _user_mode_intention.get()));
++#if defined(RESEARCH_C1C_CAPTURE)
++	_state_receipt_capture.transition(c1c_nav_before, _vehicle_status.arming_state, _vehicle_status.nav_state);
++#endif
+ 	_vehicle_status.executor_in_charge = _mode_management.modeExecutorInCharge(); // Set this in sync with nav_state
+ 	_vehicle_status.nav_state_display = _mode_management.getNavStateDisplay(_vehicle_status.nav_state);
+ 
+-	switch (_failsafe.selectedAction()) {
++#if defined(RESEARCH_C1C_CAPTURE)
++	const research_sitl::state_capture::State c1c_termination_before{_vehicle_status.arming_state, _vehicle_status.nav_state};
++#endif
++	switch (_failsafe.selectedAction()) {
+ 	case FailsafeBase::Action::Disarm:
+ 		disarm(arm_disarm_reason_t::failsafe, true);
+ 		break;
+ 
+ 	case FailsafeBase::Action::Terminate:
+-		_vehicle_status.nav_state = _vehicle_status.NAVIGATION_STATE_TERMINATION;
++		_vehicle_status.nav_state = _vehicle_status.NAVIGATION_STATE_TERMINATION;
++#if defined(RESEARCH_C1C_CAPTURE)
++		_state_receipt_capture.transition(c1c_termination_before, _vehicle_status.arming_state, _vehicle_status.nav_state);
++#endif
+ 		break;
+ 
+ 	default:
+diff --git a/src/modules/commander/Commander.hpp b/src/modules/commander/Commander.hpp
+--- a/src/modules/commander/Commander.hpp
++++ b/src/modules/commander/Commander.hpp
+@@ -42,7 +42,10 @@
+ #include "MulticopterThrowLaunch/MulticopterThrowLaunch.hpp"
+ #include "Safety.hpp"
+ #include "UserModeIntention.hpp"
+-#include "worker_thread.hpp"
++#include "worker_thread.hpp"
++#if defined(RESEARCH_C1C_CAPTURE)
++#include "Px4StateReceiptProducer.hpp"
++#endif
+ 
+ #include <lib/hysteresis/hysteresis.h>
+ #include <lib/mathlib/mathlib.h>
+@@ -221,7 +224,10 @@
+ 	/* Decouple update interval and hysteresis counters, all depends on intervals */
+ 	static constexpr uint64_t COMMANDER_MONITORING_INTERVAL{10_ms};
+ 
+-	vehicle_status_s        _vehicle_status{};
++	vehicle_status_s        _vehicle_status{};
++#if defined(RESEARCH_C1C_CAPTURE)
++	research_sitl::state_capture::Px4StateReceiptProducer _state_receipt_capture;
++#endif
+ 
+ 	Failsafe		_failsafe_instance{this};
+ 	FailsafeBase		&_failsafe{_failsafe_instance};
+diff --git a/src/modules/commander/CMakeLists.txt b/src/modules/commander/CMakeLists.txt
+--- a/src/modules/commander/CMakeLists.txt
++++ b/src/modules/commander/CMakeLists.txt
+@@ -85,7 +85,17 @@
+         atmosphere
+ 	)
+ 
+-if(CONFIG_SENSORS_VEHICLE_MAGNETOMETER)
+-	px4_add_unit_gtest(SRC mag_calibration_test.cpp LINKLIBS modules__commander)
++if(RESEARCH_C1C_CAPTURE)
++	if(NOT TARGET modules__research_state_capture OR NOT PX4_PLATFORM STREQUAL "posix"
++	   OR NOT PX4_BOARD STREQUAL "px4_sitl" OR ENABLE_LOCKSTEP_SCHEDULER)
++		message(FATAL_ERROR "Commander receipt hook requires isolated C1C native POSIX SITL")
++	endif()
++	target_compile_definitions(modules__commander PRIVATE RESEARCH_C1C_CAPTURE=1)
++	target_compile_features(modules__commander PRIVATE cxx_std_17)
++	target_link_libraries(modules__commander PRIVATE modules__research_state_capture)
++endif()
++
++if(CONFIG_SENSORS_VEHICLE_MAGNETOMETER)
++	px4_add_unit_gtest(SRC mag_calibration_test.cpp LINKLIBS modules__commander)
+ endif()
+ px4_add_functional_gtest(SRC ModeManagementTest.cpp LINKLIBS modules__commander)
+

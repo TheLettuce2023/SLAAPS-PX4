@@ -1,0 +1,3 @@
+Command: gz sdf -k models/research_vehicle/model.sdf
+Exit code: 255
+Error Code 19: Msg: A link named base_link has invalid inertia.

@@ -1,0 +1,22 @@
+# Final immutable producer evidence, published at Commander destruction.
+uint64 timestamp
+uint64 producer_lifetime_id
+uint64 observer_lifetime_id
+uint64 clock_epoch
+uint64 attempted_sequence
+uint64 emitted_sequence
+uint64 transition_epoch
+uint64 producer_time_us
+uint64 final_time_us
+uint64 emitted_transition_epoch
+uint64 emitted_producer_time_us
+uint8 retained_arming_state
+uint8 retained_nav_state
+uint8 emitted_arming_state
+uint8 emitted_nav_state
+uint8 actual_arming_state
+uint8 actual_nav_state
+uint8 first_fault
+bool has_state
+bool finished
+uint8 ORB_QUEUE_LENGTH = 2

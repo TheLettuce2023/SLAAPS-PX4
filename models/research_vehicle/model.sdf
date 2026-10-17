@@ -1,0 +1,451 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="research_vehicle">
+    <!--
+      UPDATED to use your real CAD geometry instead of placeholder shapes.
+
+      base_link's visual (and its rough collision shape) now come from
+      your actual exported frame - frame_fixed.stl. That one file already
+      contains the nose cone, the main body tube, AND the 4 fixed rear
+      "X" stability fins all fused together as one rigid piece, so those
+      no longer need to be built by hand as separate boxes/spheres like
+      before - all of that old placeholder geometry has been removed.
+
+      Still separate, still placeholders (because they physically move
+      and Gazebo needs each moving part to be its own link+joint):
+        - The 4 moving "+" control fins near the nose (still using the
+          generated NACA airfoil shape - swap in your real fin STL later
+          for exact geometry).
+        - The rear thruster (was modeled as an open propeller - you've
+          since shown it's actually a ducted fan/EDF. The simulation
+          plugin still treats it as a simple spinning thrust source,
+          which works as an approximation either way, but the visual
+          disc shape doesn't look like a real duct yet).
+
+      Numbers marked "EDIT ME" are still best-guess placements based on
+      measuring your STL's bounding box and eyeballing your screenshots,
+      NOT exact CAD measurements - nudge them once you have precise
+      numbers or send the real fin part as its own STL.
+
+      UNIT NOTE: your STL was modeled in millimeters. Gazebo assumes
+      meters, so the mesh reference below includes <scale>0.001 0.001
+      0.001</scale> to convert it. If you ever re-export a mesh in a
+      different unit, that scale number needs to change to match.
+    -->
+
+    <!-- ============================ BODY / FRAME ============================ -->
+    <link name="base_link">
+      <!-- REAL mass/CG/inertia, from your Onshape Mass Properties (whole
+           assembly). Converted from your units (lb, lb*mm^2) to SDF's
+           units (kg, kg*m^2), and rotated into this link's own X/Y/Z axes
+           - your Onshape numbers were in the mesh's native frame where Z
+           was the long axis, same as frame_fixed.stl before its 90 deg
+           visual rotation, so the same rotation was applied here to the
+           CG position and the full inertia tensor so everything lines up
+           with this link's X-forward convention.
+           <pose> below is just the CG's offset from base_link's origin
+           (the STL's native origin point) - not an added rotation, since
+           the inertia values themselves are already expressed in this
+           link's axes. -->
+      <inertial>
+        <pose>0.271013 -0.001266 -0.000341 0 0 0</pose>
+        <mass>3.041337</mass>
+        <inertia>
+          <ixx>0.0048332</ixx>
+          <iyy>0.1059419</iyy>
+          <izz>0.0105940</izz>
+          <ixy>0.0005591</ixy>
+          <ixz>-0.0007722</ixz>
+          <iyz>0.0000247</iyz>
+        </inertia>
+      </inertial>
+
+      <!-- Simplified stand-in shape for PHYSICS only (collisions with the
+           ground, etc.) - a plain cylinder roughly matching the real
+           tube's size. Deliberately NOT the detailed real mesh: physics
+           collision checks against a 178,000-triangle mesh are slow and
+           the real mesh isn't perfectly sealed (fine for visuals, not
+           ideal for collision math). Sized/positioned to match the real
+           frame's measured length (586.4mm) and center point - EDIT ME
+           if you want this closer to your real average tube radius. -->
+      <collision name="base_collision">
+        <pose>0.2764 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.052</radius>
+            <length>0.5864</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <!-- The real thing: your exported frame (nose + tube + fixed rear
+           fins, all fused). Rotated 90 degrees for the same reason as
+           before (the mesh's long axis needs to point along X to match
+           everything else in this file), but NOT shifted/recentered -
+           it keeps whatever origin point your CAD file used, which is
+           why this pose has no x/y/z offset, just the rotation. -->
+      <visual name="base_visual">
+        <pose>0 0 0 0 1.5708 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://research_vehicle/meshes/frame_fixed.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <!-- STL files don't carry color info at all, so without this the
+             mesh falls back to a flat white default instead of picking up
+             a look like your other shapes. EDIT ME to whatever color you
+             actually want (this is just a placeholder dark gray). -->
+        <material>
+          <ambient>0.25 0.25 0.27 1</ambient>
+          <diffuse>0.3 0.3 0.32 1</diffuse>
+          <specular>0.4 0.4 0.4 1</specular>
+        </material>
+      </visual>
+
+      <sensor name="imu_sensor" type="imu">
+        <always_on>1</always_on>
+        <update_rate>250</update_rate>
+      </sensor>
+    </link>
+
+    <!-- =================================================================
+         MOVING CONTROL SURFACES (4) - the "+" pattern near the nose.
+         top/bottom = your elevator pair, left/right = your rudder pair.
+         EDIT ME: positioned at x=0.50 (just aft of where your nose cone
+         meets the straight tube, based on your screenshot) and 0.052m
+         off centerline (matching the tube's rough radius there) - both
+         are estimates, not exact measurements. No collision shape on
+         these - visual + mass only, since they don't need to physically
+         bump into anything, they just need to look right and generate
+         aerodynamic force via the plugin below.
+         ================================================================= -->
+
+    <!-- == Elevator: TOP control fin ==
+         CIRCUMFERENTIAL ROTATION: these 4 moving fins used to sit at
+         straight up/down/left/right (a "+" pattern lined up with the
+         fixed rear fins' own axes). You confirmed in Gazebo that's the
+         wrong spot - so every number below (link position, the visual's
+         extra roll, the joint's hinge offset, the hinge axis, and the
+         plugin's "upward" vector) has been rotated 45 degrees around
+         the fuselage's long axis (roll, about X) as one rigid unit, so
+         each fin now sits diagonally, in the gap between two fixed rear
+         fins when you look straight down the nose. The names
+         (elevon_top/bottom, rudder_left/right) are now just leftover
+         labels from before the rotation, not literal positions. -->
+    <link name="elevon_top">
+      <!-- Still flush-mounted the same way as before (root edge sits on
+           the real fuselage surface, radius ~0.053m, so distance from
+           centerline = surface_radius + half_span = 0.053 + 0.075 =
+           0.128), just at the new 45-degree-rotated spot instead of
+           straight up. -->
+      <pose>0.455 -0.09051 0.09051 0 0 0</pose>  <!-- EDIT ME: real position on body -->
+      <inertial>
+        <mass>0.05</mass>
+        <inertia><ixx>0.0001</ixx><iyy>0.0001</iyy><izz>0.0001</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <!-- Real airfoil shape (NACA 0012 cross-section, generated from
+           scratch, not a stock shape) instead of a flat box. Swap this
+           out for your own fin STL later if you export the exact shape.
+           The mesh file's own axes are chord=X, span=Y, thickness=Z;
+           this fin needed span swapped onto Z before (90 deg roll), and
+           now gets another 45 deg on top of that so its span points
+           straight out along the new diagonal mounting direction
+           (90 + 45 = 135 deg total). -->
+      <visual name="elevon_top_visual">
+        <pose>0 0 0 2.35619 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://research_vehicle/meshes/fin_airfoil.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.1 0.2 0.45 1</ambient>
+          <diffuse>0.15 0.25 0.55 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="elevon_top_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>elevon_top</child>
+      <!-- Same hinge-offset logic as before (pull back from span-center
+           to the fuselage surface, plus the 1.85mm servo-shaft offset),
+           just with both numbers rotated 45 degrees onto the Y/Z mix
+           that matches the fin's new diagonal position.
+           EDIT ME: flip the sign on the 1.85mm part if it ends up
+           offset the wrong way once you see it rendered. -->
+      <pose>0 0.051725 -0.054341 0 0 0</pose>
+      <axis>
+        <xyz>0 0.707107 0.707107</xyz>  <!-- hinges to tilt trailing edge up/down -->
+        <limit><lower>-0.53</lower><upper>0.53</upper></limit>  <!-- ~+-30 deg -->
+        <dynamics><damping>0.1</damping></dynamics>
+      </axis>
+    </joint>
+
+    <plugin filename="gz-sim-lift-drag-system" name="gz::sim::systems::LiftDrag">
+      <a0>0.0</a0>
+      <cla>4.0</cla>
+      <cda>0.2</cda>
+      <alpha_stall>0.3391</alpha_stall>
+      <cla_stall>-3.0</cla_stall>
+      <cda_stall>-0.8</cda_stall>
+      <cp>0.0 0.0 0.0</cp>
+      <area>0.015</area>  <!-- EDIT ME: real fin area in m^2 -->
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 -0.707107 0.707107</upward>
+      <link_name>elevon_top</link_name>
+      <control_joint_name>elevon_top_joint</control_joint_name>
+      <cm_delta>0.5</cm_delta>
+    </plugin>
+
+    <!-- == Elevator: BOTTOM control fin == (also rotated 45 degrees - see note above) -->
+    <link name="elevon_bottom">
+      <pose>0.455 0.09051 -0.09051 0 0 0</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia><ixx>0.0001</ixx><iyy>0.0001</iyy><izz>0.0001</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="elevon_bottom_visual">
+        <pose>0 0 0 2.35619 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://research_vehicle/meshes/fin_airfoil.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.1 0.2 0.45 1</ambient>
+          <diffuse>0.15 0.25 0.55 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="elevon_bottom_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>elevon_bottom</child>
+      <pose>0 -0.054341 0.051725 0 0 0</pose>
+      <axis>
+        <xyz>0 0.707107 0.707107</xyz>
+        <limit><lower>-0.53</lower><upper>0.53</upper></limit>
+        <dynamics><damping>0.1</damping></dynamics>
+      </axis>
+    </joint>
+
+    <plugin filename="gz-sim-lift-drag-system" name="gz::sim::systems::LiftDrag">
+      <a0>0.0</a0>
+      <cla>4.0</cla>
+      <cda>0.2</cda>
+      <alpha_stall>0.3391</alpha_stall>
+      <cla_stall>-3.0</cla_stall>
+      <cda_stall>-0.8</cda_stall>
+      <cp>0.0 0.0 0.0</cp>
+      <area>0.015</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 -0.707107 0.707107</upward>
+      <link_name>elevon_bottom</link_name>
+      <control_joint_name>elevon_bottom_joint</control_joint_name>
+      <cm_delta>0.5</cm_delta>
+    </plugin>
+
+    <!-- == Rudder: LEFT control fin == (also rotated 45 degrees - see note above) -->
+    <link name="rudder_left">
+      <!-- Same flush-mount fix as the elevons: root touches the real
+           fuselage surface (radius ~0.053m) instead of the fin being
+           centered there, so distance from centerline =
+           0.053 + half_span (0.075) = 0.128, now split across Y and Z
+           at the new 45-degree spot instead of sitting purely on Y. -->
+      <pose>0.455 0.09051 0.09051 0 0 0</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia><ixx>0.0001</ixx><iyy>0.0001</iyy><izz>0.0001</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <!-- Same real airfoil mesh as the elevons. This fin's span used to
+           run straight along Y with no extra rotation needed; now that
+           it's mounted diagonally, it gets a 45 degree roll so its span
+           points straight out along the new mounting direction. -->
+      <visual name="rudder_left_visual">
+        <pose>0 0 0 0.7854 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://research_vehicle/meshes/fin_airfoil.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.1 0.2 0.45 1</ambient>
+          <diffuse>0.15 0.25 0.55 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="rudder_left_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rudder_left</child>
+      <!-- Same hinge-offset logic as the elevons (pull back to the
+           fuselage surface, plus the 1.85mm servo-shaft offset), now
+           rotated 45 degrees onto the Y/Z mix that matches this fin's
+           new diagonal position. EDIT ME: flip the sign on the 1.85mm
+           part if it looks mirrored once rendered. -->
+      <pose>0 -0.051725 -0.054341 0 0 0</pose>
+      <axis>
+        <xyz>0 -0.707107 0.707107</xyz>  <!-- hinges to tilt trailing edge left/right -->
+        <limit><lower>-0.53</lower><upper>0.53</upper></limit>
+        <dynamics><damping>0.1</damping></dynamics>
+      </axis>
+    </joint>
+
+    <plugin filename="gz-sim-lift-drag-system" name="gz::sim::systems::LiftDrag">
+      <a0>0.0</a0>
+      <cla>4.0</cla>
+      <cda>0.2</cda>
+      <alpha_stall>0.3391</alpha_stall>
+      <cla_stall>-3.0</cla_stall>
+      <cda_stall>-0.8</cda_stall>
+      <cp>0.0 0.0 0.0</cp>
+      <area>0.015</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0.707107 0.707107</upward>
+      <link_name>rudder_left</link_name>
+      <control_joint_name>rudder_left_joint</control_joint_name>
+      <cm_delta>0.5</cm_delta>
+    </plugin>
+
+    <!-- == Rudder: RIGHT control fin == (also rotated 45 degrees - see note above) -->
+    <link name="rudder_right">
+      <pose>0.455 -0.09051 -0.09051 0 0 0</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia><ixx>0.0001</ixx><iyy>0.0001</iyy><izz>0.0001</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="rudder_right_visual">
+        <pose>0 0 0 0.7854 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://research_vehicle/meshes/fin_airfoil.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.1 0.2 0.45 1</ambient>
+          <diffuse>0.15 0.25 0.55 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="rudder_right_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rudder_right</child>
+      <pose>0 0.054341 0.051725 0 0 0</pose>
+      <axis>
+        <xyz>0 -0.707107 0.707107</xyz>
+        <limit><lower>-0.53</lower><upper>0.53</upper></limit>
+        <dynamics><damping>0.1</damping></dynamics>
+      </axis>
+    </joint>
+
+    <plugin filename="gz-sim-lift-drag-system" name="gz::sim::systems::LiftDrag">
+      <a0>0.0</a0>
+      <cla>4.0</cla>
+      <cda>0.2</cda>
+      <alpha_stall>0.3391</alpha_stall>
+      <cla_stall>-3.0</cla_stall>
+      <cda_stall>-0.8</cda_stall>
+      <cp>0.0 0.0 0.0</cp>
+      <area>0.015</area>
+      <air_density>1.2041</air_density>
+      <forward>1 0 0</forward>
+      <upward>0 0.707107 0.707107</upward>
+      <link_name>rudder_right</link_name>
+      <control_joint_name>rudder_right_joint</control_joint_name>
+      <cm_delta>0.5</cm_delta>
+    </plugin>
+
+    <!-- ============================ REAR THRUSTER ============================
+         Real geometry now: your exported EDF rotor (the actual spinning fan
+         part - "EDF - Part 1.stl"), replacing the flat placeholder disc.
+         Just like frame_fixed.stl, this mesh came out of the same Onshape
+         assembly, so it already shares that assembly's coordinate system -
+         which means the same trick applies: rotate it 90 degrees (so its
+         own spin axis lines up with this model's forward/X axis, same as
+         everything else) and DON'T shift/recenter it, so it lands exactly
+         where it belongs relative to the fixed frame automatically.
+         Measured bounding box (in the original mm file): a symmetric disc
+         about 93mm across, 58.6mm along its spin axis, sitting right at
+         the tail end near the fixed rear fins - matches where a rear EDF
+         thruster should be.
+         NOTE: this STL is JUST the rotor/fan part, not the duct housing
+         around it (intake/nozzle) - those are still not modeled, so
+         you'll see the spinning fan itself but no duct shroud around it
+         yet. Send those over later if you want the housing added as a
+         fixed (non-spinning) piece fused to the frame. -->
+    <link name="prop">
+      <inertial>
+        <mass>0.05</mass>
+        <inertia><ixx>0.0001</ixx><iyy>0.0001</iyy><izz>0.0001</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="prop_visual">
+        <pose>0 0 0 0 1.5708 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://research_vehicle/meshes/edf_rotor.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <!-- TEMPORARY bright red, just so you can visually confirm this
+             is really a separate spinning part and not fused to the rest
+             of the fuselage - it'll look identical in shape/position
+             either way, so color is the easiest way to tell at a glance.
+             EDIT ME: swap back to a normal metal-gray (like
+             "0.35 0.35 0.37" ambient / "0.4 0.4 0.42" diffuse /
+             "0.6 0.6 0.6" specular) once you've confirmed it's correct. -->
+        <material>
+          <ambient>0.9 0.05 0.05 1</ambient>
+          <diffuse>1.0 0.1 0.1 1</diffuse>
+          <specular>0.5 0.5 0.5 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="prop_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>prop</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <limit><lower>-1e16</lower><upper>1e16</upper></limit>  <!-- spins freely -->
+      </axis>
+    </joint>
+
+    <!--
+      UNVERIFIED - same caveat as before: this follows the pattern PX4's
+      own Gazebo models use for a motor, but I couldn't pull PX4's exact
+      reference file to confirm it word-for-word. Cross-check once you
+      have PX4-gazebo-models cloned.
+    -->
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <jointName>prop_joint</jointName>
+      <linkName>prop</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>1200</maxRotVelocity>
+      <motorConstant>0.00001</motorConstant>
+      <momentConstant>0.01</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>0</motorNumber>
+      <rotorDragCoefficient>0.0001</rotorDragCoefficient>
+      <rollingMomentCoefficient>0.000001</rollingMomentCoefficient>
+      <motorSpeedPubTopic>motor_speed/0</motorSpeedPubTopic>
+      <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
+    </plugin>
+
+  </model>
+</sdf>

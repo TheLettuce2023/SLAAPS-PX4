@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.16)
+project(research_c1e_diagnostic_parser LANGUAGES CXX)
+
+if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    message(FATAL_ERROR "C1E diagnostic parser is an isolated library, not a PX4 module")
+endif()
+if(NOT EXISTS "${C1E_GENERATED_C_DIRECTORY}/diagnostic/mavlink.h")
+    message(FATAL_ERROR "Supply the pinned generated diagnostic dialect with C1E_GENERATED_C_DIRECTORY")
+endif()
+
+add_library(research_c1e_diagnostic_parser STATIC DiagnosticSignedMavlink.cpp)
+target_compile_features(research_c1e_diagnostic_parser PUBLIC cxx_std_17)
+target_compile_options(research_c1e_diagnostic_parser PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_include_directories(research_c1e_diagnostic_parser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(research_c1e_diagnostic_parser SYSTEM PUBLIC "${C1E_GENERATED_C_DIRECTORY}")

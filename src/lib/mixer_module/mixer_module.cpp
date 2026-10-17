@@ -52,6 +52,9 @@ struct FunctionProvider {
 };
 
 static constexpr FunctionProvider all_function_providers[] = {
+#if defined(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
+	{OutputFunction::Research_Bench1, OutputFunction::Research_Bench4, &FunctionBenchServos::allocate},
+#endif
 	// Providers higher up take precedence for subscription callback in case there are multiple
 	{OutputFunction::Constant_Min, &FunctionConstantMin::allocate},
 	{OutputFunction::Constant_Max, &FunctionConstantMax::allocate},
@@ -284,6 +287,19 @@ bool MixingOutput::updateSubscriptions(bool allow_wq_switch)
 		}
 
 		for (int p = 0; p < (int)(sizeof(all_function_providers) / sizeof(all_function_providers[0])); ++p) {
+#if defined(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
+
+			// Bench functions cannot route to AUX (including the EDF), CAN,
+			// another bank or a different MAIN channel, even after a remap.
+			if (_function_assignment[i] >= OutputFunction::Research_Bench1
+			    && _function_assignment[i] <= OutputFunction::Research_Bench4
+			    && (strcmp(_param_prefix, "PWM_MAIN") != 0 || i >= 4
+				|| (int)_function_assignment[i] != (int)OutputFunction::Research_Bench1 + i)) {
+				break;
+			}
+
+#endif
+
 			if (_function_assignment[i] >= all_function_providers[p].min_func &&
 			    _function_assignment[i] <= all_function_providers[p].max_func) {
 				all_disabled = false;
@@ -482,6 +498,25 @@ bool MixingOutput::update()
 			_actuator_test.overrideValues(outputs, _max_num_outputs);
 		}
 
+		// Dedicated bench channels cannot be commandeered by actuator_test, nor
+		// used while armed. Stock lockdown/kill/termination remain downstream.
+#if defined(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
+
+		for (int i = 0; i < _max_num_outputs; ++i) {
+			if (_function_assignment[i] >= OutputFunction::Research_Bench1
+			    && _function_assignment[i] <= OutputFunction::Research_Bench4) {
+				const bool permitted = !_armed.armed && _armed.prearmed && !_armed.kill
+						       && !_armed.lockdown && !_armed.termination && !_armed.in_esc_calibration_mode;
+
+				if (!permitted && _functions[i]) {
+					static_cast<FunctionBenchServos *>(_functions[i])->revoke();
+				}
+
+				outputs[i] = (permitted && _functions[i]) ? _functions[i]->value(_function_assignment[i]) : NAN;
+			}
+		}
+
+#endif
 		limitAndUpdateOutputs(outputs, has_updates);
 	}
 
@@ -553,7 +588,9 @@ float MixingOutput::output_limit_calc_single(int i, float value) const
 	if (((_function_assignment[i] >= OutputFunction::Servo1
 	      && _function_assignment[i] <= OutputFunction::ServoMax) || _function_assignment[i] == OutputFunction::Landing_Gear_Wheel
 	     || (_function_assignment[i] >= OutputFunction::Gimbal_Roll
-		 && _function_assignment[i] <= OutputFunction::Gimbal_Yaw))
+		 && _function_assignment[i] <= OutputFunction::Gimbal_Yaw)
+	     || (_function_assignment[i] >= OutputFunction::Research_Bench1
+		 && _function_assignment[i] <= OutputFunction::Research_Bench4))
 	    && _param_handles[i].center != PARAM_INVALID
 	    && _center_value[i] >= _min_value[i]
 	    && _center_value[i] <= _max_value[i]) {

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "mode": "slaaps_synthetic_stabilized_manual",
+  "pilot_semantics": "body_rate_with_quaternion_hold_on_release",
+  "axes_frame": "body_frd",
+  "fixture_airflow_m_s": 20.0,
+  "fixed_simulated_edf_thrust_n": 10.0,
+  "physical_authority_granted": false,
+  "qualification_evidence": "/var/tmp/research-stabilized-sitl-0crhkf9n",
+  "manifest_sha256": "899a1ddd82e3226f715e74be1b4a90fa30c714b8759f276978a8cb904f3bfc3a",
+  "px4_sha256": "67a6bab516dcdf0b9d7df76d548b3931f6c03fcb93b7814242e966690a6a0193",
+  "plugin_sha256": "a5addecdf9ed5378ffba95a1dd0dde62df44d08240c4a26541393edb577fb789"
+}
