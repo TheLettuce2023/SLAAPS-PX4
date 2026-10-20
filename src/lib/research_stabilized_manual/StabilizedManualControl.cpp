@@ -7,7 +7,7 @@ namespace research_stabilized_manual
 {
 namespace
 {
-float clamp(float value, float lower, float upper) { return std::fmax(lower, std::fmin(upper, value)); }
+float clamp(float value, float lower, float upper) { return ::fmaxf(lower, ::fminf(upper, value)); }
 
 bool boundedVector(const Vector3f &value, const Vector3f &limit)
 {
@@ -56,7 +56,7 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 	    || configuration.quaternion_norm_tolerance >= 1.0F || !std::isfinite(configuration.centered_enter)
 	    || !std::isfinite(configuration.centered_exit) || configuration.centered_enter < 0.0F
 	    || configuration.centered_exit <= configuration.centered_enter || configuration.centered_exit >= 1.0F
-	    || !std::isfinite(configuration.fixed_simulated_thrust_n) || configuration.fixed_simulated_thrust_n <= 0.0F
+	    || !std::isfinite(configuration.fixed_simulated_thrust_n) || configuration.fixed_simulated_thrust_n < 0.0F
 	    || !validAllocationConfiguration(configuration.allocation)) { return Status::InvalidConfiguration; }
 
 	for (unsigned axis = 0; axis < 3; ++axis) {
@@ -212,8 +212,8 @@ Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, co
 
 	} else {
 		for (unsigned axis = 0; axis < 3; ++axis) {
-			const float magnitude = std::fmax(0.0F, (std::fabs(manual.axes[axis]) - _configuration.centered_enter)
-							  / (1.0F - _configuration.centered_enter));
+			const float magnitude = ::fmaxf(0.0F, (std::fabs(manual.axes[axis]) - _configuration.centered_enter)
+							/ (1.0F - _configuration.centered_enter));
 			rate_setpoint(axis) = (manual.axes[axis] < 0.0F ? -magnitude : magnitude)
 					      * _configuration.stick_sign(axis) * _configuration.maximum_rate_rad_s(axis);
 		}

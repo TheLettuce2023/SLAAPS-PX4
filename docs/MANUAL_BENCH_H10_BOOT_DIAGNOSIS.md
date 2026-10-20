@@ -6,6 +6,47 @@ Reflashing the rollback and cycling USB restores normal QGC operation. H10 is
 withdrawn from routine commissioning while the failure is diagnosed. Preserve its
 binary and software evidence; no replacement image or bootloader change is accepted.
 
+**2026-10-19 update:** The user also reports the clean stock comparison fails to
+connect after programming and power cycling, using either the `.px4` or a `.bin`.
+The supplied QGC Daily log reports successful programming/verification on an
+ArduPilot ChibiOS bootloader, protocol revision 5, board ID 53 and application
+flash size 1,966,080 bytes. The working rollback still reconnects after this
+latest attempt. The subsequent independent readback now matches the stock
+image's stored vectors and full application-slot CRC. This rules out missing
+upload finalization for the measured attempt; application handoff/startup remains
+unlocalized. The readback issued no flash, boot or parameter commands; the
+bootloader was not modified.
+
+The user subsequently completed rollback recovery and requested recovery step 2.
+A [stock reference on the working rollback baseline](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md)
+is now built and software-validated at PX4 `e8ea98b404`, NuttX `49f3b29c92`
+and apps `e37940d85`. Its private version metadata is pinned at NuttX 11.0.0;
+the initial rebuild with newer tag-derived labels was superseded before testing.
+The final package SHA256 is
+`315f014c6acf50106fa51b1b345c6c9f3833dc8a3126ec9a69d1461ba6cf6334`.
+The supplied console now confirms matching PX4/NuttX identities, sensor/PX4IO
+initialization and USB MAVLink with a valid GCS heartbeat. The user confirms
+three cold starts each connected within 30 seconds and stayed connected for
+at least 60 seconds. Step 2 startup acceptance is recorded separately from the
+immutable build receipt. The user deliberately reset settings to stock and did
+not require a parameter backup; this is the accepted fresh configuration.
+This stock build excludes the bench controller. Calibration/output acceptance
+is not established, and the newer baseline's startup failure remains unlocalized.
+The successful run also used the deliberate settings reset, so these attempts
+do not isolate a software-baseline regression from a configuration effect.
+
+Recovery step 3 has now produced a [freshly qualified bench port](MANUAL_BENCH_WORKING_BASE_PORT.md)
+on that complete working baseline. Its `.px4` SHA256 is
+`a45cf99374fa7ccfd4f6349ca9a6341bacfcfa6199254f71ab2b04f0cb2aed31`.
+The port preserves H10's clock ordering and includes the older-base sender-ID
+and center-validation dependencies. All three 20-scenario native suites pass;
+the ARM candidate fits flash and excludes the private fixture. The user now reports
+its cold-boot tests passed and its bench module is available but stopped. A later
+console matches the candidate's base/OS/build identities, reaches PX4IO and
+confirms selected USB input instance 2 / sender 255:190. Axis/button/link review,
+remaining startup/configuration evidence and G3-G4 output checks remain open;
+the original withdrawn images are not reinstated.
+
 ## Known working and failed configurations
 
 | Item | Working rollback | H10 candidate |
@@ -81,10 +122,10 @@ does not qualify those drivers on the installed board.
 The user has no FMU debug adapter available. A stock comparison build on H10's
 exact base commit is now compiled and staged as a diagnostic alternative. It
 excludes the research changes, uses target `px4_fmu-v6x_default`, pins the required
-submodules, and records its compiler and artifacts. Its hardware result is pending. A working
-stock image would narrow the investigation toward research/build differences;
-a stock failure would show that the failure also occurs without research code,
-without by itself identifying an OS, driver or bootloader root cause.
+submodules, and records its compiler and artifacts. On October 19 the user
+reports the same missing connection with this stock image. This establishes
+that the failure also occurs without research code; it does not identify an OS,
+driver, upload-finalization or bootloader handoff root cause.
 
 | Stock comparison artifact | Verified value |
 | --- | --- |
@@ -95,7 +136,7 @@ without by itself identifying an OS, driver or bootloader root cause.
 | Firmware SHA256 | `35945a63a8cf64bd1f80175cb975ac8063994b66fd7e9a29997c93545c065218` |
 | Linked/decoded image | 1,947,404 bytes; 18,676 bytes below the 1,966,080-byte limit; decoded package equals the linked `.bin` |
 | ELF checks | NSH, board initialization, MAVLink and CDC/ACM entry points present; research bench entry point absent |
-| Build/hardware status | Build exited 0; source remained clean; no hardware boot, manual output or physical acceptance claimed |
+| Build/hardware status | Build exited 0; source remained clean; user reports no normal QGC connection after successful upload; no manual output or physical acceptance claimed |
 
 The [stock comparison firmware](../build/bench_commissioning/stock-e880f1cd79-diagnostic/px4_fmu-v6x_default_stock_e880f1cd79_clean_20261013T200117Z.px4)
 and [receipt](../build/bench_commissioning/stock-e880f1cd79-diagnostic/comparison-receipt.json)
@@ -110,7 +151,145 @@ source volume are retained for diagnosis. The build used a space-free Linux
 copy of the exact committed source with private dependency clones; it did not
 overwrite the user's branch, research files or original submodule sources.
 
-### USB comparison procedure without a debug adapter
+### October 19 upload evidence and independent flash readback
+
+The user supplied this QGC sequence for the exact stock comparison package:
+PX4 FMU V6X on COM8, bootloader re-enumeration as ArduPilot ChibiOS on COM14,
+protocol 5, board ID 53, flash size 1,966,080, erase/program/verify, reboot and
+upgrade complete. The full report is retained in
+[hardware-comparison-failure-20261019.json](../build/bench_commissioning/stock-e880f1cd79-diagnostic/hardware-comparison-failure-20261019.json).
+The `.bin` symptom is user-reported; its selected file/hash was not captured.
+The user confirms that the original rollback still reconnects after these tests.
+
+Protocol revision 5 is not an exact bootloader firmware build ID. Windows' cached
+USB records also contain the ArduPilot bootloader VID/PID `1209:5741` on COM14
+and the PX4 USB VID/PID `3185:0035` on COM8. An ArduPilot label alone does not
+make PX4 the wrong application: these bootloaders implement a PX4-compatible
+protocol and the reported target/flash layout match the candidate.
+[ArduPilot protocol source](https://github.com/ArduPilot/ardupilot/blob/master/Tools/AP_Bootloader/bl_protocol.cpp),
+[QGC interoperability discussion](https://github.com/mavlink/qgroundcontrol/issues/7318).
+
+The upstream ArduPilot implementation buffers the first eight words (32 bytes)
+while programming, substitutes those buffered words into its upload CRC, and
+commits them during the final BOOT command. Consequently, upload verification
+alone does not establish the stored reset vectors after a power cycle. This is
+a testable distinction, not a finding that finalization failed on this board.
+The installed bootloader's exact build remains unknown. The independent readback
+result below now confirms the expected stored image for the measured attempt.
+
+Both retained failing images contain the same valid-range first eight vector
+words: initial stack `0x2401b62a`, reset entry `0x080202a1`, then six
+`0x080202ab` entries. None of these first eight words is erased. This check
+rules out an erased word already present in the candidate file; it does not
+read what the controller retained or demonstrate correct CPU startup.
+
+The [inspection tool](../Tools/bench_test/inspect_bootloader.py) queries only
+GET_SYNC, GET_DEVICE, READ_MULTI, GET_CRC and optional GET_VERSION. It reads the
+first 32 bytes, obtains a slot CRC and compares both with the retained stock
+package. It issues no erase, program, finalize, boot, reboot or parameter command.
+It refuses the PX4 application USB identity and any board/slot/protocol mismatch.
+The optional version query may be unsupported by an older protocol-5 build.
+Identification can hold the loader until the next power cycle.
+
+Prepare the measurement with actuator/EDF energy disconnected:
+
+1. If the rollback is installed, reproduce the known stock failure using the
+   same identified stock `.px4` through QGC. This repeat is for readback only.
+2. Exit QGC completely. Disconnect every controller supply, including USB,
+   then reconnect USB with the failed stock image still installed. This clears
+   upload-session RAM; do not enter QGC's firmware screen again before the read.
+3. Confirm the ArduPilot bootloader's current COM port in Device Manager. Use
+   COM14 below only if that remains its assigned port. Do not select COM8 merely
+   because it was used by the working application.
+4. From the repository root in PowerShell, run the already-prepared private
+   environment and inspector:
+
+   ```powershell
+   & .\build\bench_commissioning\bootloader-readback-venv\Scripts\python.exe .\Tools\bench_test\inspect_bootloader.py --port COM14 --wait-seconds 60
+   ```
+
+5. Preserve the JSON printed and the automatically named `cold-readback-*.json`
+   under the stock comparison directory. An unavailable/busy port or protocol
+   error is a failed inspection, not a flash mismatch. Recover using the retained
+   rollback after collecting evidence if needed.
+
+For the exact stock package, the expected application-slot CRC is `0xde5dd361`;
+the CRC with only its first 32 bytes erased is `0xf573da68`. The tool pads the
+image to the actual 1,966,080-byte slot with `0xff` using the existing uploader's
+CRC convention. Its result distinguishes:
+
+| Readback | Implication |
+| --- | --- |
+| Expected vectors and expected slot CRC | The measured flash contents match the candidate; investigate launch/early application startup next. It still does not prove that the application executes. |
+| Erased first 32 bytes and `0xf573da68` | Candidate body matches while the lead vector line is missing; investigate upload finalization before changing firmware or bootloader. |
+| Other mismatch | Save actual values; do not identify a particular failing subsystem from a checksum mismatch alone. |
+| CRC matches but vector read is unavailable | Weaker evidence; preserve the unsupported-query result and do not claim the vectors were observed. |
+
+Sixteen hardware-free serial fixtures pass, including fragmented/truncated
+replies, erased-vector versus buffered-CRC cases, rejected optional version
+queries, incorrect USB/board/layout refusal, brief USB discovery, transient port
+open retry and the query-only command guard.
+The real candidate CRC also matches `Tools/px4_uploader.py`'s calculation.
+[Offline validation](../build/bench_commissioning/stock-e880f1cd79-diagnostic/readback-tool-offline-validation.json)
+records these checks. The broad unittest discovery command imports unrelated
+MAVLink bench dependencies; run this standalone test directly instead:
+
+```powershell
+& .\build\bench_commissioning\bootloader-readback-venv\Scripts\python.exe .\Tools\bench_test\test_inspect_bootloader.py -v
+```
+
+The private environment contains pyserial 3.5. On a fresh setup, create it with
+`python -m venv build/bench_commissioning/bootloader-readback-venv` and install
+`pyserial==3.5` using that environment's Python. Preparation used only fixtures;
+the subsequent controller inspection below used query commands only. No upload,
+application boot command or parameter write was issued by Codex. All application
+boot and physical acceptance flags remain false.
+
+### Measured stock flash result, October 19
+
+The user clarified that COM14 appears briefly after reconnection and then
+disappears. A host enumeration check afterward found no PX4/ArduPilot USB port.
+This does not demonstrate continuous bootloader retention; it is consistent
+with a launch attempt or reset, without identifying which occurred.
+
+The first readback attempt detected `1209:5741` but Windows lost COM14 before
+opening it; no protocol command was sent. It is preserved as
+`cold-readback-20261019T205938820815Z.json`. After adding a bounded transient-open
+retry, the user was prompted to reconnect USB with the failed stock image and
+QGC closed. The second inspection completed at 21:01:49 UTC:
+
+| Measured item | Result |
+| --- | --- |
+| USB/loader | COM14, VID/PID `1209:5741`, protocol 5, board ID 53, revision 0 |
+| Application slot | 1,966,080 bytes |
+| Stored first eight vector words | All match the stock candidate, including initial stack `0x2401b62a` and reset `0x080202a1` |
+| Full slot CRC | Expected and reported `0xde5dd361` |
+| Missing lead vector line | False; the stored first 32 bytes are present and correct |
+| Optional loader build string | No reply; exact installed build remains unidentified |
+| Application boot / physical acceptance | Not verified / not granted |
+
+The complete [successful readback report](../build/bench_commissioning/stock-e880f1cd79-diagnostic/cold-readback-20261019T210117038214Z.json)
+records the actual query sequence. The tool does not independently observe a
+physical power cycle; reconnect preparation was requested from the user. The
+stored vector observation and matching slot CRC confirm that the measured
+stock payload was finalized and retained. The failed stock connection therefore
+requires application handoff/startup investigation rather than treating this
+upload as incomplete.
+
+Identification intentionally holds the loader's session open. Its continued
+presence after this inspection is an effect of the query session, not evidence
+that the original power-on sequence remains in the loader. Power cycling releases
+that hold; the retained working rollback remains the recovery image.
+
+Do not infer an exact OS defect from these measurements. A low-level console
+trace or a separately qualified bench build on the complete known-working
+`e8ea98b4`/NuttX 11 baseline is the next development route. Keep the installed
+bootloader and original images preserved while selecting that next experiment.
+
+### Original USB comparison procedure without a debug adapter
+
+The user has now completed this comparison and reports failure. Use the
+October 19 readback procedure above for the next diagnostic reproduction.
 
 Use only the comparison artifact identified by a successful
 `build/bench_commissioning/stock-e880f1cd79-diagnostic/comparison-receipt.json`.
@@ -223,9 +402,15 @@ boot and actuator acceptance remain separate gates.
 
 ## Replacement development and acceptance
 
-Use the failed trace to choose a focused fix. If the OS/base transition is
-implicated, construct an isolated bench variant on the exact known-working
-rollback baseline, with reviewed source adaptations and both pinned submodules.
+The three-cycle stock boot reference in the
+[rollback reference procedure](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md) now
+passes with matching runtime identity and the user-accepted intentional stock
+reset. The isolated bench variant now has fresh software qualification and a
+new ARM artifact on that complete baseline, with reviewed source adaptations
+and pinned submodules. The user now reports successful cold boots and an available
+but stopped module. Continue disconnected input/identity verification and retain
+the remaining changed-image console/configuration evidence. A low-level
+failed-image trace remains the route to a focused fix for the newer baseline.
 Do not substitute only the old kernel underneath newer PX4 code or relabel the
 old software qualification as qualification of a different build.
 

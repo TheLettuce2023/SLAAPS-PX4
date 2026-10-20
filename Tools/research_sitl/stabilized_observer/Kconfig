@@ -1,0 +1,3 @@
+config EXAMPLES_STABILIZED_OBSERVER_TEST
+	bool "stabilized_observer_test"
+	default n

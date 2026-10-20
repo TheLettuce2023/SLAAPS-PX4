@@ -142,6 +142,13 @@ void selector_snapshot()
 	snapshot_publications = nullptr;
 }
 
+class CaptureMixingOutput final : public MixingOutput
+{
+public:
+	using MixingOutput::MixingOutput;
+	using MixingOutput::output_limit_calc_single;
+};
+
 class Capture final : public OutputModuleInterface
 {
 public:
@@ -159,8 +166,36 @@ public:
 	void tick() { mix.update(); mix.updateSubscriptions(false); }
 	float pwm[MAX_ACTUATORS] {};
 	unsigned writes{};
-	MixingOutput mix;
+	CaptureMixingOutput mix;
 };
+
+// Exercise the configured center range, including valid centers outside the
+// older mixer's fixed 800..2200 us window. This calls the real mixer without
+// starting an owner or a physical output driver.
+void center_bounds()
+{
+	Capture capture;
+
+	for (const auto function : {OutputFunction::Research_Bench1, OutputFunction::Servo1}) {
+		set_int("PWM_MAIN_FUNC1", static_cast<int32_t>(function));
+		capture.refresh();
+		capture.mix.updateSubscriptions(false);
+
+		for (const int center : {650, 2350, 400, 2600}) {
+			set_int("PWM_MAIN_CENT1", center);
+			capture.refresh();
+			const bool valid = center >= 500 && center <= 2500;
+			const float expected_center = valid ? static_cast<float>(center) : 1500.0F;
+			check(near(capture.mix.output_limit_calc_single(0, 0), expected_center), "configured center validity");
+			check(near(capture.mix.output_limit_calc_single(0, -1), 500), "negative endpoint retained");
+			check(near(capture.mix.output_limit_calc_single(0, 1), 2500), "positive endpoint retained");
+			check(near(capture.mix.output_limit_calc_single(0, -0.5F), (500 + expected_center) * 0.5F),
+			      "negative interpolation follows valid center");
+			check(near(capture.mix.output_limit_calc_single(0, 0.5F), (2500 + expected_center) * 0.5F),
+			      "positive interpolation follows valid center");
+		}
+	}
+}
 
 // Stalls only the private process's owner queue; the capture sink remains on
 // the command thread. These durations are fault injection, not timing budgets.
@@ -347,6 +382,12 @@ extern "C" __EXPORT int bench_active_test_main(int argc, char *argv[])
 
 	checks = failures = 0;
 	configure();
+
+	if (strcmp(argv[1], "center_bounds") == 0) {
+		center_bounds();
+		PX4_INFO("H9_RESULT scenario=%s checks=%u failures=%u capture_writes=0", argv[1], checks, failures);
+		return failures ? 1 : 0;
+	}
 
 	if (strcmp(argv[1], "selector_snapshot") == 0) {
 		selector_snapshot();

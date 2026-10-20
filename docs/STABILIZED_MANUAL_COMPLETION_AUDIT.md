@@ -1,5 +1,12 @@
 # Stabilized manual: completion audit and vehicle-data gate
 
+October 19 follow-up: the user authorized hardware-integration development.
+The [G9 observer increment](STABILIZED_MANUAL_HARDWARE_OBSERVER.md) now builds
+and verifies an output-disabled Pixhawk module independently of missing plant
+data. The October 6 audit below describes its earlier boundary; it must not be
+read as evidence that all further software development requires measurements.
+Vehicle-supported tuning and physical acceptance remain incomplete.
+
 2026-10-06, Codex. The full goal is **not complete**. Its isolated synthetic
 implementation and reproducible operator workflow have bounded evidence.
 SM5 requires accepted SLAAPS plant data and reviewed operating requirements,

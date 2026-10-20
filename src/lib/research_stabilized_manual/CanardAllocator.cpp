@@ -15,7 +15,7 @@ bool solve(double system[4][5], unsigned size, double solution[4])
 	double scale = 0.0;
 
 	for (unsigned i = 0; i < size; ++i) {
-		for (unsigned j = 0; j < size; ++j) { scale = std::fmax(scale, std::fabs(system[i][j])); }
+		for (unsigned j = 0; j < size; ++j) { scale = ::fmax(scale, std::fabs(system[i][j])); }
 	}
 
 	for (unsigned i = 0; i < size; ++i) {
@@ -101,7 +101,7 @@ bool validAllocationConfiguration(const AllocationConfiguration &configuration)
 			diagonal += static_cast<double>(configuration.axis_weight(axis)) * coefficient * coefficient;
 		}
 
-		largest_diagonal = std::fmax(largest_diagonal, diagonal);
+		largest_diagonal = ::fmax(largest_diagonal, diagonal);
 	}
 
 	constexpr double kResolutionMargin{100.0};
@@ -154,10 +154,10 @@ bool allocateCanards(const AllocationConfiguration &configuration, const Vector3
 		if (!std::isfinite(previous[channel]) || previous[channel] < configuration.minimum[channel]
 		    || previous[channel] > configuration.maximum[channel]) { return false; }
 
-		lower[channel] = std::fmax(configuration.minimum[channel], static_cast<double>(previous[channel])
-					   - static_cast<double>(dt_s) * static_cast<double>(configuration.negative_slew_per_s[channel]));
-		upper[channel] = std::fmin(configuration.maximum[channel], static_cast<double>(previous[channel])
-					   + static_cast<double>(dt_s) * static_cast<double>(configuration.positive_slew_per_s[channel]));
+		lower[channel] = ::fmax(static_cast<double>(configuration.minimum[channel]), static_cast<double>(previous[channel])
+					- static_cast<double>(dt_s) * static_cast<double>(configuration.negative_slew_per_s[channel]));
+		upper[channel] = ::fmin(static_cast<double>(configuration.maximum[channel]), static_cast<double>(previous[channel])
+					+ static_cast<double>(dt_s) * static_cast<double>(configuration.positive_slew_per_s[channel]));
 	}
 
 	double best = DBL_MAX;

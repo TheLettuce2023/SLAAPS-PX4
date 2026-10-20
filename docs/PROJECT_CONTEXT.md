@@ -1,31 +1,94 @@
 # Research vehicle: start here
 
-Updated 2026-10-17 by Codex. Navigation snapshot, not flight acceptance.
-Checkout: `slaaps-sitl`, based on PX4 `e880f1cd79`. Research source, tools,
-models and documentation are included in the source checkpoint prepared for
-`origin/slaaps-sitl`. Firmware binaries and retained WSL/build evidence remain
-local and require separate preservation. The checkpoint includes required PX4
+Updated 2026-10-19 by Codex. Navigation snapshot, not flight acceptance.
+Checkout: `slaaps-sitl`, based on PX4 `e880f1cd79`; previous source checkpoint
+`bde4aea321`. This successor source checkpoint includes the October 19 diagnostics,
+working-baseline port tooling, observer, portable output contract and handoff.
+It is a local commit checkpoint, not a new remote publication. Firmware binaries
+and retained WSL/build evidence remain local and require separate preservation.
+The previous checkpoint included required PX4
 formatting and whitespace cleanup in 23 files, including an equivalent split of
 the clock harness's compile-time type assertions to avoid formatter oscillation.
-Seven affected graph anchors and this handoff were refreshed after review.
+Its seven affected graph anchors and handoff were refreshed after review.
+The current checkpoint also revalidates graph anchors and formats changed C/C++;
+the unrelated empty `timestamp` file remains outside the commit.
 Historical evidence retains its original source bindings and acceptance scope.
 Current default isolated mode: [31-case revision-aware qualification and runnable console](STABILIZED_MANUAL_ISOLATED_MODE.md).
+Latest stabilized software: [portable output contract](STABILIZED_MANUAL_OUTPUT_CONTRACT.md)
+adds explicit producer/consumer sessions, calibrated four-servo mapping, matching
+acknowledgments and independently expiring leases. Permission loss suppresses
+fallback until deliberate recovery. Debug/Release/ASan-UBSan each pass 126,013
+checks, including 2,737 new protocol checks and an actual control-core mapping
+sequence. A separate ARM/NuttX 11 object compile passes: 2,068 text bytes, no
+static data/BSS; no new firmware link or runtime driver integration is claimed.
+Evidence is `/var/tmp/research-stabilized-host-lx60q8nq` and
+`build/stabilized_output/20261019/verification.json`; all 234 host files,
+111 ARM dependency snapshots and three prior observer firmware artifacts
+independently rehash with zero mismatches. Next software work is the runtime
+supervisor/transport, independent driver consumer, actual application/revoke
+acknowledgments and scheduled transition/loss verification. No hardware operated.
+Latest staged hardware candidate: [G9 output-disabled hardware observer](STABILIZED_MANUAL_HARDWARE_OBSERVER.md)
+now builds on the working `e8ea98b404`/NuttX 11 baseline. Final Debug/Release/
+ASan-UBSan each pass 123,083 control plus 193 profile checks; native module
+input/fault/recovery verification passes 9,015 checks with no actuator publication.
+The separate Pixhawk image fits with 4,376 bytes of flash remaining, contains the
+controller/allocator, and excludes the bench owner and test publishers. It has
+not been flashed or hardware-tested. Explicit profiles, diagnostic status and
+latched observation lifecycle are implemented; active outputs, production health/
+publisher identity, measured runtime resources and vehicle-supported tuning remain
+open. Existing bench firmware and sealed 31-case SITL default remain intact.
 Current user task: progress the manual servo bench toward hardware commissioning,
 then vehicle-supported stabilized manual control. The new
 [flash and test procedure](MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md) defines G0-G10,
 measured exit conditions and the separate stabilized hardware integration.
+Latest milestone: [step 3 working-baseline bench port](MANUAL_BENCH_WORKING_BASE_PORT.md)
+passes fresh software qualification and has a new ARM image. It uses the exact
+working PX4 `e8ea98b404` / NuttX 11/apps pair in isolated source views; the active
+newer branch remains unchanged. The user now reports the changed candidate's cold
+boots passed and `research_bench_control status` reports not running. The latest
+topic confirms disarmed state and buttons zero. The user corrected the last roll
+pair to right then left and explicitly verified left=-1/right=+1; the earlier
+reversal conclusion is superseded and calibration stays unchanged. USB telemetry
+over 60.062797 seconds shows no RX parser/buffer/drop indicator changes or new
+TX overruns. The user applied the ordered setup and its console-reboot readback
+matches the requested MAIN routing/rates/limits/centers and FMU off-values;
+AUX1..9 are zero, REV0 and safety-button prearm1. Actual armed=false/prearmed=true,
+owner stopped and IO FMU-data OK are confirmed. IO first-four failsafe entries
+initially remained1000 after console reboot despite FMU/mixer0. The subsequent
+requested cold-check response now reports actual first-four failsafe/disarmed
+zeros and saved MAIN_FAIL1..4=0, with the expected configuration and disarmed/
+prearmed state. This passes the current table check; baseline zero-write-ignore
+semantics remain unchanged and future configuration/reset changes require recheck.
+The user executed the USB profile recipe: its complete five-line/44-token board
+readback matches the staged fixture, start reports Ready/state0, both permission
+snapshots remain disarmed/prearmed with fault flags clear, and IO reports current
+PWM zero and first-four disarmed/failsafe zeros. Stop reports not running. The
+[hardware Ready-only result](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-profile-ready-result-20261019.json)
+passes that subset; no enabled session or pin measurement is claimed. No scope/
+pulse instrument is currently available (scope possible later), so the next
+stage is profile byte-integrity evidence and G4 signal capture preparation.
+Enable, full lifecycle and physical timing/fault tests remain pending equipment.
+A USB-bound 44-token synthetic profile is staged and
+passes a native Ready-only parse/start/stop check without enable or hardware.
+The fresh console matches candidate runtime identities
+and build strings and confirms USB instance 2 / sender 255:190. PX4IO responds;
+the earlier all-disabled routing explained its stale PWM-data flag; the applied
+configuration now reports FMU-data OK. This is not output
+acceptance. Retain remaining startup/configuration evidence alongside G3.
 The existing H10 candidate is staged under
-`build/bench_commissioning/h10-e880f1cd79-dirty/`; all 726 retained H10 artifacts
-and 58 current compiled source anchors revalidate. Candidate preparation did not
+`build/bench_commissioning/h10-e880f1cd79-dirty/`; its 726 retained artifacts and
+58 compiled source bindings were revalidated for the October 13 checkpoint. The
+new port and extended fixture have separate fresh evidence. Candidate preparation did not
 rebuild or operate hardware. A blank acceptance record is under `docs/templates/`.
 The procedure's local links, code blocks and command/source contracts validate;
 the blank record matches the existing checker and correctly remains incomplete.
-Latest hardware event: the user reports successful H10 programming but no normal
+Initial hardware event: the user reports successful H10 programming but no normal
 QGC connection; rollback restores it. H10 is withdrawn from routine commissioning.
 [Startup diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md) records the working
 PX4 `e8ea98b4`/NuttX 11.0.0 baseline versus H10's `e880f1cd79`/NuttX 12.12.0.
-Package/startup/source checks are consistent, but failed-image boot evidence is
-still needed; no root cause, replacement or bootloader modification is established.
+Package/startup/source checks are consistent, but a failed-image startup trace is
+still needed to localize the newer failure; no root cause or bootloader
+modification is established, and no physical bench outputs are accepted.
 The SD listing has no top-level `fault_*.txt` dump. The supplied 7,542-byte
 `param_import_fail.txt` identifies PX4 1.16.1 and the working rollback, including
 corrupt storage followed by successful SD-backup import; it has no H10 identity.
@@ -37,9 +100,136 @@ Its `.px4` SHA256 is `35945a63a8cf64bd1f80175cb975ac8063994b66fd7e9a29997c93545c
 build exit 0, matching GCC 13.2.1 package, board ID 53, decoded image/bin match,
 USB/console entry points present and research bench entry point absent. The
 receipt pins eleven submodules plus Micro-CDR; image headroom is 18,676 bytes.
-Run the documented disconnected-output USB comparison next; hardware result
-pending. The detached worktree and isolated Docker source volume are retained.
-The candidate package has 9,268 bytes of image headroom. Installed profiles,
+The user now reports this stock image also fails to reconnect, as `.px4` or
+`.bin`. QGC Daily's supplied log reports verification/upgrade complete using an
+ArduPilot ChibiOS bootloader, protocol 5, board 53, slot 1,966,080 bytes; rollback
+still reconnects. Failure therefore occurs without the bench changes. The
+ArduPilot label alone is not a cause. Cold flash persistence and exact loader
+build were initially unmeasured. `Tools/bench_test/inspect_bootloader.py` reads
+stored vectors, slot CRC and optional loader version with no flash/boot commands;
+16 standalone serial-fixture tests and the candidate/uploader CRC comparison pass.
+Expected stock CRC `0xde5dd361`, or `0xf573da68` with just the lead 32 bytes erased.
+The user then reported COM14 appears briefly and vanishes. Codex's query-only
+inspection completed on COM14 at 21:01:49 UTC on October 19: stored vectors and
+full slot CRC match the stock candidate, with no erased lead bytes. Read
+`cold-readback-20261019T210117038214Z.json` in the stock artifact directory. The
+first port-open race is preserved separately. No flash, boot or parameter command
+was issued. This confirms the measured stock payload was finalized and retained;
+application handoff/startup remains unlocalized. The optional loader build query
+got no reply. Identification now holds the loader until a power cycle; this is
+an inspection effect. Next obtain a low-level trace or prepare a separately
+qualified bench variant on the complete working rollback baseline. The detached
+worktree/source volume and both original images remain preserved; those failed
+images remain unqualified for application startup.
+The user has now completed recovery step 1 and requested step 2. A clean stock
+rebuild of the complete working rollback baseline is staged under
+`build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/`; read the
+[reference build and cold-boot check](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md).
+Its `.px4` SHA256 is `315f014c6acf50106fa51b1b345c6c9f3833dc8a3126ec9a69d1461ba6cf6334`.
+Build exit 0, board 53, 989 compile entries without research source, matching
+PX4/NuttX identities and image/bin hashes verify; 17,736 bytes of flash remain.
+The private NuttX clone's release tags are frozen at 11.0.0 so both generated
+version records match the rollback; no tracked source or host tags changed.
+The first rebuild with newer tag-derived labels is separately marked superseded.
+The user now confirms successful flashing and all three full cold-start checks:
+QGC connection within 30 seconds and stability for at least 60 seconds each.
+The supplied console matches PX4 `e8ea98b404` / NuttX `49f3b29c92`, reaches
+sensor/PX4IO initialization and USB MAVLink with a valid GCS heartbeat and zero
+USB transmit errors/receive loss. A valid 1,394-byte parameter document loads
+with `SYS_AUTOSTART=2100` and `SYS_USB_AUTO=2`. The user deliberately reset
+settings to stock and did not require a parameter backup; no preflash recovery
+or retention comparison is required for this run. Step 2 startup is complete.
+Read `hardware-startup-acceptance-20261019.json` beside the final package; it
+supersedes the preclarification settings-change concern. One transcript set and
+threshold confirmation were supplied, not exact per-cycle timing captures.
+Step 3 now ports the bench onto this complete baseline with the H10 clock fixes,
+configured-range mixer center validation, manual message v1 sender IDs plus the
+retained v0 definition, and two older-receiver sender-ID assignments. The older
+filter/work-queue/kernel/apps code remains pinned. Portable Debug, Release and
+ASan/UBSan each pass 2,431 checks; 28 stock GTests and 19 acceptance-checker tests
+pass. Three native runs each pass 20 scenarios / 3,632 checks on the same binary,
+including the new center-range regression. Disabled-startup smoke also passes.
+The ARM image is in `build/bench_commissioning/bench-e8ea98b404-step3/`; `.px4`
+SHA256 `a45cf99374fa7ccfd4f6349ca9a6341bacfcfa6199254f71ab2b04f0cb2aed31`.
+It is 1,854,271 package bytes, 1,957,752 image bytes, with 8,328 bytes remaining.
+The independent check validates 70 mapped production files and 250 native
+evidence files. The complete source patch reproduces all mapped files. The user
+reports this image's cold-boot tests passed and the bench command is available but
+stopped. Read the initial `hardware-boot-report-20261019.json` and subsequent
+`hardware-usb-input-assessment-20261019.json` beside the candidate. The later
+console matches base/OS/board/build identity, saved input parameters and valid
+USB manual input from instance 2 / sender 255:190. Eight snapshots show sample
+ages 2.1..40.7 ms and near-zero center, not continuous cadence or isolated-axis
+acceptance. Seven initially had buttons bit 11 set; all nine follow-up samples
+have buttons zero, and actuator_armed confirms armed/prearmed/ready-to-arm false,
+with kill/lockdown/termination/calibration false. Read the separate
+`hardware-usb-input-followup-20261019.json`: its roll-order conclusion is superseded
+by `hardware-usb-input-correction-and-telemetry-20261019.json`. The user corrected
+the final pair to right then left and verified left=-1/right=+1; leave calibration
+unchanged. Two USB telemetry timestamps span 60.062797 seconds, adding 1,570
+received messages with RX parser/overrun/drop indicators zero and TX-overrun
+count unchanged at 391. Sequence misses increase by 15,045; cause and worst-case
+input gaps remain open. These finite checks support disconnected configuration
+preparation, not physical-output acceptance. The USB signal-only profile has
+44 tokens and SHA256 1bf090fc08a058d00be6fb0f80f70a32f218c3df17695059faa6381524ea3c7f.
+Only the qualified fixture's instance token changes 0->2; synthetic values stay
+unchanged. Its separate native ready-only receipt records exact parsing, Ready
+and stop on the same qualified binary, without enable/Commander/physical drivers.
+Two mounted-path argument failures are preserved; a byte-identical whitespace-
+free native copy passes. No process remains running. The subsequent initial
+output readback and exact unapplied plan are retained in
+`hardware-output-configuration-plan-20261019.json`. Actual MAIN timers0..2=400,
+MAIN functions1..8=0, AUX4=101/Motor1, other AUX1..9=0 and prearm0 require setup.
+`usb-signal-only-setup.txt` has 30 parameter writes and one AUX4 readback gate;
+it disables AUX4 first and sets MAIN1..4 MIN500/MAX2500/CENT1500/DIS0/FAIL0,
+REV0, timers0..2=50, functions10000..10003 and prearm1/safety button. Current
+MAIN5..8 and other AUX functions are retained zero, including advertised AUX9
+beyond the module's AUX1..8 guard. No start/enable/arm/reboot is included.
+The user applied it and supplied the readback assessed in
+`hardware-output-configuration-result-20261019.json`. FMU configuration matches,
+owner stopped, armedfalse/prearmedtrue and IO init/data OK, but actual IO failsafe
+table first4 is1000 while FMU/mixer failsafe is0. Baseline registers.c ignores
+zero writes on the failsafe page (disarmed zero is accepted); the owner validates
+FMU parameters and cannot detect that IO register mismatch. User clarifications
+in `hardware-io-failsafe-followup-20261019.json` confirm console reboot and no
+current scope/logic/PWM instrument. Its requested cold-check response is recorded
+in `hardware-io-failsafe-cold-result-20261019.json`: actual IO first4 failsafe and
+disarmed entries zero, MAIN_FAIL1..4 saved0, persisted MAIN configuration, owner
+stopped, IO data OK and armedfalse/prearmedtrue with fault flags clear. This closes
+the current table mismatch, consistent with prior retained IO state; it does
+not change zero-write-ignore semantics or qualify physical fault waveforms.
+Recheck the actual IO table after future configuration/reset changes. The user used
+`usb-profile-create-ready-console.txt` and its `usb-profile-create-ready-plan.json`
+for five echo lines, complete cat readback, start/status/permission/IO and stop.
+The local 13-command recipe reconstructs the exact host profile bytes; linked
+mkdir/echo/cat and pinned NSH source behavior were verified. The subsequent
+`hardware-usb-profile-ready-result-20261019.json` records the matching complete
+board cat output, Ready/state0, two armedfalse/prearmedtrue captures, IO PWM zeros
+and first-four disarmed/failsafe zeros, then stopped status. The Ready-only subset
+passes. Board file bytes are not independently hashed; obtain host/card readback
+hash or verified transfer evidence before active acceptance. No enable occurred;
+all physical gates remain open for scope, with the module now stopped.
+The two new USB snapshots add 1,015 received / 9,435 missed messages. Source
+review found `rx_message_lost_rate=missed/received`, printed directly with a
+percent sign, so displayed 5.6%/8.1% are not valid packet-loss percentages.
+Growing sequence counts remain unexplained; the later finite USB (type 3)
+`telemetry_status` check above reports no new parser/buffer faults. Do not assume
+its uORB instance always equals MAVLink instance 2. Smoothed MANUAL_CONTROL
+rates 27.4/18.1 Hz show reception, not a worst-gap bound. PX4IO initially reported
+all MAIN functions/PWM zero with stale FMU-data; the applied functions now refresh
+FMU-data OK while present PWM still reports zero. Raw-PWM hardware enable is
+not vehicle arming. Routing/rates and actual prearm state match; current cached
+IO first4 failsafes now match zero. Installed profile/lifecycle and physical
+behavior remain open. Listener counts
+require `-n`; the procedure's positional-count commands were corrected. Build
+receipts and the initial boot report remain immutable; no physical output is
+accepted and no hardware command was issued by Codex.
+Read the new port record, candidate/qualification receipts and source manifest.
+Retain `/var/tmp/research-bench-step3-e8ea`, Docker volume
+`px4-bench-e8ea-step3-20261019` and metadata worktree
+`.agents/worktrees/bench-e8ea-step3`. The private native build excludes Gazebo;
+tests capture actual PX4 behavior in memory without physical drivers/Commander.
+Original H10 had 9,268 bytes of image headroom and remains withdrawn. Installed profiles,
 actual PWM/fault captures and powered/wind reviews remain open; hardware owner-
 stall/IO-loss test methods and the stabilized ARM integration still need development.
 The prior [runtime-profile correction and 31-case checkpoint](STABILIZED_MANUAL_SM4_RUNTIME_PROFILE_FIX.md) remains preserved at its original artifact scope.
@@ -709,7 +899,7 @@ a received MAVLink packet nor passing diagnostic tests proves acceleration track
 | Clock provider | [source proof candidate](C1E_NATIVE_CLOCK_QUALIFICATION.md), [P3A deployment](C1E_P3A_CLOCK_DEPLOYMENT.md) | `clock_deployment_capture`, `clock_deployment_checker`, `native_clock_provider`, `native_clock_representation`, `native_clock_alias` |
 | Geometry/plant | [Intake review](GAZEBO_GEOMETRY_INTAKE_REVIEW.md), [requirements](RESEARCH_VEHICLE_REQUIREMENTS.md) | `Tools/research_sitl/geometry/check_sdf_intake.py` |
 | Control/allocation | [Control architecture](CONTROL_ARCHITECTURE.md), [foundation](EDF_CANARD_CONTROL_FOUNDATION.md) | `frames`, `fixed_array`, `limiter`, `effectiveness_model`, `authority_analysis`, `control_pipeline`, `runtime_owner`, `px4_control_runtime`, `manual_control_input`, `px4_manual_control_input`, `manual_control_schema`, `manual_control_selector`, `manual_control_owner`, `mavlink_receiver`, `actuator_command_build`; future validated-acceleration-input and active-control seams in architecture |
-| Manual wind-tunnel bench | [Startup failure diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md), [flash and test procedure](MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md), [H10 software verification](MANUAL_BENCH_CONTROL_H10_FIX.md) | `bench_h10_boot_failure_record`, `bench_stock_usb_comparison_receipt`, `bench_commissioning_procedure`, `bench_acceptance_record_template`, `bench_px4_module`, `bench_output_provider`, `bench_h10_runner`; H10 withdrawn after user-reported startup failure, known-working rollback identified, historical parameter recovery recorded, clean stock comparison staged, USB hardware result pending |
+| Manual wind-tunnel bench | [Working-baseline bench port](MANUAL_BENCH_WORKING_BASE_PORT.md), [stock reference](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md), [startup diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md), [commissioning procedure](MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md) | `bench_working_base_port_record`, `bench_rollback_hardware_boot_report`, `bench_rollback_io_cold_result`, `bench_rollback_usb_ready_result`, `bench_rollback_usb_ready_console`, `bench_rollback_usb_ready_plan`, `bench_rollback_output_configuration_result`, `bench_rollback_io_failsafe_followup`, `bench_rollback_io_cold_readback`, `bench_rollback_output_configuration_plan`, `bench_rollback_usb_setup_commands`, `bench_rollback_usb_readback_commands`, `bench_rollback_usb_input_correction`, `bench_rollback_usb_signal_profile`, `bench_rollback_usb_profile_validation`, `bench_rollback_usb_input_assessment`, `bench_rollback_usb_input_followup`, `bench_rollback_runtime_listener`, `bench_rollback_runtime_mavlink_main`, `bench_rollback_runtime_telemetry_schema`, `bench_rollback_runner`, `bench_rollback_candidate_receipt`, `bench_rollback_qualification_receipt`, `bench_rollback_port_source_manifest`, `bench_rollback_port_patch`, `bench_rollback_artifact_validation`, `bench_rollback_reference_hardware_acceptance`, `bench_active_fixture`, `bench_px4_module`, `bench_output_provider`; software qualified, startup/USB input/disarmed/buttons-zero recorded, corrected roll sign accepted; finite parser check complete; FMU setup/current IO zeros match and hardware profile-content/Ready/start/stop subset passes; module stopped; next profile byte-integrity evidence and G4 signal captures; scope unavailable, enable/physical outputs pending |
 | Baseline/evidence | [first-operator closure](SITL_BASELINE_FIRST_OPERATOR_CLOSURE.md), [2026-09-27 diagnostic](SITL_BASELINE_DIAGNOSTIC_20260927.md), [baseline procedure](SITL_BASELINE_REPRODUCIBILITY.md), [test specification](SITL_TEST_SPECIFICATION.md) | `baseline_source_packager`, `baseline_capture`, `baseline_interval_scorer`, `baseline_acceptance_checker`, `baseline_checkpoint_checker` |
 | Phase exit criteria | [Roadmap](CUSTOM_VEHICLE_SITL_ROADMAP.txt), [Phase 2 audit](PHASE_2_EXIT_AUDIT.md) | Read the relevant phase, not historical agent assignments |
 
@@ -872,9 +1062,102 @@ GCC 13.2.1 package and is staged in build/bench_commissioning/stock-e880f1cd79-d
 Read comparison-receipt.json and graph node bench_stock_usb_comparison_receipt;
 the .px4 SHA256 is 35945a63a8cf64bd1f80175cb975ac8063994b66fd7e9a29997c93545c065218.
 Its four artifact hashes, image/bin consistency and startup entry points verify;
-no research source was compiled. Next collect the documented USB comparison
-result before choosing a bench replacement fix. The detached build worktree and
-isolated Docker source volume are retained; no build remains running. No bootloader
+no research source was compiled. On October 19 the user reports the same missing
+connection with stock .px4/.bin. QGC Daily verifies and completes the upload via
+ArduPilot ChibiOS loader protocol 5, board 53, flash slot 1966080; rollback still
+works. Read hardware-comparison-failure-20261019.json and the updated diagnosis.
+Tools/bench_test/inspect_bootloader.py is prepared in the private
+bootloader-readback-venv, guarded to query only USB 1209:5741 / board 53 /
+protocol 5. Sixteen fixture tests pass. Codex's query-only COM14 readback
+cold-readback-20261019T210117038214Z.json matches the stock vectors and CRC
+de5dd361; the first 32 bytes are present. No flash, boot or parameter command
+was issued. Upload finalization is confirmed for this attempt; early application
+startup/handoff is unresolved. Actual loader build ID got no reply. Identification
+holds the loader until power cycle, an inspection effect. The user completed
+step 1 rollback recovery. Step 2 stock firmware is built at exact e8ea98b404 /
+NuttX 49f3b29c92 / apps e37940d85, with private NuttX tag metadata frozen at
+11.0.0; see docs/MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md. The final software
+export is in build/bench_commissioning/stock-e8ea98b404-nuttx11-reference;
+.px4 SHA256 315f014c6acf50106fa51b1b345c6c9f3833dc8a3126ec9a69d1461ba6cf6334.
+The initial stock-e8ea98b404-reference export is superseded due to its newer
+tag-derived version labels. All four final hashes, source/archive/recipe pins,
+11.0.0 version records and 989 stock-only compile entries validate. The user has
+now flashed the final stock reference successfully: the supplied console has
+matching identities, a valid parameter load, PX4IO CRC match and USB GCS heartbeat.
+All three cold starts connected within 30 seconds and stayed connected at least
+60 seconds, user-confirmed. The user deliberately reset to stock and did not
+require a parameter backup; no old-settings recovery is pending. Step 2 startup
+passes. Read hardware-startup-acceptance-20261019.json and its supplied console;
+the earlier settings-reset concern was superseded by that clarification. Step 3
+is now software-qualified on the complete working base. Read
+docs/MANUAL_BENCH_WORKING_BASE_PORT.md and graph nodes bench_working_base_port_record,
+bench_rollback_candidate_receipt, bench_rollback_qualification_receipt and
+bench_rollback_port_source_manifest. New image directory:
+build/bench_commissioning/bench-e8ea98b404-step3; .px4 SHA256
+a45cf99374fa7ccfd4f6349ca9a6341bacfcfa6199254f71ab2b04f0cb2aed31.
+Portable 2,431 checks per configuration, 28 stock GTests, 19 checker tests and
+three repetitions of 20 native cases / 3,632 checks all pass. The new image
+links owner/lease, excludes the fixture, starts no bench owner automatically
+and has 8,328 bytes flash headroom. Source patch round-trip and 70 mapped / 250
+native evidence hashes validate. Native source /var/tmp/research-bench-step3-e8ea,
+Docker volume px4-bench-e8ea-step3-20261019 and metadata worktree bench-e8ea-step3
+are retained; original stock/H10 evidence remains intact. The user now reports the
+changed image's cold-boot tests passed and research_bench_control reports not
+running. Read hardware-boot-report-20261019.json beside the candidate and graph
+node bench_rollback_hardware_boot_report. A subsequent supplied console is
+transcribed/assessed in hardware-usb-input-assessment-20261019.json, graph node
+bench_rollback_usb_input_assessment. Runtime identity/build time match and valid
+USB input selects instance 2 / sender 255:190, with saved input settings. MAIN
+functions and reported PWM are all zero; source review explains the stale IO
+FMU-data flag and raw-PWM hardware-enable flag without claiming output health.
+The follow-up hardware-usb-input-followup-20261019.json confirms actual disarmed
+state and buttons zero. Its roll-order interpretation is superseded by
+hardware-usb-input-correction-and-telemetry-20261019.json: the user corrected the
+final pair to right then left and verified left=-1/right=+1. Keep calibration
+unchanged. Later USB telemetry spans 60.062797 seconds, adds 1,570 received and
+15,045 missed messages, with no new RX parser/overrun/drop indicators or TX
+overruns (391 unchanged). A USB 2 / 255:190 synthetic signal profile is staged,
+44 tokens, hash 1bf090fc08a058d00be6fb0f80f70a32f218c3df17695059faa6381524ea3c7f;
+the same native binary parses it, reports Ready and stops without enable or
+physical drivers. Read usb-profile-ready-validation/profile-validation.json;
+two rejected mounted-path attempts and final pass are retained. No process runs.
+The initial parameter readback and setup are retained in
+hardware-output-configuration-plan-20261019.json and usb-signal-only-setup.txt.
+The user applied them; hardware-output-configuration-result-20261019.json records
+matching FMU routing/rates/limits/off-values, AUX1..9 zero, REV0, owner stopped,
+armedfalse/prearmedtrue and IO data OK. Actual IO failsafe first4 remains1000
+despite FMU/mixer0. Source ignores zero failsafe writes; prior values may survive
+while only FMU reboots. hardware-io-failsafe-followup-20261019.json confirms console
+reboot and no instrument now (scope later). The later cold-check response in
+hardware-io-failsafe-cold-result-20261019.json reports actual IO first4 zeros,
+saved FAIL1..4 zeros and expected persisted MAIN configuration. Owner stopped,
+IO init/data OK and actual armedfalse/prearmedtrue with fault flags clear; current
+register-table check passes without any firmware fix. Recheck actual table after
+future configuration/reset changes. The user executed usb-profile-create-ready-console.txt
+(13 commands) creates/prints the USB signal profile then starts Ready and stops
+without enable. usb-profile-create-ready-plan.json retains preparation-time
+source/ELF command support and exact local echo reconstruction. The later
+hardware-usb-profile-ready-result-20261019.json confirms matching complete cat
+content, Ready/state0, two armedfalse/prearmedtrue snapshots with fault flags clear,
+IO current PWM zero and first4 disarmed/failsafe zeros, then not running. This
+passes the hardware Ready-only subset. No installed-byte hash or pin measurement
+is claimed. Next obtain host/card hash or verified transfer evidence and prepare
+G4 MAIN1..4 plus AUX4 capture with calibrated equipment; retain pre-enable pin
+baselines. Scope unavailable, so enable/full lifecycle and physical tests remain
+pending. No hardware command issued by Codex; module is stopped.
+Earlier status snapshots add 1,015 received
+and 9,435 missed messages, but source proves the percentage is misformatted:
+missed/received is printed directly with %. The counter's cause is unresolved.
+The subsequent finite parser/buffer check above supports configuration work,
+while sequence-counter cause and worst-case timing remain open. The
+displayed MANUAL_CONTROL 27.4/18.1 Hz is a smoothed interval estimate, not a gap
+guarantee. No firmware change is needed for this calibration/diagnostic stage.
+Use listener count flag -n; earlier positional counts were corrected in the
+procedure. Keep loads disconnected and owner stopped; no physical output tests
+or profile/routing acceptance yet. Retain remaining G2 boot/configuration evidence.
+No hardware command was issued by Codex for either rebuild. Detached build metadata
+worktrees and Docker source volumes are retained; do not prune the metadata-only
+build-e8ea98b404 worktree while its source volume is retained. No build remains running. No bootloader
 update or physical-output test is accepted. Proceed through measured-profile and actual-output gates before
 the separately required stabilized ARM integration; preserve all earlier evidence."
 For the prior isolated-SITL work, resume with "Read AGENTS.md and docs/PROJECT_CONTEXT.md, then

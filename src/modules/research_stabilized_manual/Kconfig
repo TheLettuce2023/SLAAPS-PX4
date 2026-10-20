@@ -1,0 +1,7 @@
+menuconfig MODULES_RESEARCH_STABILIZED_MANUAL
+	bool "research_stabilized_manual"
+	default n
+	help
+		Explicit-profile stabilized manual observer. Diagnostic output only;
+		no actuator publication, automatic startup or enable. Requires a
+		separate image from the research servo bench owner.

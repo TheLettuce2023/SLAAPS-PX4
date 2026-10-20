@@ -1,33 +1,387 @@
 {
     "schema_version":  1,
-    "as_of":  "2026-10-17",
-    "px4_head":  "e880f1cd79e2453ef3dfaf68ee1c067b98ea9a53",
+    "as_of":  "2026-10-19",
+    "px4_head":  "bde4aea3214eae9364534ca450bfd98da95f34d5",
     "kind":  "curated component dependency graph; not exhaustive or an AST call graph",
     "freshness":  "sha256 fingerprints exact anchor bytes, including untracked files; revalidate changed nodes and adjacent edges, never use HEAD alone",
     "nodes":  [
                   {
-                      "id": "bench_h10_boot_failure_record",
-                      "path": "docs/MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md",
-                      "scope": "reported_h10_boot_failure_working_rollback_parameter_recovery_history_no_debug_adapter_stock_usb_comparison_staged_no_cause_or_bench_replacement_accepted",
-                      "sha256": "fea6dfd21ddf77aef01e48b08a1d472e80e43b38f1643435ac113fab13736f4d"
+                      "id":  "bench_rollback_usb_ready_result",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-profile-ready-result-20261019.json",
+                      "scope":  "user_console_complete_44_token_profile_content_match_ready_state0_two_disarmed_prearmed_snapshots_IO_first4_zero_and_stop_pass_no_enable_no_pin_or_board_byte_hash_acceptance",
+                      "sha256":  "b00b18f1773f1b7627646c31c7744249018debb4c757e33158f984b7738ea25c"
                   },
                   {
-                      "id": "bench_stock_usb_comparison_receipt",
-                      "path": "build/bench_commissioning/stock-e880f1cd79-diagnostic/comparison-receipt.json",
-                      "scope": "clean_e880_base_v6x_gcc13_pinned_dependencies_verified_artifacts_and_usb_entry_points_no_research_module_hardware_result_pending",
-                      "sha256": "6044fd49830a1188245226cf161013c7f078ad0d98caa4bbcd05c813c6a24873"
+                      "id":  "bench_rollback_io_cold_result",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-io-failsafe-cold-result-20261019.json",
+                      "scope":  "user_requested_cold_check_response_actual_IO_first4_failsafe_and_disarmed_zero_saved_FAIL0_owner_stopped_armedfalse_prearmedtrue_current_table_pass_not_physical_fault_acceptance",
+                      "sha256":  "0396a01ce2cf4e4137eda868576aabdd5984dee77b01b167e7d8042b0f181f91"
                   },
                   {
-                      "id": "bench_commissioning_procedure",
-                      "path": "docs/MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md",
-                      "scope": "g0_g10_verifiable_flash_signal_calibration_manual_wind_and_separate_stabilized_hardware_procedure_no_physical_acceptance",
-                      "sha256": "98bba45f46ee973f83a9a46677eb3560d4c14cd0bab949feb0386ca8a539bb08"
+                      "id":  "bench_rollback_usb_ready_console",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/usb-profile-create-ready-console.txt",
+                      "scope":  "thirteen_console_commands_create_exact_USB_signal_fixture_cat_start_ready_status_permission_IO_stop_no_enable_all_energy_disconnected",
+                      "sha256":  "a7793948615a51c0679ea3758a2bde5b336d80e8c2740698848233263dc0e98c"
                   },
                   {
-                      "id": "bench_acceptance_record_template",
-                      "path": "docs/templates/MANUAL_BENCH_ACCEPTANCE_RECORD.json",
-                      "scope": "blank_twelve_category_physical_evidence_record_all_requirements_missing",
-                      "sha256": "ef265037d911902d2947a79dbfd6c5e9d32db8f0457439aba5b8444200574210"
+                      "id":  "bench_rollback_usb_ready_plan",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/usb-profile-create-ready-plan.json",
+                      "scope":  "local_echo_payload_exact_profile_round_trip_linked_NSH_commands_and_pinned_source_verified_board_bytes_and_ready_lifecycle_not_executed_or_qualified",
+                      "sha256":  "c5438aabc510dd7802c3599f23099cb636cdf26e2119912a6ca85d6ae604ccf2"
+                  },
+                  {
+                      "id":  "bench_rollback_output_configuration_result",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-output-configuration-result-20261019.json",
+                      "scope":  "preserved_console_reboot_observation_FMU_setup_matches_IO_failsafe1000_mismatch_later_cold_response_records_zero_no_physical_acceptance",
+                      "sha256":  "11fcbde32e04f799157845fd986274379c8306e01b7ad79980ffac2a4c0423fb"
+                  },
+                  {
+                      "id":  "bench_rollback_io_failsafe_followup",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-io-failsafe-followup-20261019.json",
+                      "scope":  "preserved_initial_console_reboot_and_equipment_clarification_cold_check_plan_subsequent_zero_table_result_recorded_separately",
+                      "sha256":  "701cb1aeefd9472b64cf09d9fb347d12174e6fe4942a49ab83ebad1d4d95efcf"
+                  },
+                  {
+                      "id":  "bench_rollback_io_cold_readback",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/io-failsafe-cold-readback.txt",
+                      "scope":  "read_only_after_all_source_power_removal_actual_IO_first4_failsafe_table_check_owner_stopped_and_actual_armedfalse_no_enable",
+                      "sha256":  "dc5369d07e489c25f5fc519fab1992469329ea522717043270c4bf6d62b16b45"
+                  },
+                  {
+                      "id":  "bench_rollback_output_configuration_plan",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-output-configuration-plan-20261019.json",
+                      "scope":  "preserved_pre_application_ordered30_write_plan_later_user_FMU_readback_matches_cached_IO_mismatch_recorded_separately_no_Codex_hardware_writes",
+                      "sha256":  "4240c380e61bdaa9c69d03e0b1d0a99ca139882fec7beec8ce79a89a22ea8732"
+                  },
+                  {
+                      "id":  "bench_rollback_usb_setup_commands",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/usb-signal-only-setup.txt",
+                      "scope":  "ordered30_parameter_writes_and_immediate_AUX4_zero_readback_synthetic_MAIN1to4_50Hz_safety_prearm_no_start_enable_arm_or_reboot",
+                      "sha256":  "478cc9db645eb752998c2b539b1720afe10f6b715d2774c036c7cd7b091a3cbd"
+                  },
+                  {
+                      "id":  "bench_rollback_usb_readback_commands",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/usb-signal-only-readback.txt",
+                      "scope":  "post_reboot_module_stopped_actual_MAIN_AUX_REV_timer_prearm_IO_and_armed_topic_evidence_commands_no_mutations",
+                      "sha256":  "600601a421861390d1ccbe70adf0e654ae1b00451c9566f9f7354be6a7b6865f"
+                  },
+                  {
+                      "id":  "bench_rollback_usb_input_correction",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-input-correction-and-telemetry-20261019.json",
+                      "scope":  "user_corrects_last_roll_pair_right_then_left_expected_sign_verified_USB60_062797s_RX_parser_zero_TXoverrun391_unchanged_next_config_preparation_no_outputs",
+                      "sha256":  "adfbbf5cf537045619ad37f1e46be62f79493f7716739920f2662a5141fe0246"
+                  },
+                  {
+                      "id":  "bench_rollback_usb_signal_profile",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/usb-signal-only-profile.txt",
+                      "scope":  "forty_four_token_USB_instance2_sender255_190_qualified_synthetic_fixture_changes_identity_only_no_installed_calibration_or_powered_authority",
+                      "sha256":  "1bf090fc08a058d00be6fb0f80f70a32f218c3df17695059faa6381524ea3c7f"
+                  },
+                  {
+                      "id":  "bench_rollback_usb_profile_validation",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/usb-profile-ready-validation/profile-validation.json",
+                      "scope":  "existing_native_binary_parses_exact_USB_fixture_reports_ready_and_stops_no_enable_or_physical_drivers_two_path_failures_retained",
+                      "sha256":  "e8e1b5e4cfa3758cd517f60332c62a03f02ba3de8962b16d547d04d1ddbe3fc1"
+                  },
+                  {
+                      "id":  "bench_rollback_usb_input_followup",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-input-followup-20261019.json",
+                      "scope":  "preserved_historical_order_report_roll_reversal_conclusion_superseded_by_user_correction_loss_display_finding_retained_no_outputs",
+                      "sha256":  "af8fe05d6ac893136b56978e20dca09d6e686b8a5ad30363a77aad854be97794"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_mavlink_main",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-followup-20261019/src/modules/mavlink/mavlink_main.cpp",
+                      "scope":  "exact_e8ea_source_review_for_loss_ratio_percent_format_and_parser_diagnostics_no_firmware_change",
+                      "sha256":  "19608126f936d0937b6382d53d8e0f3df672889f1b25730b6924ad1f9cd777f0"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_telemetry_schema",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-followup-20261019/msg/TelemetryStatus.msg",
+                      "scope":  "exact_e8ea_source_review_for_loss_ratio_percent_format_and_parser_diagnostics_no_firmware_change",
+                      "sha256":  "cc0371ed7880e4c7b234d652754ad2f6f3a0d8b6965f6da757c1cd987c70dabd"
+                  },
+                  {
+                      "id":  "bench_rollback_usb_input_assessment",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-input-assessment-20261019.json",
+                      "scope":  "preserved_initial_runtime_observation_source_review_later_disarm_direction_counter_followup_recorded_separately_no_outputs",
+                      "sha256":  "5176653c6521800e2640815ff9c590e12946219b42352f1ed0e022f9c66ac5f6"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_listener",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-20261019/src/systemcmds/topic_listener/listener_main.cpp",
+                      "scope":  "retained_exact_base_source_for_runtime_status_contract_review_not_a_firmware_change",
+                      "sha256":  "f49fe9cadff3c87dfe6b3c101fbcad1dd7b33e72069c9268a07fc4f8cea476fa"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_io_driver",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-20261019/src/drivers/px4io/px4io.cpp",
+                      "scope":  "retained_exact_base_source_for_runtime_status_contract_review_not_a_firmware_change",
+                      "sha256":  "4cab7e86fefe5c4d5b04c581eff30460b304696971eeb861ce5b5eb79efaebd5"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_io_mixer",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-20261019/src/modules/px4iofirmware/mixer.cpp",
+                      "scope":  "retained_exact_base_source_for_runtime_status_contract_review_not_a_firmware_change",
+                      "sha256":  "7948ffe58fb6e719490ad40906828e10e507b0eb50588a0f9e7059ab6ee90dcb"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_io_registers",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-20261019/src/modules/px4iofirmware/registers.c",
+                      "scope":  "retained_exact_base_source_for_runtime_status_contract_review_not_a_firmware_change",
+                      "sha256":  "c14a87e044b4014ed52872de80e622d3c40e36bf1616111a62ff4c2627c22dfc"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_mixer",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-20261019/src/lib/mixer_module/mixer_module.cpp",
+                      "scope":  "retained_exact_ported_source_for_runtime_status_contract_review_not_a_firmware_change",
+                      "sha256":  "feddef569ffd718ed284c87d3c475a5ba9d018f94495020a940b2342b3007dfe"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_receiver",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-20261019/src/modules/mavlink/mavlink_receiver.cpp",
+                      "scope":  "retained_exact_ported_source_for_runtime_status_contract_review_not_a_firmware_change",
+                      "sha256":  "3ee417ea531a966d7b35477987ba57224c97d42baae31d8a14fede1e8f029aa8"
+                  },
+                  {
+                      "id":  "bench_rollback_runtime_manual_owner",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/runtime-source-review-20261019/src/modules/manual_control/ManualControl.cpp",
+                      "scope":  "retained_exact_ported_source_for_runtime_status_contract_review_not_a_firmware_change",
+                      "sha256":  "8a9175028d13bd282f88c9e629af580a0a3e090603a964c20175b1fbe7f67b66"
+                  },
+                  {
+                      "id":  "bench_rollback_hardware_boot_report",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-boot-report-20261019.json",
+                      "scope":  "preserved_initial_user_cold_boot_and_stopped_module_report_later_console_assessed_separately_no_output_acceptance",
+                      "sha256":  "0a1d7a36877aaed85d70e391c471b4e35489b388fdd2ee99c6b6a1b3ae77a502"
+                  },
+                  {
+                      "id":  "bench_rollback_build_recipe",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/build-recipe.json",
+                      "scope":  "retained_container_image_environment_mounts_commands_and_native_qualification_actions_no_hardware",
+                      "sha256":  "9b8ea642aea4ed2cd355c17a1307bc503ee5e266febd577a500d1f1bcabda663"
+                  },
+                  {
+                      "id":  "bench_working_base_port_record",
+                      "path":  "docs/MANUAL_BENCH_WORKING_BASE_PORT.md",
+                      "scope":  "hardware_profile_content_and_ready_start_stop_pass_IO_zero_disarmed_prearmed_owner_stopped_G4_scope_and_byte_integrity_evidence_next_no_enable",
+                      "sha256":  "286078cfcabe4b0404de58111bb53d0de3a7c5ef9767342f7fdc71b52e2af495"
+                  },
+                  {
+                      "id":  "bench_rollback_runner",
+                      "path":  "Tools/research_sitl/verify_bench_rollback.py",
+                      "scope":  "isolated_whole_baseline_source_port_strict_host_native_stock_and_three_repeat_qualification_no_hardware",
+                      "sha256":  "e19c4b4342d668b95b0fc808df799fb3d00fa7d79bbaa6a5643f514a915dfa7e"
+                  },
+                  {
+                      "id":  "bench_rollback_docker_stage",
+                      "path":  "Tools/research_sitl/bench_rollback/docker_stage.py",
+                      "scope":  "private_arm_source_guards_whole_kernel_apps_pins_and_artifact_export_no_uploader",
+                      "sha256":  "f21ee25bb5b630ce4baea8b8242b07baf6a20b4dd5fe5ca578d3c59c063e8293"
+                  },
+                  {
+                      "id":  "bench_rollback_build_script",
+                      "path":  "Tools/research_sitl/bench_rollback/build-container.sh",
+                      "scope":  "docker_arm_build_with_before_after_source_guards_and_preserved_failure_status",
+                      "sha256":  "7d3eecac604d0543be037239fe71e7e5f0f194b93c2df6d7d389d91a10847d5d"
+                  },
+                  {
+                      "id":  "bench_rollback_stage_validator",
+                      "path":  "Tools/research_sitl/bench_rollback/validate_stage.py",
+                      "scope":  "independent_stage_source_artifact_and_native_evidence_hash_validation_no_hardware",
+                      "sha256":  "5f818c9c6909212113c817bce24f0f7917b603d8b5318b84a36b9db4732f51b3"
+                  },
+                  {
+                      "id":  "bench_rollback_port_source_manifest",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/port-source-manifest.json",
+                      "scope":  "seventy_ported_production_files_bound_to_base_donor_and_explicit_compatibility_backports",
+                      "sha256":  "9abda4df9d9647dd69b3e6f73c9209263d57618d1abc2a886b684e3caf0bcd11"
+                  },
+                  {
+                      "id":  "bench_rollback_port_patch",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/production-port-e8ea.patch",
+                      "scope":  "complete_patch_against_e8ea_reproduces_all_seventy_mapped_files_by_hash",
+                      "sha256":  "9050b475f8c3323a925100ba5d4ae87365feb31dfc4f236ce8ee6b888b08ef14"
+                  },
+                  {
+                      "id":  "bench_rollback_candidate_receipt",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/candidate-receipt.json",
+                      "scope":  "immutable_build_time_dirty_e8ea_nuttx11_v6x_artifacts_hardware_unverified_later_startup_report_separate",
+                      "sha256":  "8b742faa4845f5882176a2eb37616b50142357b993bf70da6db440309d120a8f"
+                  },
+                  {
+                      "id":  "bench_rollback_qualification_receipt",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/qualification-receipt.json",
+                      "scope":  "2431_portable_checks_per_config_28_stock19_checker_three20_case3632_check_runs_disabled_smoke_all_pass_no_physical_acceptance",
+                      "sha256":  "37cf9f819c867e80f6d05425d921be9db0be3879d255e65b495a89290e921cf8"
+                  },
+                  {
+                      "id":  "bench_rollback_native_evidence_manifest",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/native-evidence-manifest.json",
+                      "scope":  "250_retained_native_logs_inputs_configs_profiles_scripts_and_tested_binaries_hash_bound",
+                      "sha256":  "7c0b3f021e25aa1ffe4520957b1c4f2d9a061c2b7df81f8153b04ee37de859c0"
+                  },
+                  {
+                      "id":  "bench_rollback_artifact_validation",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/artifact-validation.json",
+                      "scope":  "immutable_build_time_artifact_payload70_source250_native_hash_checks_pass_crc79cea9e5_later_hardware_report_separate",
+                      "sha256":  "ec0aa56ac153c36a148b14bf00ae8306c6bec59c56db73837ccc1858e7b70c7c"
+                  },
+                  {
+                      "id":  "bench_rollback_firmware",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/px4_fmu-v6x_default_bench_e8ea98b404_nuttx11_dirty_20261019T225405Z.px4",
+                      "scope":  "v6x_board53_image1957752_cold_boots_user_reported_runtime_identity_and_USB_input_consistent_no_output_acceptance",
+                      "sha256":  "a45cf99374fa7ccfd4f6349ca9a6341bacfcfa6199254f71ab2b04f0cb2aed31"
+                  },
+                  {
+                      "id":  "bench_rollback_mavlink_receiver",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/ported-source/src/modules/mavlink/mavlink_receiver.cpp",
+                      "scope":  "older_receiver_plus_two_sender_id_assignments_target_and_instance_logic_unchanged",
+                      "sha256":  "3ee417ea531a966d7b35477987ba57224c97d42baae31d8a14fede1e8f029aa8"
+                  },
+                  {
+                      "id":  "bench_rollback_old_filter",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/ported-source/src/modules/manual_control/MovingDiff.hpp",
+                      "scope":  "exact_older_working_baseline_filter_api_preserved",
+                      "sha256":  "9ea615c8a8e997aed2b2bd19dea7a106ea852999040aefc3277082a7b2b0030d"
+                  },
+                  {
+                      "id":  "bench_rollback_old_alpha_filter",
+                      "path":  "build/bench_commissioning/bench-e8ea98b404-step3/ported-source/src/lib/mathlib/math/filter/AlphaFilter.hpp",
+                      "scope":  "exact_older_working_baseline_alpha_filter_preserved",
+                      "sha256":  "f5397a18862e2e7fa21aa8dcb589c0737005d6b2d34f53c96d3059692c0bf2d8"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_hardware_acceptance",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/hardware-startup-acceptance-20261019.json",
+                      "scope":  "runtime_identity_usb_link_and_three_cold_cycles_user_confirmed_intentional_reset_accepted_step2_pass_no_parameter_recovery_or_output_acceptance",
+                      "sha256":  "885c1b55dfb3e23ca7edfc8ce102dbadd14e06346b777687200a986099648443"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_hardware_console",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/hardware-console-user-supplied-20261019.txt",
+                      "scope":  "one_user_supplied_console_set_e8ea_49f3_nuttx11_valid_1394_byte_parameters_px4io_and_usb_gcs_heartbeat",
+                      "sha256":  "a2145c0f2052f6abfac5fe90dfcf07e3f18662cf7c6aa67c71135bcb5ca4bb13"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_preclarification_report",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/hardware-startup-result-20261019.json",
+                      "scope":  "historical_startup_report_before_user_confirmed_reset_deliberate_superseded_by_final_acceptance",
+                      "sha256":  "72f0ec49f210b5bf8302a4592e1718baf97df4a8fddbe0b46e69d36285b42468"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_procedure",
+                      "path":  "docs/MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md",
+                      "scope":  "stock_e8ea_nuttx11_runtime_identity_and_three_cold_cycles_user_confirmed_deliberate_stock_reset_step2_complete_no_actuator_acceptance",
+                      "sha256":  "ef3bbdf62a649b61d5b2c8fb2766ec8668b79a97b288aa89ee4eecaacf18699b"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_receipt",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/comparison-receipt.json",
+                      "scope":  "immutable_build_time_clean_working_baseline_artifact_pins_later_hardware_result_recorded_separately",
+                      "sha256":  "c7f2ef73e3bdb664b2db7f39af87028dffdea72405dbbf63a1c56be689540ae6"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_validation",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/artifact-validation.json",
+                      "scope":  "four_hashes_archive_recipes_tag_snapshot_image_bin_version11_and_989_stock_only_compile_entries_verified",
+                      "sha256":  "5a471c83310cc2d976517a1411d880bf61f8c46fef718a318dd87e4add09e7fa"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_boot_template",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/cold-boot-record.template.json",
+                      "scope":  "preserved_blank_three_cycle_form_completed_user_report_in_separate_acceptance_record",
+                      "sha256":  "d7fcaf4057e3fa9e0c9426a2626232b8aba1bb9bdc884329c9d7ade06448df2b"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_tag_metadata",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/nuttx-version-tag-snapshot.json",
+                      "scope":  "private_cloned_kernel_release_tags_frozen_at_11_0_0_no_host_tags_or_tracked_source_modified",
+                      "sha256":  "5902f884351e8c6d123a99b22ad9291eea1cd837b2166c1fb12d7ffbc305f391"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_build_recipe",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/build-recipe.json",
+                      "scope":  "retained_docker_image_mounts_metadata_only_worktree_volume_and_preparation_build_export_sequence",
+                      "sha256":  "a9ef5c68e9c99ac4c7951fb977c99fa3da01f6a1e66fcb436967745da1082b06"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_validator",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/validate-artifacts.py",
+                      "scope":  "retained_independent_stage_verifier_no_hardware_access",
+                      "sha256":  "c31318d6b52c6e188bf9a8e426a5e2296f74106fd38c5f32f15b9e1a219d1baa"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_version_header",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/build_git_version.h",
+                      "scope":  "generated_e8ea_px4_49f3_kernel_and_nuttx11_version_identity",
+                      "sha256":  "7fd99dd151e7d345b9d2d09c798df22cb9702d34fc1ab130af1bbee1c4817f4c"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_kernel_version",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/nuttx.version",
+                      "scope":  "generated_kernel_11_0_0_version_for_exact_working_source_commit",
+                      "sha256":  "8af651cc575149c3c773c1f198213b91f662d1d310cf4c4c53a17b5d52465e2f"
+                  },
+                  {
+                      "id":  "bench_rollback_reference_firmware",
+                      "path":  "build/bench_commissioning/stock-e8ea98b404-nuttx11-reference/px4_fmu-v6x_default_stock_e8ea98b404_nuttx11_clean_20261019T212447Z.px4",
+                      "scope":  "stock_reference_runtime_identity_and_three_cold_cycle_startup_user_confirmed_no_bench_or_actuator_acceptance",
+                      "sha256":  "315f014c6acf50106fa51b1b345c6c9f3833dc8a3126ec9a69d1461ba6cf6334"
+                  },
+                  {
+                      "id":  "bench_stock_cold_flash_readback",
+                      "path":  "build/bench_commissioning/stock-e880f1cd79-diagnostic/cold-readback-20261019T210117038214Z.json",
+                      "scope":  "actual_com14_ap_protocol5_board53_stored_vectors_and_full_slot_crc_match_stock_upload_finalized_application_startup_unresolved",
+                      "sha256":  "48c8cda14ea787a2765180d54d1eac1f27f0710b5e71bc80e6b56fe11eccf146"
+                  },
+                  {
+                      "id":  "bench_bootloader_offline_validation",
+                      "path":  "build/bench_commissioning/stock-e880f1cd79-diagnostic/readback-tool-offline-validation.json",
+                      "scope":  "candidate_crc_matches_uploader_sixteen_fixture_tests_separate_hardware_readback_recorded",
+                      "sha256":  "af863652c7fd99b7f26783dc203351a4b54f2f0067a3415dd77825fdd457be44"
+                  },
+                  {
+                      "id":  "bench_stock_boot_failure_report",
+                      "path":  "build/bench_commissioning/stock-e880f1cd79-diagnostic/hardware-comparison-failure-20261019.json",
+                      "scope":  "user_reported_stock_px4_bin_no_connection_qgc_verified_ap_loader_protocol5_board53_rollback_recovery_true",
+                      "sha256":  "739a1a7f8d3da00e9797c80dc487cb95b923f8e033d229a8098bf808706e28db"
+                  },
+                  {
+                      "id":  "bench_bootloader_reader_tests",
+                      "path":  "Tools/bench_test/test_inspect_bootloader.py",
+                      "scope":  "sixteen_hardware_free_serial_fixtures_for_crc_lead_words_usb_window_open_retry_and_query_guard",
+                      "sha256":  "72ad887fad3c61504c217f218b20ff5cc96df96248768936088a630b10fcccb6"
+                  },
+                  {
+                      "id":  "bench_bootloader_reader",
+                      "path":  "Tools/bench_test/inspect_bootloader.py",
+                      "scope":  "query_only_ap_usb_v6x_vectors_crc_optional_build_version_after_cold_boot_no_flash_or_boot_commands",
+                      "sha256":  "74905ee93ce752a2a20d184bda08d24b1de4d2a4561d4199ccc43df57f09b743"
+                  },
+                  {
+                      "id":  "bench_h10_boot_failure_record",
+                      "path":  "docs/MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md",
+                      "scope":  "newer_h10_and_stock_missing_connection_stored_stock_payload_verified_older_rebuilt_stock_boots_after_intentional_reset_exact_cause_unresolved",
+                      "sha256":  "efa952a953c2f73a28c4eb5b676636ce364fd1b5d5fba7e1fc33791da75facd6"
+                  },
+                  {
+                      "id":  "bench_stock_usb_comparison_receipt",
+                      "path":  "build/bench_commissioning/stock-e880f1cd79-diagnostic/comparison-receipt.json",
+                      "scope":  "clean_e880_v6x_verified_software_artifacts_user_reported_boot_connection_failure_see_separate_hardware_record",
+                      "sha256":  "6044fd49830a1188245226cf161013c7f078ad0d98caa4bbcd05c813c6a24873"
+                  },
+                  {
+                      "id":  "bench_commissioning_procedure",
+                      "path":  "docs/MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md",
+                      "scope":  "g0_g10_current_IO_zero_and_hardware_ready_only_subset_pass_module_stopped_G4_capture_equipment_and_full_lifecycle_pending",
+                      "sha256":  "0168fa045d5d3fa3c3f28cf9aa69cf536f549814ff960a6e1d7f14bb595179c0"
+                  },
+                  {
+                      "id":  "bench_acceptance_record_template",
+                      "path":  "docs/templates/MANUAL_BENCH_ACCEPTANCE_RECORD.json",
+                      "scope":  "blank_twelve_category_physical_evidence_record_all_requirements_missing",
+                      "sha256":  "ef265037d911902d2947a79dbfd6c5e9d32db8f0457439aba5b8444200574210"
                   },
                   {
                       "id":  "stabilized_manual_api",
@@ -39,7 +393,7 @@
                       "id":  "stabilized_manual_core",
                       "path":  "src/lib/research_stabilized_manual/StabilizedManualControl.cpp",
                       "scope":  "host_verified_body_rate_quaternion_hold_pid_saturation_and_fault_latch",
-                      "sha256":  "a1cf3ed69f942d76961c7d74b441a20d0a04d07628dfb819dd456061b8241a08"
+                      "sha256":  "804b685545ecc0a27d68f6cf976a31f66c66a13cd17b76fc952bdb9cb88467f1"
                   },
                   {
                       "id":  "stabilized_manual_allocator_api",
@@ -51,7 +405,7 @@
                       "id":  "stabilized_manual_allocator",
                       "path":  "src/lib/research_stabilized_manual/CanardAllocator.cpp",
                       "scope":  "bounded_81_active_set_weighted_regularized_box_and_slew_solver",
-                      "sha256":  "8f9bd92e28c07f53ba84622cefb327a1f31edaf11a09589a24207ccb2de3c2ea"
+                      "sha256":  "b9687b2483cb38ba0a4ca6ddd91d923efdda8a54d1dd41fe4433443e810227dd"
                   },
                   {
                       "id":  "stabilized_manual_test",
@@ -63,7 +417,7 @@
                       "id":  "stabilized_manual_build",
                       "path":  "src/lib/research_stabilized_manual/CMakeLists.txt",
                       "scope":  "standalone_strict_host_build_real_generated_rate_status_and_unmodified_pid",
-                      "sha256":  "b22a4cb4f4320dcc707413d2e9f28787472cc2e16ca2de0a9c15c3b6768e4035"
+                      "sha256":  "fe754ad0650346303da26bb2d5f937da3ba68cc37db601a4b58145914f24635c"
                   },
                   {
                       "id":  "stabilized_manual_runner",
@@ -170,8 +524,8 @@
                   {
                       "id":  "bench_active_fixture",
                       "path":  "Tools/research_sitl/bench_active/BenchActiveTest.cpp",
-                      "scope":  "actual_selector_owner_mixer_memory_sink_and_loopback_ingress",
-                      "sha256":  "9cf96434a94246cb9a577b0cbb9bc3916585a4f0d5f2902e3a31bc7eb5ecf7f9"
+                      "scope":  "actual_selector_owner_mixer_memory_sink_loopback_and_configured_center_regression_twenty_cases_in_working_base_port",
+                      "sha256":  "2dc298f858a539304f83b2e391c8f5b009cf582d0b0e2685fdde3739a8974f24"
                   },
                   {
                       "id":  "bench_active_build",
@@ -201,7 +555,7 @@
                       "id":  "project_context",
                       "path":  "docs/PROJECT_CONTEXT.md",
                       "scope":  "compact_current_handoff",
-                      "sha256":  "0c1d0d10dc5bfa29769c9a2874e1633e4865a7ea263ec5dbf1025a853e5cde61"
+                      "sha256":  "8f902e8515eabae6e0e2f399ae10b1841c71ac3977dc18a5a31f2d38d07c11fc"
                   },
                   {
                       "id":  "phase_gate_status",
@@ -261,7 +615,7 @@
                       "id":  "bench_msg_build",
                       "path":  "msg/CMakeLists.txt",
                       "scope":  "bench_topic_generation",
-                      "sha256":  "57abde1e5ea87ca1d15334fd5313b12f0a96f6881c58b51260680f86cf6f9f51"
+                      "sha256":  "8af1e557816f26714921fcb3ad214f1b4716cbf139831a0f7e3ced7a8bdc6450"
                   },
                   {
                       "id":  "bench_output_provider",
@@ -573,7 +927,7 @@
                       "id":  "actuator_command_px4_registration",
                       "path":  "src/lib/CMakeLists.txt",
                       "scope":  "px4_excluded_by_default_registration",
-                      "sha256":  "11b2888cb5ed4e9d792f65610486cf70fdd0fbda2c345feaeed511e8c716ce1d"
+                      "sha256":  "456d29b2edc7329b9f2b22392b86f20d266fd9967588de6a38c488172aea7d5b"
                   },
                   {
                       "id":  "manual_control_input_api",
@@ -2707,81 +3061,957 @@
                       "id":  "stabilized_manual_completion_audit",
                       "path":  "docs/STABILIZED_MANUAL_COMPLETION_AUDIT.md",
                       "scope":  "original_goal_incomplete_three_consecutive_vehicle_input_blocker_audits",
-                      "sha256":  "b970078051411bb10d7794ae2a4fe7e5637e93e832d2d3ddd84c11245cb0bd6f"
+                      "sha256":  "798968fb1a3c715b5310b959c2e2ede1c29d6f40c5fc66363b3b2034f1685ed5"
+                  },
+                  {
+                      "id":  "stabilized_observer_profile_api",
+                      "path":  "src/lib/research_stabilized_manual/ObserverProfile.hpp",
+                      "scope":  "explicit_output_disabled_profile_no_vehicle_defaults",
+                      "sha256":  "2e40d63f05978ad2b5d8aa363c52a039f47a52fc0d0428fd0c745774b2c853a1"
+                  },
+                  {
+                      "id":  "stabilized_observer_profile",
+                      "path":  "src/lib/research_stabilized_manual/ObserverProfile.cpp",
+                      "scope":  "86_token_atomic_profile_parse_zero_thrust_no_output_authority",
+                      "sha256":  "ab644478daf9a5d18e45e761c5ba8f9fc6a7a91b0ce9d6fa3b02ee8c2b6da172"
+                  },
+                  {
+                      "id":  "stabilized_observer_profile_test",
+                      "path":  "src/lib/research_stabilized_manual/ObserverProfileTest.cpp",
+                      "scope":  "193_strict_debug_release_sanitized_checks_parse_faults_and_zero_thrust_hold",
+                      "sha256":  "031f50764db816e2d1a0614843b21724aa62f5713ccd15f65512b86a84f1fcbe"
+                  },
+                  {
+                      "id":  "stabilized_observer_module",
+                      "path":  "src/modules/research_stabilized_manual/ResearchStabilizedManual.cpp",
+                      "scope":  "default_off_nuttx_observer_selected_state_body_rate_hold_diagnostics_only_no_actuator_publisher",
+                      "sha256":  "d1b333f3ef2b2bc6d4608cd226d1c4328cc9cf41bd745a730827e116b06663a4"
+                  },
+                  {
+                      "id":  "stabilized_observer_module_build",
+                      "path":  "src/modules/research_stabilized_manual/CMakeLists.txt",
+                      "scope":  "explicit_module_build_rejects_concurrent_bench_inclusion",
+                      "sha256":  "cb510df311b51e15531aa7ccbed2b16edcd70986c3320e435ede0bf8730924f1"
+                  },
+                  {
+                      "id":  "stabilized_observer_kconfig",
+                      "path":  "src/modules/research_stabilized_manual/Kconfig",
+                      "scope":  "default_off_observer_no_startup",
+                      "sha256":  "241b85756ddeedf709c38e008ece87941a10a84ec5ca9ca9f23f5ac7792b0561"
+                  },
+                  {
+                      "id":  "stabilized_observer_status",
+                      "path":  "msg/StabilizedObserverStatus.msg",
+                      "scope":  "diagnostic_validity_reference_rate_allocation_session_fault_no_output_authority",
+                      "sha256":  "de88a095c85c37c4ed4e32eb8016639a5bdaa76d129717164218770607f68ba4"
+                  },
+                  {
+                      "id":  "stabilized_observer_native_test",
+                      "path":  "Tools/research_sitl/stabilized_observer/ObserverIntegrationTest.cpp",
+                      "scope":  "final_actual_module_native_input_fault_recovery_9015_checks_no_actuation_no_physics",
+                      "sha256":  "d62cb960df5d08d4d274e0631691051732e57b710bc165e2cce02e1fee68dc53"
+                  },
+                  {
+                      "id":  "stabilized_observer_native_build",
+                      "path":  "Tools/research_sitl/stabilized_observer/CMakeLists.txt",
+                      "scope":  "private_posix_integration_fixture",
+                      "sha256":  "e3db34b678ef4518833c805238c68c3098371a5402390010ff15f260a2a0e449"
+                  },
+                  {
+                      "id":  "stabilized_observer_native_kconfig",
+                      "path":  "Tools/research_sitl/stabilized_observer/Kconfig",
+                      "scope":  "private_test_module_default_off",
+                      "sha256":  "b399bc04818901fcaa52d25e688a8c0f8532fe56c11d2848f4f10ce27fce4952"
+                  },
+                  {
+                      "id":  "stabilized_observer_verifier",
+                      "path":  "Tools/research_sitl/verify_stabilized_observer.py",
+                      "scope":  "isolated_working_base_prepare_host_native_test_and_seal_no_hardware",
+                      "sha256":  "34b345582a92e50cdbd486cdf1f834d361cf03bc75806196ff7407e5d966fab9"
+                  },
+                  {
+                      "id":  "stabilized_observer_arm_stage",
+                      "path":  "Tools/research_sitl/stabilized_observer/arm_stage.py",
+                      "scope":  "isolated_arm_source_guard_and_symbol_image_export_no_flash",
+                      "sha256":  "baa4312e23c6fb6a6ac7227f011845ccfdd8d064e9ebb038c92aa09c2d531697"
+                  },
+                  {
+                      "id":  "stabilized_observer_arm_build",
+                      "path":  "Tools/research_sitl/stabilized_observer/arm_build.sh",
+                      "scope":  "source_guarded_px4_dev_arm_build",
+                      "sha256":  "db53b07153c0796e3e9d4c8c8ae2ea1d2db80ff88fa7c7649c21fdc5db9bd925"
+                  },
+                  {
+                      "id":  "stabilized_observer_record",
+                      "path":  "docs/STABILIZED_MANUAL_HARDWARE_OBSERVER.md",
+                      "scope":  "partial_G9_observer_verified_4376_flash_bytes_remaining_active_outputs_and_hardware_open",
+                      "sha256":  "6c251384b5b710ffe7c72810d4a40cb6795ed4c534b154929834181a860a5a65"
+                  },
+                  {
+                      "id":  "stabilized_observer_arm_receipt",
+                      "path":  "build/stabilized_observer/e8ea-20261019/observer-arm-receipt.json",
+                      "scope":  "working_base_dirty_pixhawk_observer_build_zero_exit_no_hardware",
+                      "sha256":  "3f841d1fff9fd263296874d4ede40bce8794bdabf15e30bc8e4baf53062ee507"
+                  },
+                  {
+                      "id":  "stabilized_observer_arm_source",
+                      "path":  "build/stabilized_observer/e8ea-20261019/arm-overlay-inputs.json",
+                      "scope":  "exact_inherited_backport_and_observer_overlay_source_hashes",
+                      "sha256":  "e2b963d3c562c6025ac6975c3925b17d51cbd686e1f94f02a87118690457b593"
+                  },
+                  {
+                      "id":  "stabilized_output_api",
+                      "path":  "src/lib/research_stabilized_manual/StabilizedOutput.hpp",
+                      "scope":  "portable_explicit_session_acknowledgement_and_consumer_expiry_contract_no_runtime_binding",
+                      "sha256":  "25284bace3cc0df35154da831d5b82cb045434dff540e64d5c4f881eea806db5"
+                  },
+                  {
+                      "id":  "stabilized_output_core",
+                      "path":  "src/lib/research_stabilized_manual/StabilizedOutput.cpp",
+                      "scope":  "four_servo_calibrated_mapping_permission_inhibition_and_latched_lease_no_driver",
+                      "sha256":  "e18e9de0b243747b7941766174758bb19c6a2579ceaafdb4fae81b701bd94587"
+                  },
+                  {
+                      "id":  "stabilized_output_test",
+                      "path":  "src/lib/research_stabilized_manual/StabilizedOutputTest.cpp",
+                      "scope":  "synthetic_mapping_protocol_faults_and_actual_control_core_to_consumer_host_tests",
+                      "sha256":  "bbe92a33c4a4dbec54319a2b2ba5fa994c8ea37b4cc69214e3ffab1452ab0678"
+                  },
+                  {
+                      "id":  "stabilized_output_record",
+                      "path":  "docs/STABILIZED_MANUAL_OUTPUT_CONTRACT.md",
+                      "scope":  "portable_G9_output_boundary_verified_no_PX4_runtime_driver_or_hardware_integration",
+                      "sha256":  "164b4e358d271f4a594e0410a5c881bf94c8f4f699e55e4530419d021ae5e099"
+                  },
+                  {
+                      "id":  "stabilized_output_verification",
+                      "path":  "build/stabilized_output/20261019/verification.json",
+                      "scope":  "126013_checks_each_Debug_Release_ASan_UBSan_234_host_files_111_ARM_dependencies_rehashed_zero_mismatch",
+                      "sha256":  "e37181f606f31a639d7401d158cfada48d384e02f2899816bac66313a5ab7340"
+                  },
+                  {
+                      "id":  "stabilized_output_arm_receipt",
+                      "path":  "build/stabilized_output/20261019/arm-receipt.json",
+                      "scope":  "working_baseline_NuttX11_GCC13_2_1_unlinked_object_2068_text_zero_data_bss_no_firmware_size_claim",
+                      "sha256":  "fe1b6c1ebc6b29831a012f81c269ba6025393ba41367aea8fe89776c26d0675a"
+                  },
+                  {
+                      "id":  "stabilized_output_arm_recipe",
+                      "path":  "build/stabilized_output/20261019/check_arm.py",
+                      "scope":  "read_only_retained_observer_build_environment_one_object_all_header_snapshot_recipe",
+                      "sha256":  "3c94a36fcb9fa72573f523a609029e4956069c35e656b5a5e2582575ba76481d"
+                  },
+                  {
+                      "id":  "stabilized_output_arm_container",
+                      "path":  "build/stabilized_output/20261019/docker-args.json",
+                      "scope":  "read_only_firmware_volume_and_workspace_with_separate_writable_evidence",
+                      "sha256":  "85403471b436c1a19cbd808a7460ae81fbb09afaff704ac5a573634385ebf496"
                   }
               ],
     "edges":  [
                   {
-                      "from": "bench_h10_boot_failure_record",
-                      "to": "bench_stock_usb_comparison_receipt",
-                      "relation": "defines a no-adapter USB comparison using clean H10 base firmware and pinned artifacts",
-                      "scope": "stock_build_verified_hardware_boot_pending"
+                      "from":  "project_context",
+                      "to":  "bench_rollback_usb_ready_result",
+                      "relation":  "records completed user hardware profile-content and Ready-only start/stop subset",
+                      "scope":  "disarmed_prearmed_IO_zero_no_enable_no_physical_acceptance"
                   },
                   {
-                      "from": "project_context",
-                      "to": "bench_stock_usb_comparison_receipt",
-                      "relation": "identifies the next disconnected-output hardware diagnosis artifact",
-                      "scope": "no_bench_or_stabilized_acceptance_advanced"
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_usb_ready_result",
+                      "relation":  "records completed user hardware profile-content and Ready-only start/stop subset",
+                      "scope":  "disarmed_prearmed_IO_zero_no_enable_no_physical_acceptance"
                   },
                   {
-                      "from": "bench_h10_boot_failure_record",
-                      "to": "bench_h10_contract",
-                      "relation": "preserves bounded software evidence while recording failed hardware startup qualification",
-                      "scope": "h10_hardware_failure_cause_unresolved"
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_usb_ready_result",
+                      "relation":  "records completed user hardware profile-content and Ready-only start/stop subset",
+                      "scope":  "disarmed_prearmed_IO_zero_no_enable_no_physical_acceptance"
                   },
                   {
-                      "from": "bench_h10_boot_failure_record",
-                      "to": "bench_commissioning_procedure",
-                      "relation": "withdraws routine H10 commissioning and requires actual boot verification before G2-G4 resume",
-                      "scope": "no_hardware_output_gate_advanced"
+                      "from":  "bench_rollback_usb_ready_result",
+                      "to":  "bench_rollback_usb_ready_console",
+                      "relation":  "records user execution of the staged console recipe",
+                      "scope":  "hardware_ready_only_not_enabled_or_pin_measured"
                   },
                   {
-                      "from": "bench_h10_boot_failure_record",
-                      "to": "bench_px4_module",
-                      "relation": "records linked presence without inferring that hardware startup reaches or runs this default-off module",
-                      "scope": "static_checks_not_boot_acceptance"
+                      "from":  "bench_rollback_usb_ready_result",
+                      "to":  "bench_rollback_usb_ready_plan",
+                      "relation":  "retains earlier preparation-time scope without rewriting receipt",
+                      "scope":  "hardware_ready_only_not_enabled_or_pin_measured"
                   },
                   {
-                      "from": "bench_commissioning_procedure",
-                      "to": "bench_h10_contract",
-                      "relation": "identifies retained source-bound firmware and software qualification before hardware commissioning",
-                      "scope": "procedure_existing_candidate_no_new_build"
+                      "from":  "bench_rollback_usb_ready_result",
+                      "to":  "bench_rollback_usb_signal_profile",
+                      "relation":  "compares complete displayed five-line 44-token content with the staged fixture",
+                      "scope":  "hardware_ready_only_not_enabled_or_pin_measured"
                   },
                   {
-                      "from": "bench_commissioning_procedure",
-                      "to": "bench_px4_module",
-                      "relation": "documents exact 44-token profile, routing checks and disarmed/prearmed CLI lifecycle",
-                      "scope": "physical_execution_pending"
+                      "from":  "bench_rollback_usb_ready_result",
+                      "to":  "bench_rollback_usb_profile_validation",
+                      "relation":  "adds later hardware Ready-only observation to earlier native parse qualification",
+                      "scope":  "hardware_ready_only_not_enabled_or_pin_measured"
                   },
                   {
-                      "from": "bench_commissioning_procedure",
-                      "to": "bench_output_provider",
-                      "relation": "requires actual PWM and independent expiry/fault captures through the hardware output path",
-                      "scope": "physical_execution_pending"
+                      "from":  "bench_rollback_usb_ready_result",
+                      "to":  "bench_rollback_io_cold_result",
+                      "relation":  "confirms actual first-four IO failsafe and disarmed zeros persist in Ready check",
+                      "scope":  "hardware_ready_only_not_enabled_or_pin_measured"
                   },
                   {
-                      "from": "bench_commissioning_procedure",
-                      "to": "bench_acceptance_contract",
-                      "relation": "uses ordered physical release and named review requirements",
-                      "scope": "no_flash_powered_or_wind_authorization_granted"
+                      "from":  "bench_rollback_usb_ready_result",
+                      "to":  "bench_rollback_candidate_receipt",
+                      "relation":  "binds later hardware observation without changing sealed build receipt",
+                      "scope":  "hardware_ready_only_not_enabled_or_pin_measured"
                   },
                   {
-                      "from": "bench_commissioning_procedure",
-                      "to": "bench_acceptance_record_template",
-                      "relation": "provides a blank session record for the required physical evidence",
-                      "scope": "all_requirements_missing"
+                      "from":  "project_context",
+                      "to":  "bench_rollback_io_cold_result",
+                      "relation":  "records the later actual first-four IO zero table observation and disarmed prearm state while retaining earlier mismatch history",
+                      "scope":  "current_register_table_check_only_hardware_profile_and_physical_fault_measurements_pending"
                   },
                   {
-                      "from": "bench_acceptance_record_template",
-                      "to": "bench_acceptance_checker",
-                      "relation": "generated by the existing read-only checker template interface",
-                      "scope": "record_completeness_and_integrity_not_authority"
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_io_cold_result",
+                      "relation":  "records the later actual first-four IO zero table observation and disarmed prearm state while retaining earlier mismatch history",
+                      "scope":  "current_register_table_check_only_hardware_profile_and_physical_fault_measurements_pending"
                   },
                   {
-                      "from": "bench_commissioning_procedure",
-                      "to": "stabilized_manual_goal",
-                      "relation": "defines measured plant, separate NuttX integration and restrained physical rate/quaternion-hold acceptance after manual bench commissioning",
-                      "scope": "planned_vehicle_supported_control_not_sitl_promotion"
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_io_cold_result",
+                      "relation":  "records the later actual first-four IO zero table observation and disarmed prearm state while retaining earlier mismatch history",
+                      "scope":  "current_register_table_check_only_hardware_profile_and_physical_fault_measurements_pending"
+                  },
+                  {
+                      "from":  "bench_rollback_io_failsafe_followup",
+                      "to":  "bench_rollback_io_cold_result",
+                      "relation":  "records the later actual first-four IO zero table observation and disarmed prearm state while retaining earlier mismatch history",
+                      "scope":  "current_register_table_check_only_hardware_profile_and_physical_fault_measurements_pending"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_result",
+                      "to":  "bench_rollback_io_cold_result",
+                      "relation":  "records the later actual first-four IO zero table observation and disarmed prearm state while retaining earlier mismatch history",
+                      "scope":  "current_register_table_check_only_hardware_profile_and_physical_fault_measurements_pending"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_usb_ready_console",
+                      "relation":  "provides the current console-only fixture creation inspection and disabled Ready/start/stop step",
+                      "scope":  "staged_ready_only_recipe_no_hardware_execution_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_usb_ready_console",
+                      "relation":  "hands off hardware profile readback and Ready-only execution as next without enable or powered outputs",
+                      "scope":  "staged_ready_only_recipe_no_hardware_execution_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_ready_console",
+                      "to":  "bench_rollback_usb_ready_plan",
+                      "relation":  "binds exact command bytes to the local reconstruction and pinned linked-command support check",
+                      "scope":  "staged_ready_only_recipe_no_hardware_execution_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_ready_plan",
+                      "to":  "bench_rollback_usb_signal_profile",
+                      "relation":  "reconstructs all five lines and 44 tokens locally without claiming a hash of installed board bytes",
+                      "scope":  "staged_ready_only_recipe_no_hardware_execution_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_ready_plan",
+                      "to":  "bench_rollback_usb_profile_validation",
+                      "relation":  "reuses the unchanged synthetic profile already parsed Ready and stopped on the qualified native binary",
+                      "scope":  "staged_ready_only_recipe_no_hardware_execution_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_output_configuration_result",
+                      "relation":  "records matching user-applied FMU configuration and the distinct actual IO cached failsafe mismatch before enable",
+                      "scope":  "FMU_configuration_subset_only_actual_IO_failsafe_gate_open"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_output_configuration_result",
+                      "relation":  "records matching user-applied FMU configuration and the distinct actual IO cached failsafe mismatch before enable",
+                      "scope":  "FMU_configuration_subset_only_actual_IO_failsafe_gate_open"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_output_configuration_result",
+                      "relation":  "records matching user-applied FMU configuration and the distinct actual IO cached failsafe mismatch before enable",
+                      "scope":  "FMU_configuration_subset_only_actual_IO_failsafe_gate_open"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_plan",
+                      "to":  "bench_rollback_output_configuration_result",
+                      "relation":  "records matching user-applied FMU configuration and the distinct actual IO cached failsafe mismatch before enable",
+                      "scope":  "FMU_configuration_subset_only_actual_IO_failsafe_gate_open"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_result",
+                      "to":  "bench_rollback_io_failsafe_followup",
+                      "relation":  "records subsequent console-reboot and unavailable-instrument clarifications with a bounded unexecuted cold-check plan",
+                      "scope":  "diagnostic_plan_no_hardware_command_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_io_failsafe_followup",
+                      "relation":  "holds enable and physical tests pending actual IO fallback review and calibrated capture",
+                      "scope":  "diagnostic_plan_no_hardware_command_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_io_failsafe_followup",
+                      "relation":  "hands off full-power IO reset/readback as next hardware diagnostic with current parameters unchanged",
+                      "scope":  "diagnostic_plan_no_hardware_command_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_io_failsafe_followup",
+                      "to":  "bench_rollback_io_cold_readback",
+                      "relation":  "provides read-only commands after actual complete power removal without assuming a zero table result",
+                      "scope":  "diagnostic_plan_no_hardware_command_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_io_failsafe_followup",
+                      "to":  "bench_rollback_runtime_io_registers",
+                      "relation":  "binds zero-write ignore and zero initialization semantics to retained baseline source",
+                      "scope":  "diagnostic_plan_no_hardware_command_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_io_failsafe_followup",
+                      "to":  "bench_rollback_runtime_io_driver",
+                      "relation":  "binds actualFailsafeValue forwarding and IO page readback to retained baseline driver source",
+                      "scope":  "diagnostic_plan_no_hardware_command_or_physical_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_output_configuration_plan",
+                      "relation":  "preserves the initial setup plan while later application and IO register mismatch are recorded separately",
+                      "scope":  "G3_configuration_preparation_only_no_hardware_application_or_outputs"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_output_configuration_plan",
+                      "relation":  "preserves the initial setup plan while later application and IO register mismatch are recorded separately",
+                      "scope":  "G3_configuration_preparation_only_no_hardware_application_or_outputs"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_output_configuration_plan",
+                      "relation":  "preserves the initial setup plan while later application and IO register mismatch are recorded separately",
+                      "scope":  "G3_configuration_preparation_only_no_hardware_application_or_outputs"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_plan",
+                      "to":  "bench_rollback_usb_setup_commands",
+                      "relation":  "retains ordered writes with AUX4 disable/readback first and no automatic owner or reboot command",
+                      "scope":  "source_reviewed_unapplied_signal_configuration_only"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_plan",
+                      "to":  "bench_rollback_usb_readback_commands",
+                      "relation":  "requires persisted actual IO configuration and stopped disarmed state after operator reboot",
+                      "scope":  "source_reviewed_unapplied_signal_configuration_only"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_plan",
+                      "to":  "bench_rollback_usb_signal_profile",
+                      "relation":  "uses the exact synthetic profile neutral and USB identity without installed-servo calibration",
+                      "scope":  "source_reviewed_unapplied_signal_configuration_only"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_plan",
+                      "to":  "bench_px4_module",
+                      "relation":  "derives required MAIN routing limits center off-values and reversal from the compiled routing validator",
+                      "scope":  "source_reviewed_unapplied_signal_configuration_only"
+                  },
+                  {
+                      "from":  "bench_rollback_output_configuration_plan",
+                      "to":  "bench_output_functions",
+                      "relation":  "identifies function101 as Motor1 and functions10000to10003 as dedicated bench outputs",
+                      "scope":  "source_reviewed_unapplied_signal_configuration_only"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_usb_input_correction",
+                      "relation":  "records the user-corrected roll labels and finite USB parser/buffer observations while preserving prior evidence and open sequence-counter finding",
+                      "scope":  "input_observation_and_configuration_preparation_only_no_outputs"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_usb_input_correction",
+                      "relation":  "records the user-corrected roll labels and finite USB parser/buffer observations while preserving prior evidence and open sequence-counter finding",
+                      "scope":  "input_observation_and_configuration_preparation_only_no_outputs"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_usb_input_correction",
+                      "relation":  "records the user-corrected roll labels and finite USB parser/buffer observations while preserving prior evidence and open sequence-counter finding",
+                      "scope":  "input_observation_and_configuration_preparation_only_no_outputs"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_followup",
+                      "to":  "bench_rollback_usb_input_correction",
+                      "relation":  "records the user-corrected roll labels and finite USB parser/buffer observations while preserving prior evidence and open sequence-counter finding",
+                      "scope":  "input_observation_and_configuration_preparation_only_no_outputs"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_correction",
+                      "to":  "bench_rollback_usb_signal_profile",
+                      "relation":  "identifies the staged USB-bound synthetic fixture for disconnected configuration preparation",
+                      "scope":  "synthetic_signal_fixture_only_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_usb_signal_profile",
+                      "relation":  "provides the exact 44-token electrical fixture and its scope before installed configuration",
+                      "scope":  "synthetic_signal_fixture_only_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_signal_profile",
+                      "to":  "bench_rollback_usb_profile_validation",
+                      "relation":  "binds exact profile bytes to a native Ready-only parse start and stop check",
+                      "scope":  "synthetic_signal_fixture_only_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_usb_profile_validation",
+                      "relation":  "retains the native check and both rejected mounted-path attempts",
+                      "scope":  "synthetic_signal_fixture_only_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_profile_validation",
+                      "to":  "bench_rollback_native_evidence_manifest",
+                      "relation":  "derives only the instance token from a hash-bound qualified synthetic profile",
+                      "scope":  "synthetic_signal_fixture_only_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_usb_input_followup",
+                      "relation":  "preserves the earlier direction-label report whose roll-reversal conclusion is superseded by the user correction",
+                      "scope":  "input_calibration_diagnostics_only_physical_outputs_pending"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_usb_input_followup",
+                      "relation":  "preserves the earlier direction-label report whose roll-reversal conclusion is superseded by the user correction",
+                      "scope":  "input_calibration_diagnostics_only_physical_outputs_pending"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_usb_input_followup",
+                      "relation":  "preserves the earlier direction-label report whose roll-reversal conclusion is superseded by the user correction",
+                      "scope":  "input_calibration_diagnostics_only_physical_outputs_pending"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_usb_input_followup",
+                      "relation":  "preserves the earlier direction-label report whose roll-reversal conclusion is superseded by the user correction",
+                      "scope":  "input_calibration_diagnostics_only_physical_outputs_pending"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_followup",
+                      "to":  "bench_rollback_runtime_mavlink_main",
+                      "relation":  "binds exact source for the missed_received ratio percent formatting smoothed receive-rate estimates and parser diagnostic counter semantics",
+                      "scope":  "source_review_no_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_followup",
+                      "to":  "bench_rollback_runtime_telemetry_schema",
+                      "relation":  "binds exact source for the missed_received ratio percent formatting smoothed receive-rate estimates and parser diagnostic counter semantics",
+                      "scope":  "source_review_no_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_followup",
+                      "to":  "bench_rollback_runtime_receiver",
+                      "relation":  "binds exact source for the missed_received ratio percent formatting smoothed receive-rate estimates and parser diagnostic counter semantics",
+                      "scope":  "source_review_no_firmware_change"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_usb_input_assessment",
+                      "relation":  "retains later runtime identity and selected USB input evidence while leaving axis mapping timing routing and physical outputs open",
+                      "scope":  "G3_input_observation_only_no_output_acceptance"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_usb_input_assessment",
+                      "relation":  "retains later runtime identity and selected USB input evidence while leaving axis mapping timing routing and physical outputs open",
+                      "scope":  "G3_input_observation_only_no_output_acceptance"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_usb_input_assessment",
+                      "relation":  "retains later runtime identity and selected USB input evidence while leaving axis mapping timing routing and physical outputs open",
+                      "scope":  "G3_input_observation_only_no_output_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_hardware_boot_report",
+                      "to":  "bench_rollback_usb_input_assessment",
+                      "relation":  "retains later runtime identity and selected USB input evidence while leaving axis mapping timing routing and physical outputs open",
+                      "scope":  "G3_input_observation_only_no_output_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_runtime_listener",
+                      "relation":  "binds the exact reviewed source for listener syntax IO freshness hardware enable or manual input statistics interpretation",
+                      "scope":  "runtime_source_review_only_no_code_or_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_runtime_io_driver",
+                      "relation":  "binds the exact reviewed source for listener syntax IO freshness hardware enable or manual input statistics interpretation",
+                      "scope":  "runtime_source_review_only_no_code_or_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_runtime_io_mixer",
+                      "relation":  "binds the exact reviewed source for listener syntax IO freshness hardware enable or manual input statistics interpretation",
+                      "scope":  "runtime_source_review_only_no_code_or_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_runtime_io_registers",
+                      "relation":  "binds the exact reviewed source for listener syntax IO freshness hardware enable or manual input statistics interpretation",
+                      "scope":  "runtime_source_review_only_no_code_or_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_runtime_mixer",
+                      "relation":  "binds the exact reviewed source for listener syntax IO freshness hardware enable or manual input statistics interpretation",
+                      "scope":  "runtime_source_review_only_no_code_or_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_runtime_receiver",
+                      "relation":  "binds the exact reviewed source for listener syntax IO freshness hardware enable or manual input statistics interpretation",
+                      "scope":  "runtime_source_review_only_no_code_or_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_usb_input_assessment",
+                      "to":  "bench_rollback_runtime_manual_owner",
+                      "relation":  "binds the exact reviewed source for listener syntax IO freshness hardware enable or manual input statistics interpretation",
+                      "scope":  "runtime_source_review_only_no_code_or_firmware_change"
+                  },
+                  {
+                      "from":  "bench_rollback_hardware_boot_report",
+                      "to":  "bench_rollback_firmware",
+                      "relation":  "records the user-reported cold-boot pass and stopped command in the candidate context without an independent installed-byte readback",
+                      "scope":  "startup_user_report_only_no_output_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_hardware_boot_report",
+                      "to":  "bench_rollback_candidate_receipt",
+                      "relation":  "records later hardware observations separately while preserving the sealed build-time receipt",
+                      "scope":  "startup_user_report_only_no_output_acceptance"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_hardware_boot_report",
+                      "relation":  "retains the exact user statement and identifies remaining console and configuration evidence",
+                      "scope":  "startup_user_report_only_next_G3_input"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_hardware_boot_report",
+                      "relation":  "advances the startup subchecks while preserving remaining G2 evidence and disconnected G3 gates",
+                      "scope":  "startup_user_report_only_next_G3_input"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_hardware_boot_report",
+                      "relation":  "hands off user-reported startup success and the next stopped-module input check",
+                      "scope":  "startup_user_report_only_next_G3_input"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_build_recipe",
+                      "relation":  "retains the explicit build environment and source-volume command recipe",
+                      "scope":  "step3_software_build_recipe_later_hardware_report_separate"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_working_base_port_record",
+                      "relation":  "routes the qualified port and user-reported startup to disconnected G3 input checks",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_working_base_port_record",
+                      "relation":  "selects the current G1 candidate instead of the withdrawn H10 artifact",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_working_base_port_record",
+                      "relation":  "retains failure history while documenting a separately qualified older-baseline candidate",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_procedure",
+                      "to":  "bench_working_base_port_record",
+                      "relation":  "provides the verified whole firmware baseline for the software port",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_candidate_receipt",
+                      "relation":  "identifies the exact dirty ARM source and hashed artifacts",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_qualification_receipt",
+                      "relation":  "records fresh portable stock and native qualification for this port",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_working_base_port_record",
+                      "to":  "bench_rollback_artifact_validation",
+                      "relation":  "records independent artifact and retained-evidence consistency",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_runner",
+                      "to":  "bench_rollback_port_source_manifest",
+                      "relation":  "captures reviewed donor inputs and explicit older-base compatibility changes",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_runner",
+                      "to":  "bench_rollback_port_patch",
+                      "relation":  "produces a complete patch and proves round-trip reconstruction against the old base",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_runner",
+                      "to":  "bench_active_fixture",
+                      "relation":  "runs all twenty private native cases including the new center bounds regression",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_runner",
+                      "to":  "bench_rollback_old_filter",
+                      "relation":  "preserves the older native filter API rather than copying newer manual-control dependencies",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_runner",
+                      "to":  "bench_rollback_old_alpha_filter",
+                      "relation":  "verifies unchanged older filter implementation",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_docker_stage",
+                      "to":  "bench_rollback_candidate_receipt",
+                      "relation":  "guards compiled inputs dependency pins startup isolation and exported symbols",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_build_script",
+                      "to":  "bench_rollback_docker_stage",
+                      "relation":  "runs source guards before and after the actual ARM build",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_candidate_receipt",
+                      "to":  "bench_rollback_firmware",
+                      "relation":  "pins the final package hash target and flash headroom",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_qualification_receipt",
+                      "to":  "bench_rollback_candidate_receipt",
+                      "relation":  "binds qualification to the same exported ARM candidate and mapped production source",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_qualification_receipt",
+                      "to":  "bench_rollback_native_evidence_manifest",
+                      "relation":  "pins all retained native qualification evidence and the tested binary",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_qualification_receipt",
+                      "to":  "bench_rollback_reference_hardware_acceptance",
+                      "relation":  "uses the user-verified stock baseline without claiming changed-image hardware acceptance",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_stage_validator",
+                      "to":  "bench_rollback_artifact_validation",
+                      "relation":  "independently validates package payload sources and all retained native hashes",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_port_source_manifest",
+                      "to":  "bench_rollback_mavlink_receiver",
+                      "relation":  "binds only the older receiver with minimal sender identity backport",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_port_source_manifest",
+                      "to":  "manual_control_schema",
+                      "relation":  "backports the same version1 sender fields while retaining version0 definition",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_port_source_manifest",
+                      "to":  "manual_control_owner",
+                      "relation":  "retains the exact H10 selector snapshot ordering fix",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_port_source_manifest",
+                      "to":  "bench_px4_module",
+                      "relation":  "retains the explicit profile default-disabled owner without automatic startup",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_port_source_manifest",
+                      "to":  "bench_mixer",
+                      "relation":  "retains H10 bench routing guards and its configured-range center semantics",
+                      "scope":  "step3_software_qualified_later_user_reported_boot_and_stopped_module_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_reference_hardware_acceptance",
+                      "relation":  "identifies completed step 2 and the intentional reset accepted without a parameter backup",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_procedure",
+                      "to":  "bench_rollback_reference_hardware_acceptance",
+                      "relation":  "records the actual later hardware outcome separately from build-time software checks",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_rollback_reference_hardware_acceptance",
+                      "relation":  "retains the successful rebuilt stock comparison without assigning the newer failure to a specific cause",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_hardware_acceptance",
+                      "to":  "bench_rollback_reference_hardware_console",
+                      "relation":  "binds runtime identities valid storage and USB link observations to the supplied transcript",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_hardware_acceptance",
+                      "to":  "bench_rollback_reference_firmware",
+                      "relation":  "binds the user reported upload and matching runtime identity to the staged stock package",
+                      "scope":  "user_report_and_runtime_identity_no_new_flash_readback"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_hardware_acceptance",
+                      "to":  "bench_rollback_reference_receipt",
+                      "relation":  "preserves immutable build-time provenance while recording later startup success",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_hardware_acceptance",
+                      "to":  "bench_rollback_reference_preclarification_report",
+                      "relation":  "supersedes the preliminary parameter concern after the user confirmed the reset was deliberate",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_rollback_reference_procedure",
+                      "relation":  "routes the completed stock startup reference to the next bench port and qualification",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_rollback_reference_procedure",
+                      "relation":  "records successful working-baseline stock startup while the newer failure remains unlocalized",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_rollback_reference_procedure",
+                      "relation":  "links the separate startup recovery comparison while bench hardware gates remain open",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_procedure",
+                      "to":  "bench_rollback_reference_receipt",
+                      "relation":  "identifies the exact final firmware export and pinned source baseline",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_procedure",
+                      "to":  "bench_rollback_reference_validation",
+                      "relation":  "records completed software artifact checks separately from application boot",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_procedure",
+                      "to":  "bench_rollback_reference_boot_template",
+                      "relation":  "retains the original blank form separately from the later hardware acceptance report",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_receipt",
+                      "to":  "bench_rollback_reference_firmware",
+                      "relation":  "pins the selected final stock reference package by size and SHA256",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_receipt",
+                      "to":  "bench_rollback_reference_tag_metadata",
+                      "relation":  "pins the private kernel version tag snapshot used for this rebuild",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_receipt",
+                      "to":  "bench_rollback_reference_build_recipe",
+                      "relation":  "retains build environment and source-volume reconstruction details",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_validation",
+                      "to":  "bench_rollback_reference_validator",
+                      "relation":  "records successful execution of the independent stage verifier",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_validation",
+                      "to":  "bench_rollback_reference_version_header",
+                      "relation":  "checks exact PX4 kernel and reported NuttX 11 identities",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_validation",
+                      "to":  "bench_rollback_reference_kernel_version",
+                      "relation":  "checks generated kernel version agrees with the working rollback",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_rollback_reference_boot_template",
+                      "to":  "bench_rollback_reference_firmware",
+                      "relation":  "binds all pending hardware observations to the final package hash",
+                      "scope":  "stock_startup_pass_user_confirmed_intentional_reset_no_bench_or_actuator_acceptance"
+                  },
+                  {
+                      "from":  "bench_bootloader_reader",
+                      "to":  "bench_stock_cold_flash_readback",
+                      "relation":  "produces the successful query-only measurement of the retained stock image",
+                      "scope":  "stored_image_confirmed_no_flash_or_boot_command_no_application_boot_acceptance"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_stock_cold_flash_readback",
+                      "relation":  "records actual stored-image verification while leaving application startup unqualified",
+                      "scope":  "stored_image_confirmed_no_flash_or_boot_command_no_application_boot_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_bootloader_reader",
+                      "relation":  "retains the query-only tool used to confirm the older failed stock image was finalized",
+                      "scope":  "stored_image_readback_completed_application_startup_unresolved"
+                  },
+                  {
+                      "from":  "bench_bootloader_offline_validation",
+                      "to":  "bench_bootloader_reader_tests",
+                      "relation":  "records passing standalone tests and candidate CRC agreement with the existing uploader",
+                      "scope":  "offline_evidence_only"
+                  },
+                  {
+                      "from":  "bench_bootloader_reader_tests",
+                      "to":  "bench_bootloader_reader",
+                      "relation":  "exercises query framing, mutation refusal and finalization/readback distinctions",
+                      "scope":  "sixteen_fixtures_no_hardware"
+                  },
+                  {
+                      "from":  "bench_bootloader_reader",
+                      "to":  "bench_stock_usb_comparison_receipt",
+                      "relation":  "loads the default candidate and verifies its retained package hash",
+                      "scope":  "offline_candidate_binding"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_bootloader_reader",
+                      "relation":  "links the query-only tool that confirmed stored vectors and slot CRC after the failed stock upload",
+                      "scope":  "stored_image_measurement_complete_startup_unresolved"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_stock_boot_failure_report",
+                      "relation":  "records the failed older stock comparison and working rollback recovery with a separate cold readback",
+                      "scope":  "reported_failure_and_separate_successful_stored_image_readback"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_stock_usb_comparison_receipt",
+                      "relation":  "preserves the clean newer-base stock build that failed application connection despite matching stored vectors and CRC",
+                      "scope":  "stock_build_verified_user_reported_hardware_boot_failure"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "bench_stock_usb_comparison_receipt",
+                      "relation":  "retains the older stock comparison whose stored payload matched despite missing application connection",
+                      "scope":  "no_bench_or_stabilized_acceptance_advanced"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_h10_contract",
+                      "relation":  "preserves bounded software evidence while recording failed hardware startup qualification",
+                      "scope":  "h10_hardware_failure_cause_unresolved"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_commissioning_procedure",
+                      "relation":  "withdraws routine H10 commissioning and requires actual boot verification before G2-G4 resume",
+                      "scope":  "no_hardware_output_gate_advanced"
+                  },
+                  {
+                      "from":  "bench_h10_boot_failure_record",
+                      "to":  "bench_px4_module",
+                      "relation":  "records linked presence without inferring that hardware startup reaches or runs this default-off module",
+                      "scope":  "static_checks_not_boot_acceptance"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_h10_contract",
+                      "relation":  "identifies retained source-bound firmware and software qualification before hardware commissioning",
+                      "scope":  "procedure_existing_candidate_no_new_build"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_px4_module",
+                      "relation":  "documents exact 44-token profile, routing checks and disarmed/prearmed CLI lifecycle",
+                      "scope":  "physical_execution_pending"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_output_provider",
+                      "relation":  "requires actual PWM and independent expiry/fault captures through the hardware output path",
+                      "scope":  "physical_execution_pending"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_acceptance_contract",
+                      "relation":  "uses ordered physical release and named review requirements",
+                      "scope":  "no_flash_powered_or_wind_authorization_granted"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "bench_acceptance_record_template",
+                      "relation":  "provides a blank session record for the required physical evidence",
+                      "scope":  "all_requirements_missing"
+                  },
+                  {
+                      "from":  "bench_acceptance_record_template",
+                      "to":  "bench_acceptance_checker",
+                      "relation":  "generated by the existing read-only checker template interface",
+                      "scope":  "record_completeness_and_integrity_not_authority"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "stabilized_manual_goal",
+                      "relation":  "defines measured plant, separate NuttX integration and restrained physical rate/quaternion-hold acceptance after manual bench commissioning",
+                      "scope":  "planned_vehicle_supported_control_not_sitl_promotion"
                   },
                   {
                       "from":  "stabilized_manual_core",
@@ -6232,6 +7462,156 @@
                       "to":  "stabilized_manual_completion_audit",
                       "relation":  "records remaining SM5 data-dependent boundary",
                       "scope":  "completion_not_proven_vehicle_input_gate"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "stabilized_observer_record",
+                      "relation":  "records October 19 partial G9 milestone",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "stabilized_observer_record",
+                      "relation":  "separates observation software from active output and hardware gates",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_module",
+                      "to":  "stabilized_manual_core",
+                      "relation":  "reuses rate and quaternion control with zero simulated thrust",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_module",
+                      "to":  "stabilized_observer_profile",
+                      "relation":  "requires explicit validated configuration",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_module",
+                      "to":  "stabilized_observer_status",
+                      "relation":  "publishes diagnostic candidates only",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_profile",
+                      "to":  "stabilized_observer_profile_api",
+                      "relation":  "implements fixed token contract",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_profile_test",
+                      "to":  "stabilized_observer_profile",
+                      "relation":  "verifies rejection and wind-only core configuration",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_native_test",
+                      "to":  "stabilized_observer_module",
+                      "relation":  "tests actual scheduled observer and no actuator publication",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_verifier",
+                      "to":  "stabilized_observer_native_test",
+                      "relation":  "builds and seals finite native verification",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_record",
+                      "to":  "stabilized_observer_arm_receipt",
+                      "relation":  "records source-bound ARM link and image evidence",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_arm_receipt",
+                      "to":  "stabilized_observer_arm_source",
+                      "relation":  "binds exact older-baseline port source",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_module_build",
+                      "to":  "stabilized_observer_module",
+                      "relation":  "builds separately from bench owner",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "stabilized_observer_arm_stage",
+                      "to":  "stabilized_observer_arm_build",
+                      "relation":  "checks sources before and after ARM compilation",
+                      "scope":  "output_disabled_observer_partial_G9_no_physical_acceptance"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "stabilized_output_record",
+                      "relation":  "records latest portable stabilized output increment",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_observer_record",
+                      "to":  "stabilized_output_record",
+                      "relation":  "identifies subsequent portable contract without changing staged observer",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "stabilized_output_record",
+                      "relation":  "records partial G9 software progress",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_core",
+                      "to":  "stabilized_output_api",
+                      "relation":  "implements explicit granted sessions acknowledgments mapping and expiry",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_api",
+                      "to":  "stabilized_manual_api",
+                      "relation":  "consumes control report status and four-canard coordinates",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_test",
+                      "to":  "stabilized_output_core",
+                      "relation":  "exercises calibration lifecycle timing corruption and permission inhibition",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_test",
+                      "to":  "stabilized_manual_core",
+                      "relation":  "runs actual rate-to-hold controller reports through consumer mapping",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_manual_build",
+                      "to":  "stabilized_output_core",
+                      "relation":  "compiles portable source into library",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_record",
+                      "to":  "stabilized_output_verification",
+                      "relation":  "binds source evidence and finite host verification",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_verification",
+                      "to":  "stabilized_output_arm_receipt",
+                      "relation":  "records separately compiled ARM object only",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_arm_receipt",
+                      "to":  "stabilized_output_arm_recipe",
+                      "relation":  "records exact command compiler and all header dependencies",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "stabilized_output_arm_recipe",
+                      "to":  "stabilized_output_arm_container",
+                      "relation":  "runs with prior firmware source and build volume read-only",
+                      "scope":  "portable_output_contract_no_runtime_driver_binding"
                   }
               ],
     "gaps":  [
@@ -6291,6 +7671,16 @@
                  }
              ],
     "notes":  [
+                  "2026-10-19 source commit checkpoint prepared on slaaps-sitl: October 19 bench diagnostics and rollback tooling, observer, portable output contract, tests and handoff. px4_head identifies the parent checkpoint bde4aea321; use git HEAD for the new commit identity. All 11 changed C/C++ files pass repository make format without changes; 16 bootloader protocol fixtures pass. Local build/WSL evidence and the unrelated empty timestamp file are excluded. No push, flash or hardware action.",
+                  "2026-10-19 G9 portable stabilized output boundary: explicit non-message session grants, calibrated asymmetric/reversed four-servo mapping, one outstanding command with matching software acceptance ack, independent consumer expiry, stale/replay/future/clock faults and latched permission inhibition. Debug Release ASan/UBSan each pass 126013 checks (2737 new output); host lx60q8nq manifest f2cdfaa6aaec3f2646791e19e3889bbc43038d61d72305dcad9913b635a19155. ARM GCC13.2.1/NuttX11 unlinked object 2068 text, zero static data/BSS, max individual compiler stack frame88 not runtime high-water. Rehashed234 host files111 ARM dependencies3 prior observer artifacts zero mismatch. No new firmware link, PX4 driver/transport integration, physical operation or commissioning acceptance. Next runtime supervisor, exclusive ownership, driver application/revoke acknowledgments, production health and scheduled fault verification.",
+                  "2026-10-19 authorized stabilized hardware development: output-disabled observer built on working e8ea98b404/NuttX11, default off, explicit 86-token profile and diagnostic publication only. Zero simulated thrust permitted; C math portability fixed without changing allocation algorithm. Debug/Release/ASan-UBSan each pass123083+193 checks; final native module9015 checks no actuator publications, receipt c7eaf8171b937254c1047df9a6719d3ed6177b27e7c98b1bea35754d8cc51a66,156 artifacts independently rehashed. ARM .px4 4b3e706ab4130461e1085134d1dca4813ec168c5948c9209caec9f5d36362226,1961704 image bytes,4376 headroom, bench/test modules excluded;3 ARM artifacts rehashed. No flash or physical operation. Bench and original31-case SITL evidence preserved; G9 active output/health/ownership transitions and G8/G10 measurements remain open. Root library guard preserves earlier external SITL registration.",
+                  "2026-10-19 subsequent requested cold-check response: saved MAIN_FAIL1..4 zero and actual IO first4 failsafe/disarmed zeros, expected MAIN config, IO data OK, owner stopped, actual armedfalse/prearmedtrue with fault flags clear. Current table mismatch cleared; zero-write-ignore source semantics unchanged and no physical waveform acceptance. Scope unavailable. Next thirteen-command console recipe creates five-line44-token USB2/255:190 fixture, cats, starts Ready/status/permission/IO then stops without enable. Local echo reconstruction equals exact staged bytes; board installation/hash and Ready execution still pending. Prior records/firmware preserved.",
+                  "2026-10-19 user applied signal setup: FMU routing/rates/centers/limits and disarmed/failsafe0 match, AUX1..9 zero, owner stopped, actual armedfalse/prearmedtrue and IO data OK. Actual IO pwm_failsafe first4 remains1000. Baseline register code ignores zero failsafe writes and initializes table0; console reboot confirmed, complete IO power reset unmeasured. No measurement instrument now, scope possible later. Next all-source power removal then actual IO first4 table readback; zero is not assumed, enable/physical tests held. No firmware changes or Codex hardware commands.",
+                  "2026-10-19 G3 output readback: actual MAIN timers0..2=400, MAIN functions1..8=0, AUX4=101/Motor1, other AUX1..9=0, prearm0. Exact staged setup has30 parameter writes plus AUX4 readback gate: AUX4 off first, MAIN1..4 MIN500/MAX2500/CENT1500/DIS0/FAIL0, REV0, timers50, dedicated functions10000..10003 and safety-button prearm1. No hardware write by Codex; user application/autosave/reboot/readback remain pending. AUX9 is verified off beyond the module eight-AUX guard. Owner remains stopped; all physical gates open.",
+                  "2026-10-19 latest user correction supersedes the prior roll-reversal interpretation: final pair was right then left, verified left=-1/right=+1, leave calibration unchanged. USB type3 telemetry spans60.062797s: +1570 received, +15045 sequence misses; RX parser/overrun/drop indicators zero and TXoverruns391 unchanged. Sequence cause/worst gaps remain open. Exact 44-token USB2/255:190 synthetic profile staged; same native binary parses, reports Ready and stops without enable/hardware. Two mounted-path argument failures retained, whitespace-free copy passes. Next actual MAIN timer/output and AUX/prearm readbacks; no physical-output gate advanced.",
+                  "2026-10-19 user confirms left-stick up/down/left/right then right in same order: roll is reversed (right-stick left +1, right -1), yaw/manual-pitch signs match; actual armed/prearmed false and all nine button masks zero. Two USB statuses add 1015 received/9435 missed. Source computes missed/received then prints a percent sign; displayed 8.1% is not packet-loss percentage. Counter cause unlocalized. Next correct QGC roll calibration and compare USB type3 telemetry_status parser/buffer counters; no output/physical gate advanced.",
+                  "2026-10-19 follow-up console: candidate runtime base/OS/build strings match, USB selected input is instance2 sender255:190 with valid snapshots. IO all-disabled scheduling explains stale PWM-data flag; hardware-enable flag is not vehicle arming. Listener counts require -n and procedure corrected. Axis isolation, bit11/button action, USB sequence-gap trends, timing/routing and physical-output acceptance remain open.",
+                  "2026-10-19 step 3: old whole-base bench port freshly qualifies; three20-case3632-check native runs pass. New bench cold boots and stopped module are now user-reported as passed; fresh console/configuration evidence, G3 input/routing and physical-output acceptance remain open.",
                   "2026-10-17 repository backup preparation: all 449 existing hashed anchors initially matched. Required PX4 formatting, EOF whitespace cleanup and LF normalization affect 23 files; seven cleanup anchor fingerprints and the handoff refreshed after review. Cleanup is whitespace-only except splitting the clock harness combined type-trait assertion into four equivalent static_asserts to avoid astyle 3.1 oscillation. Historical WSL/build evidence and acceptance scopes are preserved separately; this backup does not requalify hardware or previously sealed binaries.",
                   "2026-10-06 third consecutive vehicle-input dependency audit: goal status set to blocked. Previous turn was no progress; current 445 anchors unchanged, known allocation inputs contain only synthetic_fixture, accepted CAD/plant/servo/EDF measurements and operating requirements remain absent. Existing supplied-model inertia rejection remains source-bound. No required vehicle-specific implementation can advance without accepted inputs; retain full objective, synthetic default, baseline and bench/acceleration gates. Resume on new accepted evidence.",
                   "2026-10-06 first post-software completion boundary audit: original SM0-SM4 requirements have finite synthetic evidence; SM5 not achieved. Known allocation JSON input directory has one synthetic_fixture profile and zero measured_single_condition profiles. Current source-bound model.sdf a90644454080c2eba006cb29050d28a2e70fde5be33cafeae1185d7d844afa6d read-only intake again rejects physical inertia; mass remains3.291337 vs provisional3.041337; six mesh references resolve only packaging. No admitted vehicle profile, vehicle_supported_tuning=false, general_publisher_identity_qualified=false, no live native fixture. User already reports measurements unavailable/CAD pending. Accepted physical evidence and operating/deployment requirements are needed for next SM5 work; goal remains active, completion not claimed.",

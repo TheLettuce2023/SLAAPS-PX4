@@ -67,6 +67,16 @@ pip install -e Tools/bench_test          # library only
 pip install -e "Tools/bench_test[ulog]"  # + pyulog for deep ULog verification
 ```
 
+## Bootloader readback
+
+For a V6X that remains in its ArduPilot USB bootloader after a reported successful
+upload, `inspect_bootloader.py --port COM14` provides a separate query-only
+diagnostic. It needs only pyserial and defaults to the retained stock comparison
+package. Follow the [cold readback procedure](../../docs/MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md)
+with QGC closed, the failed image installed and actuator power disconnected.
+This path does not reboot, upload, arm or run the bench suite. Its standalone
+fixtures are `python Tools/bench_test/test_inspect_bootloader.py -v`.
+
 ## Requirements
 
 - Python 3.8+.

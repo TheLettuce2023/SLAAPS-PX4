@@ -1,12 +1,21 @@
 # SLAAPS manual servo bench commissioning and stabilized control procedure
 
-2026-10-13 | Codex | Pixhawk 6X, `px4_fmu-v6x_default`
+2026-10-13, updated 2026-10-19 | Codex | Pixhawk 6X, `px4_fmu-v6x_default`
 
-Current hardware disposition: the user reports that H10 programs successfully but
-does not reconnect normally to QGC; the rollback does. The H10 candidate below is
-withdrawn from routine commissioning. Follow the
-[startup failure diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md) before any further
-candidate flash or output tests. Its software evidence remains preserved.
+Current hardware disposition: the original H10 candidate remains withdrawn after
+failed startup. Its [startup diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md) and
+software evidence remain preserved. A new working-baseline bench port has fresh
+software qualification and is now the G1 candidate. The user reports its cold-boot
+tests passed and the bench module is available but not running, as intended.
+
+Recovery step 2's clean stock rebuild of the working rollback baseline now has
+matching runtime identity and three user-confirmed successful cold starts. Its
+[reference-build and cold-boot record](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md)
+records the deliberate reset to stock settings, accepted without a preflash
+parameter backup. The [step 3 bench port](MANUAL_BENCH_WORKING_BASE_PORT.md) now
+passes fresh qualification on that complete baseline. Continue with disconnected
+G3 input verification, retaining the remaining G2 console/configuration evidence
+alongside it. Calibration/profile and actual output verification remain open.
 
 Commission the existing servo-only manual controller through firmware identification,
 USB flashing, disconnected-output measurements, restrained servo tests and staged
@@ -27,18 +36,18 @@ to its dependent gate. A failed or unmeasured requirement remains open. The exis
 separate authorization for flashing, powered tests and wind tests. Writing this
 procedure and preparing a candidate do not perform those operations.
 
-| Gate | Result needed to proceed | Status on 2026-10-13 |
+| Gate | Result needed to proceed | Status on 2026-10-19 |
 | --- | --- | --- |
 | G0 | Named operators, installation record and numerical test limits | Open |
-| G1 | Exact bench firmware and retained software evidence | H10 software evidence retained; candidate withdrawn after hardware startup failure |
-| G2 | USB flash verified on the identified controller, all loads disconnected | User reports successful programming but failed normal startup; rollback works |
-| G3 | Actual selected QGC input, output routing and prearm behavior verified | Pending hardware execution |
-| G4 | Signal-only normal and failure captures reviewed | Pending hardware execution |
+| G1 | Exact bench firmware and retained software evidence | Working-baseline port freshly qualified and staged; original H10 remains withdrawn |
+| G2 | USB flash verified on the identified controller, all loads disconnected | Bench cold boots/stopped module user-confirmed; fresh runtime identity and PX4IO captured; boot/configuration evidence remains open |
+| G3 | Actual selected QGC input, output routing and prearm behavior verified | FMU setup/current IO zeros match; hardware profile-content/Ready/start/stop subset passes; disarmed/prearmed and owner stopped; full lifecycle open |
+| G4 | Signal-only normal and failure captures reviewed | No instrument currently available; active captures/enable pending measurement equipment and physical timing/fault review |
 | G5 | Independent servo calibration and reviewed installed profile | Measurements required |
 | G6 | Restrained, powered no-wind manual bench operation accepted | Depends on G4-G5 |
 | G7 | Manual bench accepted within a finite measured wind/load envelope | Depends on G6 |
 | G8 | Vehicle plant and stabilized allocation/tuning supported by measurements | Missing vehicle inputs |
-| G9 | Dedicated stabilized hardware firmware and output ownership verified | Development required |
+| G9 | Dedicated stabilized hardware firmware and output ownership verified | Output-disabled observer builds/tests pass; active output integration and hardware qualification remain open |
 | G10 | Restrained stabilized rate/hold operation accepted in its measured envelope | Depends on G8-G9 |
 
 G2-G4 can use a clearly labelled electrical test profile while servos and EDF are
@@ -109,58 +118,70 @@ limits explicitly; they prevent those later gates from passing.
 
 ## G1 Identify and verify the firmware candidate
 
-### Existing source and software evidence
+### Current working-baseline candidate
 
-The retained [H10 software record](MANUAL_BENCH_CONTROL_H10_FIX.md) contains
+The [working-baseline port](MANUAL_BENCH_WORKING_BASE_PORT.md) has fresh results:
 2,431 portable checks per Debug/Release/ASan-UBSan configuration, 28 stock
-compatibility tests and three passing repetitions of 19 native integration cases.
-Native integration uses a memory output sink. Physical PWM response must be
-measured in G4.
+compatibility GTests, 19 acceptance-checker tests and three passing repetitions
+of 20 native cases (3,632 checks per run). Native integration uses a memory
+output sink. Physical PWM response must be measured in G4.
 
-On 2026-10-13, all 726 artifacts in the H10 manifest rehashed clean. Fifty-eight
-mapped compiled bench-source files match the current checkout. The original
-manifest and WSL source/build trees remain preserved. No new compilation was
-performed for this candidate preparation.
+The retained [H10 software record](MANUAL_BENCH_CONTROL_H10_FIX.md), original
+manifest and source/build trees remain historical evidence. Their withdrawn
+image is not selected for this commissioning attempt. The replacement was
+compiled on the verified older PX4/NuttX/apps baseline and has its own source,
+artifact and qualification receipts.
 
 The Windows staging directory, relative to the checkout, is:
 
 ```text
-build/bench_commissioning/h10-e880f1cd79-dirty/
-  px4_fmu-v6x_default_h10_e880f1cd79_dirty.px4
+build/bench_commissioning/bench-e8ea98b404-step3/
+  px4_fmu-v6x_default_bench_e8ea98b404_nuttx11_dirty_20261019T225405Z.px4
   candidate-receipt.json
-  h10-manifest.json
+  qualification-receipt.json
+  port-source-manifest.json
+  artifact-validation.json
+  production-port-e8ea.patch
 ```
 
 | Item | Identity |
 | --- | --- |
 | Target | `px4_fmu-v6x_default`, board ID 53 |
-| Source base | `e880f1cd79e2453ef3dfaf68ee1c067b98ea9a53`, dirty research tree |
-| Firmware SHA-256 | `7163791e111aadc4f1abfafa7679749c12a93c056c2d89fab25b0efa0d68634a` |
-| Firmware package bytes | 1,864,146 |
-| H10 manifest SHA-256 | `b8176eaf9f23098b9800e8ab4c33bc8b0e41adf0015aa222310672631acb9c43` |
-| Retained WSL evidence | `/var/tmp/research-bench-h10` |
+| Source base | `e8ea98b404baf50623a519ac67ec1c03aa240859`, explicit dirty port |
+| Kernel/apps | NuttX 11.0.0 `49f3b29c92` / apps `e37940d85` |
+| Firmware SHA-256 | `a45cf99374fa7ccfd4f6349ca9a6341bacfcfa6199254f71ab2b04f0cb2aed31` |
+| Firmware package bytes | 1,854,271 |
+| Retained WSL evidence | `/var/tmp/research-bench-step3-e8ea` |
 
 From PowerShell in the checkout:
 
 ```powershell
-$benchStage = Join-Path (Get-Location) 'build/bench_commissioning/h10-e880f1cd79-dirty'
-$benchFirmware = Join-Path $benchStage 'px4_fmu-v6x_default_h10_e880f1cd79_dirty.px4'
-$benchExpectedHash = '7163791e111aadc4f1abfafa7679749c12a93c056c2d89fab25b0efa0d68634a'
+$benchStage = Join-Path (Get-Location) 'build/bench_commissioning/bench-e8ea98b404-step3'
+$benchFirmware = Join-Path $benchStage 'px4_fmu-v6x_default_bench_e8ea98b404_nuttx11_dirty_20261019T225405Z.px4'
+$benchExpectedHash = 'a45cf99374fa7ccfd4f6349ca9a6341bacfcfa6199254f71ab2b04f0cb2aed31'
 if ((Get-FileHash -LiteralPath $benchFirmware -Algorithm SHA256).Hash.ToLowerInvariant() -ne $benchExpectedHash) {
     throw 'Bench firmware hash mismatch'
 }
 $benchReceipt = Get-Content -Raw -LiteralPath (Join-Path $benchStage 'candidate-receipt.json') | ConvertFrom-Json
-if ($benchReceipt.hardware_disposition -eq 'withdrawn_after_reported_boot_failure') {
-    throw 'H10 hardware startup failed; use the diagnosis record before further commissioning'
+$benchQualification = Get-Content -Raw -LiteralPath (Join-Path $benchStage 'qualification-receipt.json') | ConvertFrom-Json
+if ($benchReceipt.source_base -ne 'e8ea98b404baf50623a519ac67ec1c03aa240859' -or $benchReceipt.board_id -ne 53) {
+    throw 'Unexpected source base or board'
+}
+if ($benchQualification.firmware_sha256 -ne $benchExpectedHash) {
+    throw 'Qualification does not bind the selected firmware'
+}
+if ((Get-FileHash -LiteralPath (Join-Path $benchStage 'port-source-manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $benchReceipt.source_manifest_sha256) {
+    throw 'Port source manifest hash mismatch'
 }
 $benchReceipt
 ```
 
-1. Recheck current bench sources against `source_anchors` in the receipt. Archive
-   `git status`, including untracked files, with the commissioning record. A
-   matching Git commit alone does not identify this implementation.
-2. Review linked-module and resource evidence in H10. The `.px4` uncompressed image
-   is 1,956,812 bytes against a package limit of 1,966,080 bytes: only **9,268 bytes**
+1. Recheck `ported-source/` against `files` in `port-source-manifest.json` and the
+   independent artifact check. Archive `git status`, including untracked files,
+   with the commissioning record. The active newer checkout is the donor, not
+   this older port's entire compiled source; a commit alone is insufficient.
+2. Review the new linked-module and resource evidence. The uncompressed image
+   is 1,957,752 bytes against a package limit of 1,966,080 bytes: only **8,328 bytes**
    remain. This is a package size comparison, not runtime stack or timing margin.
 3. Confirm the candidate includes `research_bench_control_main`, the bench owner
    and output lease. Its private SITL test module is excluded from the ARM image.
@@ -184,9 +205,9 @@ CONFIG_MODULES_RESEARCH_BENCH_CONTROL=y
 
 The target is confirmed by [PX4's Pixhawk 6X build instructions](https://docs.px4.io/main/en/flight_controller/pixhawk6x).
 Use the project's [build workflow](../.agents/skills/build-px4/SKILL.md) for the
-container/toolchain and artifact handling. Docker was unavailable during this
-preparation; the existing candidate was built with the retained Ubuntu-24.04 WSL
-native toolchain. Do not build NuttX directly in the Windows checkout or silently
+container/toolchain and artifact handling. The current port's ARM image was built
+in the pinned PX4 Docker image; native capture tests used Ubuntu-24.04 WSL.
+Do not build NuttX directly in the Windows checkout or silently
 replace dirty/untracked research inputs with a clean Git checkout.
 
 The H10 verification runner has a fixed `/var/tmp/research-bench-h10` output path.
@@ -229,15 +250,21 @@ In QGC's Analyze Tools / MAVLink Console, capture:
 
 ```text
 ver all
+dmesg
+mavlink status
 px4io status
 research_bench_control status
+param show SYS_AUTOSTART
+param show SYS_USB_AUTO
 param show COM_PREARM_MODE
 param show COM_RC_IN_MODE
 param show PWM_MAIN_FUNC*
 param show PWM_AUX_FUNC*
 ```
 
-6. Check board identity, expected source base, normal boot and PX4IO firmware/status.
+6. Complete three full power-off/reconnect cycles, checking QGC connection within
+   30 seconds and at least 60 seconds of stable connection per cycle. Check board
+   identity, the expected base/NuttX 11 identity, normal boot and PX4IO status.
    At this point `research_bench_control status` should report that the module is
    not running. An unknown command instead indicates the required module is absent.
 7. Review retained SD startup files and airframe configuration. Remove unintended
@@ -254,6 +281,21 @@ startup/output activity. Loads remain disconnected.
 ## G3 Verify input, profile parsing and output routing
 
 ### Select the actual QGC input
+
+Current entry point: the user reports the bench cold boots passed and the module
+is stopped. A fresh console matches the candidate's PX4/NuttX identities and
+October 19 22:51:17 build strings. Valid selected USB input has `data_source=4`,
+hence MAVLink instance **2**, and sender **255:190**. The two input parameters
+read back saved as requested. Read the
+[runtime assessment](MANUAL_BENCH_WORKING_BASE_PORT.md#usb-input-and-px4io-observation).
+The next console confirms disarmed state and released buttons. The user corrected
+the final roll test order to **right then left**, explicitly verifying left=-1
+and right=+1. The earlier roll-reversal conclusion is superseded; leave its
+calibration unchanged. Two USB telemetry samples show no reported RX parser or
+buffer faults over 60.062797 seconds. Continue signal-only profile and routing
+preparation below, retaining the open sequence-accounting finding.
+Keep loads disconnected and the module stopped; retain remaining G2 boot and
+configuration evidence without repeating the reported successful cold boots.
 
 1. With loads disconnected, configure QGC joystick calibration and Normal mode,
    which sends `MANUAL_CONTROL`. Record axis mapping, inversion, center noise,
@@ -272,7 +314,7 @@ startup/output activity. Loads remain disconnected.
    parameter names into this older source revision. Keep the physical safety
    configuration intact; do not defeat it with a circuit breaker to obtain output.
 3. Observe input initially over a direct link. Capture `mavlink status` and
-   `listener manual_control_setpoint 10` while centering and moving each axis.
+   `listener manual_control_setpoint -n 10` while centering and moving each axis.
    Record `valid`, timestamps, `data_source`, `source_system_id` and
    `source_component_id`. `data_source` 2..7 represents MAVLink instance 0..5.
 4. Repeat over the intended SiK/TELEM1 path. Observe the actual instance and IDs
@@ -284,12 +326,89 @@ startup/output activity. Loads remain disconnected.
    rotation. Record this explicitly in the mix and later rate-command mapping.
    Sweep throttle independently and verify the bench has no throttle command effect.
 
+This firmware requires `-n` for the sample count; the earlier positional `10`
+instruction printed only one snapshot. Multi-sample mode clears/redraws the
+display, so a retained last frame does not establish sample rate or maximum gap.
+Use plain `listener manual_control_setpoint` for one labelled held position:
+center, roll-left/right, pitch-forward/back and yaw-left/right, with other axes
+centered. Then release all controls and capture center again. Mixed-axis samples
+do not verify precise axis independence. The initial `buttons=2048` cleared to
+zero in all nine follow-up samples; retain the QGC button-action review.
+
+The physical labels, including the user's latest roll-order correction, give:
+
+| Physical movement | Selected response | Assessment |
+| --- | --- | --- |
+| Left stick up / down | throttle +0.960 / -1 | Bench ignores throttle; no full endpoint acceptance |
+| Left stick left / right | yaw -1 / +1 | Expected sign |
+| Right stick up / down | pitch +1 / -1 | Expected manual forward/nose-down sign |
+| Right stick left / right | roll -1 / +1 | Expected sign, user corrected/verified |
+
+The latest correction establishes the expected roll sign without recalibration.
+Keep the current pilot-axis calibration. Earlier reports retain their original
+physical labels and conclusions for history; the new
+[correction and telemetry record](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-input-correction-and-telemetry-20261019.json)
+supersedes that roll interpretation. Precise axis isolation, center-noise bounds
+and input-gap behavior still require the applicable measured checks.
+The actual `actuator_armed` capture has armed/prearmed/ready-to-arm false and
+kill/lockdown/termination/calibration false. Keep the owner stopped; obtain the
+reviewed prearm permission later during the output lifecycle, without force arming.
+
+For the observed USB RX-loss counters, use one QGC instance and one direct USB
+path, with other command routes inactive. Two supplied status snapshots show
+1,015 additional received and 9,435 additional missed messages; exact elapsed
+time was not supplied. Source review found the printed `8.1%` is actually the
+missed/received ratio rounded to one decimal with a percent sign appended. It is
+not a valid packet-loss percentage. The sequence-counter growth remains
+unexplained; displayed MANUAL_CONTROL rates of 27.4 and 18.1 Hz are smoothed
+receive-interval estimates, not a maximum-gap bound.
+
+The subsequent `telemetry_status` captures identify USB by `type: 3` (instance 2
+in these captures). Their timestamps differ by **60.062797 seconds**. RX messages
+increase by 1,570; RX overruns, parse errors and parser-drop indicators remain
+zero. The TX-overrun count stays at 391, so no new TX-overrun events are reported
+in this window; its earlier history is unlocalized. Sequence misses increase by
+15,045 and remain an open accounting/transport finding. In this receiver the
+packet-drop field counts observed changes in the parser's drop counter, not
+necessarily the number of lost packets. These finite observations support
+disconnected configuration preparation; they prove no worst-case input gap or
+physical-output behavior. Keep the finding in the G4 timing/fault review.
+
 QGC documentation describes 5 Hz idle transmission and a default 25 Hz changing
 input rate. Measure the installed build over the actual radio, including buffering
 and loss. This is especially relevant to the later stabilized input deadline;
 the bench's 500 ms age limit and isolated SITL's 100 ms limit are different contracts.
 
 ### Prepare the profile
+
+The [USB signal-only profile](../build/bench_commissioning/bench-e8ea98b404-step3/usb-signal-only-profile.txt)
+is now staged for the observed instance **2**, sender **255:190**. SHA256:
+`1bf090fc08a058d00be6fb0f80f70a32f218c3df17695059faa6381524ea3c7f`.
+It reuses the qualified synthetic 1400/1500/1600 us fixture (C2 reversed), its
+mix, 10-degree model scale and synthetic slew values. These are electrical test
+values, not installed actuator calibration or a vehicle allocation. All servo
+and EDF energy must remain disconnected. Its 44 tokens were parsed by the same
+qualified native binary, which reported Ready and stopped without an enable
+request; see the [ready-only check](../build/bench_commissioning/bench-e8ea98b404-step3/usb-profile-ready-validation/profile-validation.json).
+This does not establish card installation, hardware routing or output acceptance.
+
+The user supplied the following initial configuration readback: MAIN timer groups
+0..2 are 400 Hz, MAIN1..8 functions are zero, AUX4 is function 101 (Motor 1), all
+other advertised AUX1..9 functions are zero, and prearm mode is zero. The exact
+ordered setup below addresses these values. Its later FMU readback matches.
+The initial nonzero IO failsafe table is zero on the first four channels in the
+subsequent cold-check response. These commands retain the initial readback form
+for comparisons:
+
+```text
+param show PWM_MAIN_TIM*
+param show PWM_MAIN_FUNC*
+param show PWM_AUX_FUNC*
+param show COM_PREARM_MODE
+```
+
+Keep the owner stopped during this preparation. Copy/read back the profile using
+the method in the lifecycle section only after its identity/scope are reviewed.
 
 The module accepts a plain text file with exactly 44 numeric tokens: eight header
 values and nine values for each canard. Whitespace and line breaks separate tokens.
@@ -329,7 +448,7 @@ prerequisites checked by `routingValid()`, rather than general PX4 defaults:
 | --- | --- |
 | `PWM_MAIN_FUNC1` .. `PWM_MAIN_FUNC4` | 10000, 10001, 10002, 10003 respectively |
 | `PWM_MAIN_FUNC5` .. `PWM_MAIN_FUNC8` | 0 |
-| `PWM_AUX_FUNC1` .. `PWM_AUX_FUNC8` | 0, including AUX4 |
+| `PWM_AUX_FUNC1` .. `PWM_AUX_FUNC8`, plus advertised AUX9 | 0, including AUX4; the module guards 1..8, and this commissioning record also verifies AUX9 off |
 | `PWM_MAIN_REV` | 0 |
 | `PWM_MAIN_MIN1` .. `PWM_MAIN_MIN4` | 500 |
 | `PWM_MAIN_MAX1` .. `PWM_MAIN_MAX4` | 2500 |
@@ -351,6 +470,203 @@ the installed `PWM_MAIN_TIM*` parameters and group mapping; do not assume a
 assignment afterward. Keep AUX functions disabled and verify absence of any
 EDF control signal in G4.
 
+#### Apply the observed USB signal configuration
+
+The [configuration plan and initial readback](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-output-configuration-plan-20261019.json)
+bind this step to the staged USB signal profile. The same commands are retained
+in [usb-signal-only-setup.txt](../build/bench_commissioning/bench-e8ea98b404-step3/usb-signal-only-setup.txt).
+The user subsequently applied them and supplied a console-reboot readback; the
+FMU/mixer values match. The initial IO cached failsafe mismatch is followed by
+a passing current-table check below.
+The sequence is retained for reproducibility; do not repeat it to clear the IO
+table. No hardware changes were made by Codex. Keep servo/EDF signal connections and power
+disconnected, the vehicle disarmed and the bench module stopped.
+
+Execute one line at a time in MAVLink Console. The first two commands are a
+gate: verify AUX4 reads **0** before continuing. Stop on any parameter rejection,
+missing name or clamped value. MAIN5..8 and all other AUX functions are already
+zero in this readback; retain and verify those values after reboot.
+
+```text
+param set PWM_AUX_FUNC4 0
+param show PWM_AUX_FUNC4
+param set PWM_MAIN_DIS1 0
+param set PWM_MAIN_FAIL1 0
+param set PWM_MAIN_MIN1 500
+param set PWM_MAIN_MAX1 2500
+param set PWM_MAIN_CENT1 1500
+param set PWM_MAIN_DIS2 0
+param set PWM_MAIN_FAIL2 0
+param set PWM_MAIN_MIN2 500
+param set PWM_MAIN_MAX2 2500
+param set PWM_MAIN_CENT2 1500
+param set PWM_MAIN_DIS3 0
+param set PWM_MAIN_FAIL3 0
+param set PWM_MAIN_MIN3 500
+param set PWM_MAIN_MAX3 2500
+param set PWM_MAIN_CENT3 1500
+param set PWM_MAIN_DIS4 0
+param set PWM_MAIN_FAIL4 0
+param set PWM_MAIN_MIN4 500
+param set PWM_MAIN_MAX4 2500
+param set PWM_MAIN_CENT4 1500
+param set PWM_MAIN_REV 0
+param set PWM_MAIN_TIM0 50
+param set PWM_MAIN_TIM1 50
+param set PWM_MAIN_TIM2 50
+param set PWM_MAIN_FUNC1 10000
+param set PWM_MAIN_FUNC2 10001
+param set PWM_MAIN_FUNC3 10002
+param set PWM_MAIN_FUNC4 10003
+param set COM_PREARM_MODE 1
+```
+
+The three actual MAIN timer parameters are set to 50 Hz; unused outputs remain
+disabled. The synthetic profile's centers are 1500 us. The 500/2500 transport
+limits do not authorize that pulse range on installed servos. Prearm value 1
+uses the safety button; leave the button alone during this configuration step.
+No start, enable, arm or automatic reboot is included in the command file.
+
+Allow parameter autosave to finish and check for persistent unsaved `*` markers
+or save errors. Then run `reboot`, reconnect QGC and capture the following
+[readback commands](../build/bench_commissioning/bench-e8ea98b404-step3/usb-signal-only-readback.txt):
+
+```text
+research_bench_control status
+param show PWM_MAIN_TIM*
+param show PWM_MAIN_FUNC*
+param show PWM_AUX_FUNC*
+param show PWM_MAIN_REV
+param show COM_PREARM_MODE
+px4io status
+listener actuator_armed -n 1
+```
+
+Verify timers 0..2=50, MAIN1..4=10000..10003, MAIN5..8=0, AUX1..9=0, REV=0,
+and prearm mode=1. In PX4IO's channel configuration, MAIN1..4 must show
+min=500, max=2500, center=1500, disarmed=0 and failsafe=0. Independently verify
+actual `px4io_status.pwm_failsafe[0..3]` is zero; the mixer's channel configuration
+alone does not verify the IO register table. The module must remain
+not running and actual armed must be false; prearmed follows the real safety
+state and is not forced here. Capture any unexpected PWM/status activity for
+review. Software readback does not establish electrical silence at the pins.
+Stop this stage after the readback; profile installation, Ready-only start and
+measured output enable follow their own checks below.
+
+#### Resolve the retained IO failsafe table before enable
+
+The [post-setup result](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-output-configuration-result-20261019.json)
+shows MAIN functions 10000..10003, timers 50 Hz, min/max/center 500/2500/1500 us
+and FMU disarmed/failsafe 0, with all AUX functions zero. IO initialization and FMU-data
+OK are true. The owner is stopped; actual armed=false, prearmed=true and kill,
+lockdown, termination and calibration=false. However, actual IO `pwm_failsafe`
+is 1000 on the first four channels. Its present reported PWM is zero.
+
+The retained baseline source explicitly **ignores zero writes** to IO's failsafe
+register page; disarmed zero writes are accepted. Thus the parameter/mixer
+value zero can coexist with a prior IO failsafe entry of 1000. The owner checks
+FMU parameters and does not detect this register mismatch. Repeating FAIL=0 is
+not a method of clearing it.
+
+The user confirms the reset was a console `reboot`, and that no scope/pulse
+instrument is currently available. Read the [clarification and cold-check plan](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-io-failsafe-followup-20261019.json).
+IO may remain powered across an FMU restart. The source initializes its failsafe
+array to zero on IO startup, so a full power removal tests retained state; it
+does not guarantee the cold startup will leave the required zeros.
+
+1. Keep all servo/EDF connections and energy disconnected, and the owner stopped.
+2. Remove USB and every other controller supply/backfeed path, including any
+   powered battery/BEC or telemetry connection. Allow at least five seconds for
+   board power to discharge, then reconnect **USB only** and wait for QGC.
+3. Capture these [cold readback commands](../build/bench_commissioning/bench-e8ea98b404-step3/io-failsafe-cold-readback.txt):
+
+   ```text
+   research_bench_control status
+   param show PWM_MAIN_FAIL*
+   px4io status
+   listener actuator_armed -n 1
+   ```
+
+4. Verify MAIN_FAIL1..4=0 **and actual IO pwm_failsafe first four entries=0**.
+   Unused channels5..8 need not have zero failsafe entries. The owner stays
+   stopped and actual armed must be false; prearm follows the real safety state.
+   If any first-four IO entry is nonzero, retain the cold boot/status evidence
+   and investigate startup/firmware initialization before enable.
+
+Do not enable or connect actuator energy while that mismatch remains open.
+Profile copying and a disabled Ready-only parse can be prepared independently;
+all active electrical tests wait for calibrated capture equipment and review of
+the IO failsafe result. A zero table readback alone grants no physical acceptance.
+
+The [subsequent cold-check result](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-io-failsafe-cold-result-20261019.json)
+now shows saved MAIN_FAIL1..4=0 and actual IO `pwm_failsafe=[0,0,0,0,1000,1000,1000,1000]`.
+MAIN1..4's disarmed values are also zero; functions, limits and centers persist.
+IO init/data OK are true, the owner is stopped and actual armed=false/prearmed=true
+with fault flags clear. This passes the **current first-four register-table
+check**. The zero-write-ignore behavior is unchanged; verify actual IO entries
+again after future configuration/reset changes. The physical fault response and
+worst-case timing still require measurements. Do not repeat the completed cold
+check merely to perform the Ready-only step below.
+
+### Current USB profile: create, inspect and check Ready only
+
+Keep all servo/EDF connections and energy disconnected. No instrument is
+currently available, so the current scope ends at profile inspection and
+Ready/start/stop. Use the staged USB fixture only; its synthetic values do not
+qualify installed servo calibration. The source-checked
+[console recipe](../build/bench_commissioning/bench-e8ea98b404-step3/usb-profile-create-ready-console.txt)
+and [recipe validation record](../build/bench_commissioning/bench-e8ea98b404-step3/usb-profile-create-ready-plan.json)
+retain the exact steps. They have not been executed on the controller by Codex.
+
+The user has now executed this recipe successfully; see the
+[hardware Ready-only result](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-profile-ready-result-20261019.json).
+The complete board readback matches all five lines/44 tokens, start reports
+Ready/state0, both actual permission snapshots are armed=false/prearmed=true
+with fault flags clear, and IO reports present PWM zeros and first-four
+disarmed/failsafe zeros. Stop reports not running. This subset passes; retain
+the commands below for reproducibility without repeating the completed check.
+
+Execute these lines individually to create the directory and write the five
+profile lines. The first `>` replaces this named signal-fixture file; later
+`>>` lines append to it. `mkdir -p` preserves an existing directory.
+
+```text
+mkdir -p /fs/microsd/bench
+echo "1 2 255 190 200000 0.05 0.05 500000" > /fs/microsd/bench/usb-signal-only-profile.txt
+echo "1400 1500 1600 10 1000 1000 1 1 1" >> /fs/microsd/bench/usb-signal-only-profile.txt
+echo "1600 1500 1400 10 1000 1000 1 -1 -1" >> /fs/microsd/bench/usb-signal-only-profile.txt
+echo "1400 1500 1600 10 1000 1000 -1 1 -1" >> /fs/microsd/bench/usb-signal-only-profile.txt
+echo "1400 1500 1600 10 1000 1000 -1 -1 1" >> /fs/microsd/bench/usb-signal-only-profile.txt
+cat /fs/microsd/bench/usb-signal-only-profile.txt
+```
+
+Stop on any write/read error. Compare the complete `cat` output with the
+[host profile](../build/bench_commissioning/bench-e8ea98b404-step3/usb-signal-only-profile.txt)
+before proceeding: five lines, 44 numeric tokens, observed USB instance2 and
+sender255:190. The local echo payloads reconstruct its exact bytes by hash, but
+that check is not an independent hash of the board file. Retain the console
+readback; obtain a host/card readback hash or verified transfer receipt before
+active acceptance. No onboard checksum command is assumed.
+
+Once the content matches, capture this disabled lifecycle:
+
+```text
+research_bench_control start /fs/microsd/bench/usb-signal-only-profile.txt
+research_bench_control status
+listener actuator_armed -n 1
+px4io status
+research_bench_control stop
+research_bench_control status
+```
+
+Expect **`state=0 (0 ready, 1 active, 2 revoked)`** before stop, and **not running**
+afterward. Actual armed must stay false, fault flags clear, and actual IO
+first-four failsafe entries zero. Start parses/configures and advertises the
+topic without enabling a session. Ready/status alone does not accept routing,
+pin silence, slew, timing or fault behavior. Stop this run here; enable and G4
+measurements wait for calibrated capture equipment. The full lifecycle below is
+retained for that later measured stage, not an instruction to enable now.
+
 ### Exercise the module lifecycle
 
 1. Hash and copy the profile using a card reader or an available verified file
@@ -360,7 +676,7 @@ EDF control signal in G4.
    ```text
    research_bench_control start /fs/microsd/bench/bench-profile.txt
    research_bench_control status
-   listener actuator_armed 1
+   listener actuator_armed -n 1
    ```
 
    Expected module state is `0 ready`. Start parses/configures the profile but
@@ -370,13 +686,14 @@ EDF control signal in G4.
    `termination`, `in_esc_calibration_mode` all false in the actual topic.
    If Commander cannot provide this state, investigate it; do not force arm or
    publish synthetic permission messages on the hardware.
-4. Center the three axes and observe fresh valid input from the configured source.
+4. First verify the actual IO failsafe table and signal-capture equipment checks
+   above. Center the three axes and observe fresh valid input from the configured source.
    While capturing outputs, issue:
 
    ```text
    research_bench_control enable
    research_bench_control status
-   listener bench_servo_command 5
+   listener bench_servo_command -n 5
    ```
 
    Expected module state is `1 active`, with a new session and enabled frames.
@@ -581,7 +898,20 @@ synthetic inertia/effectiveness and gains cannot become vehicle defaults.
 
 ## G9 Implement and verify the stabilized hardware firmware
 
-The current stabilized owner/consumer live in a private POSIX SITL integration;
+October 19 update: the [output-disabled observer](STABILIZED_MANUAL_HARDWARE_OBSERVER.md)
+now builds for Pixhawk on the working baseline and passes host/native software
+tests. It publishes diagnostic candidates only and has not been flashed. Its
+separate image excludes the bench owner and leaves 4,376 bytes of flash headroom.
+This is partial G9 implementation; the active output contract and physical gates
+below remain open.
+
+The subsequent [portable output boundary](STABILIZED_MANUAL_OUTPUT_CONTRACT.md)
+passes host fault/mapping tests and a separate ARM object compile. It implements
+explicit sessions, software acknowledgments and independent lease expiry; runtime
+supervision, actual driver application/revoke acknowledgments and integrated
+firmware verification remain open. It does not change the staged observer image.
+
+The current active stabilized owner/consumer live in a private POSIX SITL integration;
 the bench ARM candidate has no deployable SLAAPS stabilized mode. The existing
 library supplies reusable rate PID, quaternion reference handling and allocation,
 with [31-case SITL evidence](STABILIZED_MANUAL_CHECKOUT_QUALIFICATION.md).
@@ -606,8 +936,9 @@ to accommodate an unmeasured link. Select and verify an input update strategy th
 meets the stabilized requirement, including QGC's centered/idle state.
 
 Produce a new source/configuration manifest and `.px4`, including linked symbol,
-size and runtime resource review. Revisit the 9,268-byte package headroom before
-assuming the added code fits. Repeat G2-G4 for the new image with loads disconnected.
+size and runtime resource review. The current bench image has 8,328 bytes of flash
+headroom; the separate observer now has 4,376 bytes. Budget further additions
+before assuming the active path fits. Repeat G2-G4 for the new image with loads disconnected.
 Keep the original H10 candidate, bench results and synthetic SITL qualification
 immutable. No flight-mode dropdown or firmware parameter completes these tasks.
 
@@ -682,7 +1013,16 @@ sequence, and verify the fixture is safe before approaching it. For an unexpecte
 motion or limit exceedance, use the independent stop and reviewed tunnel shutdown;
 do not wait for a CLI or radio response. Record the failure before any restart.
 
-The next milestone is diagnosing the H10 startup failure and verifying an accepted
-replacement's cold boot/QGC connection with all loads disconnected. G2-G4 resume
-after that result. Installed calibration, powered/wind acceptance and the separate
-stabilized firmware remain subsequent milestones.
+The bench cold boots and available/stopped module are user-confirmed, and the
+runtime console confirms USB input identity 2 / 255:190, disarmed state and clear
+buttons. The corrected physical labels establish the expected roll sign; finite
+USB parser checks and applied FMU setup are recorded. Following the requested
+cold check, actual IO first-four failsafe entries now match zero. The user then
+created the exact USB signal fixture: complete displayed content matches and
+hardware Ready/start/stop passes, with no enable and the module now stopped.
+Next obtain profile byte-integrity evidence and prepare calibrated MAIN1..4 and
+AUX4 captures, retaining pin baselines before the first enabled session. Full
+lifecycle, powered operation and G4 timing/fault acceptance remain pending
+measurement equipment and their measured checks.
+Installed calibration, powered/wind acceptance and the separate stabilized firmware
+remain subsequent milestones.
