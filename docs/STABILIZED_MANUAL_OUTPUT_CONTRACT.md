@@ -7,6 +7,12 @@ calibrated four-servo mapping. It does not connect the observer to a driver,
 publish actuator topics, grant hardware permission, or change the staged firmware.
 The existing bench and synthetic SITL consumers retain their original contracts.
 
+Subsequent work: [scheduled output integration](STABILIZED_MANUAL_SCHEDULED_OUTPUT.md)
+adds a reusable driver-handled acknowledgment/revoke boundary and native
+work-queue/uORB/mixer tests with a memory-only sink. Production driver integration
+and hardware acceptance remain open; the evidence below describes this earlier
+portable-contract milestone.
+
 ## Implemented behavior
 
 Both endpoints require an explicit `begin(now, session, configuration, permitted)`

@@ -177,7 +177,56 @@ public:
 	 * and publish to this node or if another node should be tried. */
 	bool is_advertised() const { return _advertised.load(); }
 
+#if defined(CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL) || defined(CONFIG_MODULES_SLAAPS)
+	void mark_as_advertised()
+	{
+		ATOMIC_ENTER;
+		advance_research_revision();
+		_advertised.store(true);
+		ATOMIC_LEAVE;
+	}
+
+	void mark_research_unadvertised()
+	{
+		// Use the same critical section as payload publication on both POSIX
+		// and NuttX. The ordinary device mutex alone does not serialize ISRs.
+		ATOMIC_ENTER;
+		advance_research_revision();
+		_advertised.store(false);
+		ATOMIC_LEAVE;
+	}
+
+	unsigned research_revision()
+	{
+		ATOMIC_ENTER;
+		const unsigned revision = _advertised.load() ? _research_revision : 0;
+		ATOMIC_LEAVE;
+		return revision;
+	}
+
+	bool copy_research_revision(void *destination, unsigned &generation, unsigned &revision)
+	{
+		revision = 0;
+
+		if (!destination || _meta->o_queue != 1) { return false; }
+
+		ATOMIC_ENTER;
+
+		if (!_advertised.load() || !_data_valid || !_data || !_research_revision
+		    || _research_data_revision != _research_revision) {
+			ATOMIC_LEAVE;
+			return false;
+		}
+
+		memcpy(destination, _data, _meta->o_size);
+		generation = _generation.load();
+		revision = _research_data_revision;
+		ATOMIC_LEAVE;
+		return true;
+	}
+#else
 	void mark_as_advertised() { _advertised.store(true); }
+#endif
 
 	/**
 	 * Print statistics
@@ -289,6 +338,12 @@ private:
 	uint8_t *_data{nullptr};   /**< allocated object buffer, guarded by the node lock (ATOMIC_ENTER) */
 	bool _data_valid{false}; /**< At least one valid data */
 	px4::atomic<unsigned>  _generation{0};  /**< object generation count */
+#if defined(CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL) || defined(CONFIG_MODULES_SLAAPS)
+	// Research/SLAAPS lifecycle provision; zero stays invalid after exhaustion.
+	unsigned _research_revision{1};
+	unsigned _research_data_revision{};
+	void advance_research_revision() { if (_research_revision != 0) { ++_research_revision; } }
+#endif
 	List<uORB::SubscriptionCallback *>	_callbacks;
 
 	const uint8_t _instance; /**< orb multi instance identifier */

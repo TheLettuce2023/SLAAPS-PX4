@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Common rcS already starts sensors, EKF2, manual_control, commander and
+# configured output/communications drivers. Stock flight controllers and
+# allocation must not start as a second SLAAPS output owner.
+#
+
+if ! slaaps start
+then
+	echo "ERROR [slaaps] supervisor failed; commander keeps SLAAPS unavailable"
+fi
+
+# Active driver attachment, measured flight admission and a vehicle-supported
+# land detector remain prerequisites. The supervisor advertises unavailable
+# development modes until these paths are implemented.

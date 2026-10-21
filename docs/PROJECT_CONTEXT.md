@@ -1,8 +1,255 @@
 # Research vehicle: start here
 
-Updated 2026-10-19 by Codex. Navigation snapshot, not flight acceptance.
-Checkout: `slaaps-sitl`, based on PX4 `e880f1cd79`; previous source checkpoint
-`bde4aea321`. This successor source checkpoint includes the October 19 diagnostics,
+Updated 2026-10-20 by Codex. Navigation snapshot, not flight acceptance.
+Active goal: [SLAAPS airframe and flight-mode integration](SLAAPS_AIRFRAME_GOAL.md).
+Implement QGC-selectable manual/acceleration/servo-bench modes, configurable
+vehicle data and output channels, and one EDF owner. Vehicle measurements will
+follow; retain missing-data gates and do not substitute synthetic defaults.
+Latest milestone: all-bank activation completion accounting now requires exact
+session, routing, driver and command/reply lifetimes, immutable activation times,
+and an explicit first-command budget. Partial or lost replies cannot complete
+activation; rejection retains every participating bank for caller cancellation.
+Host `/var/tmp/slaaps-configuration-ne9t1jdd`: 2,046 checks in each Debug, Release
+and ASan/UBSan build, 175 parameters; all 95 input hashes revalidated. Native `/var/tmp/slaaps-native-ecgq_q0f`,
+runtime `/var/tmp/slaaps-native-runtime-5fnlz8fi`: 2,721 control checks, 34 input
+checks and four supervisor lifecycles pass; five changed snapshot inputs match.
+These tests use synthetic bank
+activation and first-command delivery, not production admission or physical I/O.
+Next: lifetime-bound activation request/reply and cancellation transport, then
+supervisor/physical-driver attachment. The barrier grants no flight permission;
+production availability remains zero. Vehicle measurements and recovery policy
+remain pending. ARM/full-board evidence predates these paths.
+Checkpoint requested: commit and push accumulated source/documentation updates
+to origin/slaaps-sitl, then resume software integration. Validation jobs terminal.
+Clearing history or starting a fresh chat is safe using this handoff.
+
+Previous milestone: observation-bound preparation now freezes captured driver
+identities and validated routing before publishing a proposal. Explicit capture/
+report freshness limits are required; current failed capture status, replacement,
+time reversal, stale data or routing/configuration changes latch rejection.
+Raw inventory polling cannot bypass an observed transaction. Host
+`/var/tmp/slaaps-configuration-bobhr10t`: 1,997 checks per build, 175 parameters,
+94 input hashes revalidated. Native `/var/tmp/slaaps-native-3_biy2k9`, runtime
+`/var/tmp/slaaps-native-runtime-yybdmne_`: 2,651 control checks, 34 input checks,
+four supervisor lifecycles; five changed snapshot files revalidated. The 38 new
+host and 28 native-only checks cover identity/freshness binding, explicit policy,
+failed-entry replay, current capture errors and raw-poll bypass rejection.
+Next: activation completion acknowledgments and partial-failure handling, then
+production supervisor/driver attachment using observed preparation. The supervisor
+captures reports but does not yet begin preparation or fill flight permissions.
+No default vehicle timing policy or flight permission was added. ARM/full-board
+evidence below predates these paths; refresh before deployment claims. All jobs
+terminal; changes uncommitted; goal active. Clearing history or starting a fresh
+chat is safe using this handoff.
+
+Previous milestone: production routing diagnostics now retain a validated driver
+observation snapshot with physical driver tokens, report times, topic instances,
+publisher revisions and complete effective inventory. Every instance is checked;
+a second pass rejects changed publisher revisions or publication generations.
+Failed capture clears routing validity while leaving the prior snapshot untouched.
+This is observation consistency, not output authority or atomic physical handling.
+Host `/var/tmp/slaaps-configuration-t0ou9zq1`: 1,959 checks per build, 175 parameters,
+93 source hashes revalidated. Native `/var/tmp/slaaps-native-zm0ehra4`, runtime
+`/var/tmp/slaaps-native-runtime-2k17w7l4`: 2,585 control checks, 34 input checks,
+four supervisor lifecycles; four changed inputs match the snapshot. Eighteen new
+checks cover bank/instance mapping, heartbeat versus restart identity, absent/extra
+publishers, invalid/stale reports and preservation on capture failure. Existing
+production routing fault checks pass. No deterministic mid-capture race injection
+was performed; the two-pass generation check was reviewed against atomic uORB copy.
+Next: bind these report identities and routing into preparation/activation, then
+complete activation acknowledgments/rollback and physical driver attachment.
+Flight permission remains empty. ARM/full-board evidence below predates this
+production observation change; refresh resource evidence before deployment claims.
+All jobs terminal; changes uncommitted; goal active. Clearing history or starting
+a fresh chat is safe using this handoff.
+
+Previous milestone: `ManualPreparationCoordinator` now collects readiness from all
+participating banks, binds their actual advertisement lifetimes, excludes retained
+pre-proposal replies, and continuously checks configuration/routing, original
+expiry and exact reply identity. Partial readiness cannot complete preparation.
+This is native-verified readiness collection, not production admission/activation.
+Host `/var/tmp/slaaps-configuration-6a_4weui`: 1,959 checks per build, 175 parameters,
+92 input hashes revalidated. Native `/var/tmp/slaaps-native-0dimfwqb`, runtime
+`/var/tmp/slaaps-native-runtime-gm4ecx43`: 2,567 control checks, 34 input checks,
+four supervisor lifecycles; four changed inputs match the sealed snapshot.
+The 124 new checks cover two-bank collection, silent peers, retained baselines,
+changed lifetimes/payloads, cancellation, replay and independent activation.
+Next: implement the distinct activation/completion phase and trusted driver-report
+snapshot binding, then attach these transactions to Slaaps::Run and PWMOut/PX4IO.
+Current routing reports are diagnostics only; production flight permission remains
+empty and availability remains zero. All jobs are terminal; changes uncommitted;
+goal active. ARM/full-board evidence below predates this coordinator. Clearing
+history or starting a fresh chat is safe using this handoff.
+
+Previous milestone: native bank preparation endpoints now consume lifetime-bound
+proposals, prepare once, publish exact readiness echoes and invalidate retained
+readiness on cancellation/consumption. Duplicates do not renew timestamps or
+expiry; configuration/routing and publisher changes cancel pending preparation.
+Activation still requires independent trusted permission. Existing active banks
+are unaffected by later preparation/cancellation traffic. Host
+`/var/tmp/slaaps-configuration-putueyok`: 1,959 checks per build, 175 parameters,
+91 input hashes revalidated. Native `/var/tmp/slaaps-native-u2hg106n`, runtime
+`/var/tmp/slaaps-native-runtime-q9kubd_z`: 2,443 control checks, 34 input checks,
+four supervisor lifecycles; four changed snapshot files revalidated. The 134 new
+native checks cover both bank endpoints and injected faults, without drivers.
+Next: supervisor preparation transaction across all participating banks, then
+serialized physical driver attachment. These APIs still do not grant flight
+availability. Vehicle measurements and recovery policy remain pending inputs;
+independent software work can continue. ARM/full-board evidence below predates
+these endpoints. All jobs are terminal; changes are uncommitted; goal active.
+Clearing history or starting a fresh chat is safe using this handoff.
+
+Previous milestone: preparation/readiness wire schema and strict codecs now exist
+for separate proposal, MAIN and AUX topics. The complete proposal is echoed;
+publication cannot renew expiry, and replies cannot cross bank/topic roles.
+Host `/var/tmp/slaaps-configuration-po3p369q`: 1,959 checks per Debug/Release/
+ASan-UBSan build, 175 parameters, all 90 input hashes revalidated. Native build
+`/var/tmp/slaaps-native-vy_7mdmv`, runtime `/var/tmp/slaaps-native-runtime-9pa4j6i9`:
+2,309 control checks, 34 input checks and four supervisor lifecycles pass,
+including all three generated topics through lifetime-bound subscriptions.
+Five changed native inputs match the snapshot. This proves codecs and native
+delivery, not the supervisor transaction or driver attachment. The ARM probe and
+full board evidence below predate the new schema/shared validation refactor.
+Next: connect bank preparation/readiness endpoints, deduplicate retained proposals,
+and implement the supervisor transaction before physical driver attachment.
+All validation jobs are terminal; changes are uncommitted and the goal is active.
+Clearing history or starting a fresh chat is safe using this handoff.
+
+Previous milestone: non-actuating bank preparation and one-use activation now
+bind the configuration/routing, session, command publisher and each participating
+reply publisher. Restarted endpoints reject proposals addressed to predecessors.
+Preparation grants no authority and produces no command or handled acknowledgment.
+Host `/var/tmp/slaaps-configuration-xiqp8bo_`: 1,932 checks each Debug/Release/
+ASan-UBSan, 175 parameters, 88 source hashes revalidated. Native build
+`/var/tmp/slaaps-native-f67d12gr`, runtime `/var/tmp/slaaps-native-runtime-df4yx30j`:
+2,276 control checks, 34 input checks, four supervisor endpoint lifecycles pass;
+five changed native source bindings revalidated. ARM probe
+`build/slaaps_active_target/20261020-prepared-bank-verified`: 34 source bindings
+and 235 dependencies revalidated, 11,500 B unlinked text, 1,552 B per bank,
+712 B maximum individual static frame. This is not a firmware link or runtime
+stack qualification. The last full firmware package below predates preparation.
+Next: prepare/ready transport and supervisor transaction, then PWMOut/PX4IO
+attachment with actual handled replies. Keep flight admission disabled until
+those paths and the measured-condition/recovery policy are qualified. Vehicle
+measurements remain unavailable; the recovery-mechanism question is pending.
+No jobs remain running at this checkpoint; changes are uncommitted. The goal
+remains active. Clearing history or starting a fresh chat is safe using this handoff.
+
+Current [implementation/evidence](SLAAPS_CONFIGURATION_INTEGRATION.md):
+- Airframe 22001, dedicated startup, native supervisor and commander guard exist.
+  Three modes register; all availability masks remain zero pending active outputs.
+- 175 QGC parameters (173 vehicle fields plus explicit apply/scope), coherent
+  capture, immutable configuration validation and logical MAIN/AUX routing.
+- Common EdfOwner validates units/session/source/configuration/expiry and slew.
+  ManualEdfInput converts validated selected throttle into expiring requests;
+  ManualWorker combines attitude/allocation and EDF in one expiring result,
+  waits for all routing-bound bank acknowledgments, and monitors health while waiting.
+  ManualOutputBank independently validates/maps each bank and expires commands;
+  preparation produces no ack until exact-ticket handling is confirmed.
+  Command/per-bank ack schemas and codecs pass native uORB round-trip tests;
+  atomic advertisement-lifetime binding now passes native restart tests;
+  trusted supervisor admission and production attachment remain required.
+  Native producer and MAIN/AUX bank transports now connect the real manual
+  controller/EDF owner through uORB commands, consumers and handled replies.
+  Same-publisher session re-entry ignores expired retained traffic; active
+  producer destruction revokes ownership. Lifetime checks and expiry remain.
+  Shared selected-input observation is now attached to supervisor diagnostics;
+  the bench adapter retains its disarmed permission gates. The native worker now
+  binds selected publisher/device identities and metadata timing per session;
+  faults revoke attitude/EDF even while waiting for bank replies. Raw samples
+  cannot bypass a selected session. The production supervisor now owns the EDF
+  and manual endpoint lifetimes; startup advertises without admitting a worker,
+  and shutdown revokes ownership. Four actual endpoint lifecycles reject retained
+  commands. The supervisor now contains serialized selected-worker execution
+  with configured fast cadence and separate 100 ms maintenance. The shared
+  execution gate is tested; full active supervisor scheduling is not yet exercised
+  because admission remains absent. PWMOut/PX4IO attachment remains pending.
+  AccelerationControllerPort
+  is explicitly unavailable. Flight-capable propulsion is the authorized scope.
+- PWMOut/PX4IO now report effective bank masks/rates/calibration/functions.
+  Supervisor diagnoses fresh complete MAIN/AUX routing. Reports are observations,
+  not output admission or an atomic driver transaction; no SLAAPS provider yet.
+Host evidence `/var/tmp/slaaps-configuration-1rjyj4wi`: 1,882 checks each
+Debug/Release/ASan-UBSan and actual PX4 parameter metadata generation; 87 inputs
+rehash. Timing admission now rejects expiry at/before the first permitted tick.
+Fresh wall-clock native build `/var/tmp/slaaps-native-7sgk_m1l`; runtime
+`/var/tmp/slaaps-native-runtime-5kg4gbbd` passes 34 selected-input checks and
+2,182 control checks inside PX4, plus registration/apply/restart/routing faults
+(130 successful commands total; four endpoint lifecycles with idle-cadence checks).
+Five changed production/test inputs rehash
+against the sealed native snapshot. Shared observation accepts armed sensor
+metadata without granting authority; bench restrictions remain enforced.
+The selected-input refactor is native-verified, not yet board-qualified.
+This includes seven uORB round-trip and fourteen lifetime-binding checks with
+synthetic inputs. The new binding detects replacement, including identical
+payloads, but does not authenticate shared publisher handles. Nine native bank
+transport scenarios add 82 checks for preparation/handling, duplicate traffic,
+replacement, invalid frames and expiry. Another 52 checks exercise the real
+worker-to-bank transport loop, stick release/EDF slew, lost/replaced replies,
+re-entry and destruction. The new input tests cover original sample times,
+armed observation, bench inhibits, invalid timing/device/estimator configuration
+and identical publisher replacement. Another 123 checks cover selected-session
+metadata faults, command preservation, raw-cycle bypass rejection, expiry and
+failed-entry session consumption. Production supervisor admission and
+physical driver attachment remain absent. The fixture is excluded
+from vehicle targets.
+Prior active-path ARM compile passes with actual board/NuttX flags. Evidence
+`build/slaaps_active_target/20261020-selected-input-verified`: 32 source bindings
+and 234 compiler dependencies rehash; active interface object 10,116 B text.
+The probe forces selected-snapshot entry/cycle and both bank transports. Object
+sizes: EDF owner 848 B, worker 1,736 B, each bank 1,336 B (5,256 B total before
+uORB, supervisor and stacks). Largest individual static frame 712 B, not runtime
+stack usage. This predates supervisor ownership/pinned advertisement changes
+and is unlinked, not a current flash-fit proof. Prior probe remains retained.
+PWMOut handling correction: uninitialized PWM or any rejected channel register
+write now returns false; remaining writes and existing trigger behavior continue.
+Host evidence `/var/tmp/slaaps-pwm-output-ep6_7lz3` reproduces nine old-method
+failures and passes 25 checks each Debug/Release/ASan-UBSan on the actual method
+with injected registers. This is not electrical feedback or an atomic write.
+Latest full board verification (before bank preparation) is complete in
+`build/slaaps_firmware/active-loop-headroom-20261020`; retained Docker volume
+`px4-slaaps-active-loop-headroom-20261020`. Target `px4_fmu-v6x_slaaps`, dirty
+checkpoint `472a7d6786`, embeds `v1.18.0-beta1-679-g472a7d6786f`. Image
+1,943,368 B; flash headroom 22,712 B; linked AXI SRAM 111,356 B (excludes runtime
+heap/stack usage). Package 1,842,548 B, SHA-256
+`094353fb3f385383579edacb3e22d634bdbcfe047d7689875e1a8360d7e7fdd6`.
+Package/bin/ELF/version/capacity and 88 changed production anchors independently
+verify. Actual stabilized cycle and EDF sample symbols are linked; native test
+entry points and stock VTOL control are absent. Effective board configuration
+also verifies SLAAPS enabled/VTOL disabled. No flashing or boot testing.
+The first active-loop build passed with only 948 B free and is retained in
+`build/slaaps_firmware/active-loop-20261020`. Removing the unused stock winged-VTOL
+transition controller from this dedicated target recovered 21,764 B. SLAAPS
+startup does not run it and commander rejects stock flight modes. Stock/default
+and retained working-baseline configurations are unchanged. Earlier firmware
+and Docker volumes remain preserved; current headroom does not prove fit of
+future driver/admission changes or runtime scheduling/stack margins.
+All build sessions are terminal. Distinct package copies were staged without
+flashing; `/tmp/px4-firmware` copies are temporary, workspace artifacts persist.
+Prior non-test native link `/var/tmp/slaaps-native-y8no43f3` remains retained.
+Prior routing board build remains preserved. Evidence and package:
+`build/slaaps_firmware/routing-20261020`; retained Docker volume
+`px4-slaaps-routing-20261020`. Image 1,952,100 B; flash headroom 13,980 B.
+Target omits optional MSP OSD/gimbal and stock autotunes. Source revisions and
+artifact/source verification are recorded; no flashing, boot or physical tests.
+Known-working e8ea98b404/NuttX 11 baseline and its artifacts remain preserved;
+porting this integration to that baseline is still pending.
+User direction: continue software integration for parameter-driven QGC vehicle
+configuration; geometry derivation/automatic tuning are future work, not present
+capabilities. See the goal record for the measured-data boundary.
+Next: driver prepare/activation handshake and final output attachment;
+production supervisor admission and active scheduling/stack verification, bench worker and
+final per-bank routing/session handoff,
+PWMOut/PX4IO attachment with serialized write/handling confirmation,
+EDF permission and flight-loss policy,
+vehicle-supported land detection, and actual QGC GUI acceptance. Do not mark
+registered mode names or diagnostic routing as completed flight integration.
+Recovery-mechanism input was requested asynchronously on 2026-10-20 and is
+pending; do not assume a parachute, controlled fallback or propulsion cutoff.
+Goal remains active. Fresh chat is safe with workspace and WSL/Docker evidence
+preserved; changes are uncommitted. Six external-mode schemas match e8ea98b404.
+Checkout: `slaaps-sitl`, based on PX4 `e880f1cd79`; current committed checkpoint
+`472a7d6786` (parent `bde4aea321`). That source checkpoint includes the October 19 diagnostics,
 working-baseline port tooling, observer, portable output contract and handoff.
 It is a local commit checkpoint, not a new remote publication. Firmware binaries
 and retained WSL/build evidence remain local and require separate preservation.
@@ -14,7 +261,184 @@ The current checkpoint also revalidates graph anchors and formats changed C/C++;
 the unrelated empty `timestamp` file remains outside the commit.
 Historical evidence retains its original source bindings and acceptance scope.
 Current default isolated mode: [31-case revision-aware qualification and runnable console](STABILIZED_MANUAL_ISOLATED_MODE.md).
-Latest stabilized software: [portable output contract](STABILIZED_MANUAL_OUTPUT_CONTRACT.md)
+Current integrated candidate: [30-case qualification and runnable operator console](STABILIZED_MANUAL_SESSION_QUALIFICATION.md).
+The request-owner producer, independent consumer and Gazebo plant pass 30 fresh
+cases on one ELF, plus eight actual console checks. All 786 child files rehash;
+24,311 maneuver cycles audited. Worst rate error 0.02871573 rad/s, final hold
+0.00574914 rad, peak 0.49008303 rad (<0.5; narrow margin). No gains/limits changed.
+Build `/var/tmp/research-stabilized-sitl-0o5n1g_b`, manifest
+`de24b85bd0fb41383efa7da8c3b3d0514d3cc0375f4e0ef1d68c344ed696dc4f`.
+Qualification `/var/tmp/research-stabilized-session-qualification-_e84t5eb`, receipt
+`62722f917fdf5a048b2f5a5da014c754dc449fd127a8d2c7f58fb830ff2d8209`.
+Console check `/var/tmp/research-stabilized-session-console-check-uk_m1tzr`, receipt
+`86e11af05ca16569bed94d2dcf03eb7376b901fe8af464cd74f972d2b54d6093`.
+Prior candidate qualification-pj64a0bz remains retained; later seed/release analysis
+below belongs to that earlier binary, not automatically to this request-owner build.
+`stabilized_session_console.py --qualification <directory>` operates the candidate;
+legacy console/default remain unchanged. Restart confirms disarm before a new session.
+Fault coverage includes independent queue stalls, command/ack transport faults,
+grant/disarm reply loss and identical-payload command/ack publisher replacement.
+Selected-input and grant request/response hidden replacements retain separate
+native coverage; four current helper sources match final native snapshots, all
+735 files rehash (review `research-stabilized-session-coverage-review-_k8dqh_n`).
+Additional unchanged-candidate exploration passes 12 coupled cases at seeds
+7/13/73, 30,396 audited cycles, all 305 artifacts rehashed. Worst peak
+0.49550473 rad remains close to 0.5. Evidence `research-stabilized-session-robustness-xy5fsxve`,
+receipt `590a2d68c5bbbea56ac9a6dbfc394234a6fce0a97bac8abdb460b1c537a73e49`.
+Original coupled-case diagnosis places the peak 484 ms after stick release,
+before the impulse; release braking is the next margin investigation target.
+Details and analysis receipt are in the integrated qualification record above.
+Extended timing: requested braking within 12 ms, allocation within 84 ms,
+physical rate reversal 320?560 ms after first hold output. Separate sealed
+analysis `research-stabilized-session-release-analysis-1m5jnfka`; no tuning.
+This is finite synthetic qualification, not vehicle tuning, broad robustness or
+publisher authentication. Remaining work: coverage/robustness boundaries, active
+full ARM resource review, production permission/driver integration and measured
+vehicle admission. Human measurements remain unavailable; no need to reask.
+ARM active portable-component probe: session/output driver/contract compile with
+working-baseline board flags; unlinked text totals 4,140 B versus prior full-image
+3,264 B headroom (not a linked overflow proof). Session object 1,120 B, driver
+512 B. Full link and runtime resource checks remain necessary. Retained stage
+`build/stabilized_active_resources/20261020`; receipt/details in qualification record.
+Diagnostic retained-object relink reproduces baseline binary exactly; current
+core adds 64 B. Forced full portable session/output API overflows FLASH by 960 B.
+This is not a minimal production-path or complete integration size; optional
+entry points are retained. Stage `build/stabilized_active_resources/20261020-link`.
+Eight intended session/split-driver entry points still overflow by 832 B;
+optional API removal saves only 128 B. Stage
+`build/stabilized_active_resources/20261020-entrypoints`. Next: separate research
+target feature budget, then clean active integration; preserve stock configuration
+and actual linker capacity.
+New `px4_fmu-v6x_slaaps-research` variant disables only FW/MC stock autotune
+and enables output-disabled research observer. Current Kconfig verifies exactly
+three effective changes; output hook remains off. Clean working-e8ea observer
+variant now passes: 1,943,864 B image, 22,216 B flash headroom (+18,952 B).
+Stage `build/stabilized_research_firmware/e8ea-20261020`; only two autotune
+config removals versus prior observer. Active path still absent. Next repeat
+entry-point resource probe on new image, then integrate production ownership.
+Evidence `build/stabilized_active_resources/20261020-config`.
+Research-image intended-entry-point relink passes: 4,096 B added, 18,120 B
+remaining. Stage `build/stabilized_active_resources/20261020-research-link`.
+Diagnostic only; owner RAM/queues/supervisor/mixer attachment are absent. Next
+production request/profile owner with independent scheduling and explicit vehicle
+admission; reuse selected-state/grant/lifecycle contracts, retain observer path.
+Production scope decision pending: first hardware restrained canards/EDF off or
+flight with propulsion. Asked explicitly; earlier user choices cover synthetic
+fixture only. [Ownership decision record](STABILIZED_MANUAL_PRODUCTION_OWNERSHIP.md)
+traces disarmed input/MAIN mixer boundaries and shared flow. Independent work:
+transport-independent session orchestration and synthetic owner tests. Do not
+substitute fixture permission for a reviewed production policy.
+Shared `SessionRequestOwner.hpp` implemented; 59 checks pass each debug/release/
+sanitizer, evidence `research-session-request-po1gh5eq`, receipt
+`5cd74c636a67ddceab71dd4e62208cc728e5b0012152e79e993077954d094818`.
+Hardware-scope question remains pending. Host helper evidence above predates
+the integrated candidate below.
+Request owner now integrated into private SITL producer. Fresh candidate
+`research-stabilized-sitl-0o5n1g_b`, ELF
+`8495c11d2452c86ef22f1b7c28f6d6d987850a9377425c99651f716bf0d5656b`, receipt
+`de24b85bd0fb41383efa7da8c3b3d0514d3cc0375f4e0ef1d68c344ed696dc4f`.
+Four focused runtime checks pass: drop_disarm, drop_grant, command publisher
+replacement, producer stall. See ownership record for receipts. Full 30-case qualification and actual console now pass (current receipts above).
+Next production ownership/mixer integration within user-selected hardware scope.
+Native mixer positive grant path now uses shared request owner. Fresh 45x2 runs
+pass 11,412 assertions and 2,771 handled acks; observer regression passes same ELF.
+All 641 files rehash: `research-stabilized-output-native-request-owner-20261020`,
+receipt `0e726563cdb336755efbfb737fcfc5735aa0337159be1635cbb7dc274f9fbd64`.
+Real mixer software, synthetic inputs/memory sink; no physical driver attachment.
+Negative request injections retained. Details in production ownership record.
+Goal audit: isolated software milestone verified; full production/vehicle goal
+incomplete. Next production implementation awaits hardware-scope answer (restrained
+canards/EDF off versus flight/propulsion). Automated continuations are not an
+answer. Measurements remain unavailable. Completion matrix in ownership record;
+no further synthetic campaign is required solely to defer this decision.
+Stock/bench/acceleration/H10 gates are preserved; no hardware operated or flashed.
+Changes remain uncommitted. Detailed milestone/failure receipts are retained in
+[session integration record](STABILIZED_MANUAL_SESSION_LINK.md). Preserve workspace
+and local WSL evidence for safe fresh-chat continuation.
+Latest completed endpoint increment: [independent selected-input health](STABILIZED_MANUAL_SELECTED_HEALTH.md)
+wires the shared sampler and separate latched guards into both native controller
+and consumer endpoints. All 90 runs pass 11,322 assertions and 2,757 acks;
+the final ELF passes 14,464 observer checks. Host checks remain 126,287 per
+configuration. All 735 native and 231 ARM evidence files rehash. The guard is
+408 bytes on ARM; no full firmware image or hardware operation. The consumer
+rejects bad selected inputs even while the controller queue is stalled.
+The [shared-validator dynamic requalification](STABILIZED_MANUAL_VALIDATOR_REQUALIFICATION.md)
+now passes 31 fresh cases over 68,761 cycles and the actual console test. All 1,768
+qualification artifacts rehash; the tested profile is now the default and the
+previous profile is preserved. Session/handshake/consumer integration into the
+dynamic fixture remains separate and is next.
+The [shared selected-state sampler](STABILIZED_MANUAL_SELECTED_INPUT.md) remains
+used by the production output-disabled observer. Production permission policy,
+mode/profile requests, scheduling and physical driver attachment remain open.
+Prior [coherent grant handshake](STABILIZED_MANUAL_GRANT_HANDSHAKE.md) binds explicit
+consumer acceptance to current request/response/command/acknowledgment lifetimes.
+The [dynamic core requalification](STABILIZED_MANUAL_SESSION_REQUALIFICATION.md)
+passed 31 cases over 68,648 cycles and the actual console test. Its previous
+default remains preserved; the new handshake is not yet in the dynamic fixture owner.
+Next: production mode requests/profile selection, authoritative health, independent
+scheduling and physical driver attachment, followed by a complete-image resource
+check including new message metadata. Vehicle calibration/timing gates remain open.
+Previous increments: [grant expiry](STABILIZED_MANUAL_GRANT_DEADLINE.md),
+[controller session](STABILIZED_MANUAL_CONTROLLER_SESSION.md), and
+[source-bound ownership](STABILIZED_MANUAL_SOURCE_OWNERSHIP.md).
+Changes remain uncommitted; the prior default profile and all baseline artifacts
+remain preserved.
+Recent milestones: [dedicated mixer routing](STABILIZED_MANUAL_DEDICATED_ROUTING.md)
+removed shared servo topics from the prepared-value path; the
+[reusable adapter](STABILIZED_MANUAL_MIXER_ADAPTER.md),
+[mixer transaction hook](STABILIZED_MANUAL_MIXER_TRANSACTION.md) and
+[matching completion protocol](STABILIZED_MANUAL_OUTPUT_COMPLETION.md) establish
+final-bank validation and driver-handled disarm barriers. Each linked record
+retains its original evidence and qualification limits.
+Latest staged software candidate (predates the selected-input extraction): [current-core/grant-schema ARM image](STABILIZED_MANUAL_HANDSHAKE_FIRMWARE.md)
+links cleanly on working `e8ea98b404`/NuttX 11 in a fresh isolated Docker volume.
+The output-disabled image is 1,962,816 bytes with 3,264 flash bytes remaining,
+320 bytes larger than the [previous lifecycle image](STABILIZED_MANUAL_LIFECYCLE_FIRMWARE.md).
+Static data/BSS remain 5,824/104,816 bytes. Observer object size grows 8 bytes to
+1,504; uORB node/diagnostic sizes remain 60/160. Active session/driver and test
+publishers are absent. Staged only; no flash or hardware qualification.
+All 131 firmware files, 361 layout files, 103 overlay entries, 54 current-root
+sources and 14 retained baseline artifacts independently rehash.
+Next: production supervisor/health/scheduling/driver integration and a new full
+resource check with that active path linked. Runtime timing/calibration gates remain open.
+Previous uncommitted follow-on: [observer publisher lifecycle binding](STABILIZED_MANUAL_OBSERVER_LIFECYCLE.md)
+replaces the constant source epoch with a bound seven-topic advertisement revision
+tuple. Observer-enabled uORB builds copy revision and payload under the same
+POSIX lock or NuttX critical section. Two fresh native runs pass 28,372 checks,
+including hidden restarts of all seven publishers in each run, with no actuator
+publication. Debug/Release/ASan-UBSan each retain 126,064 passing host checks.
+The complete modified uORB and observer translation units compile for the working
+NuttX 11/ARM target; no new firmware image was linked. All 139 native evidence
+files, 256 ARM evidence files and three prior firmware artifacts rehash.
+This detects advertisement lifetime changes, not authenticated publisher identity
+or reviewed flight health. Next: full ARM link/resource review and production
+output supervisor/sink integration; hardware timing and plant measurements remain open.
+Previous uncommitted follow-on: [PX4IO output acknowledgment fix](STABILIZED_MANUAL_PX4IO_OUTPUT.md)
+corrects false success on failed or suppressed direct-PWM register writes.
+The verbatim production-method fixture reproduces 76 failures on the old code;
+the corrected code passes 22,672 checks in each Debug/Release/ASan-UBSan build.
+The existing 126,064 host checks also pass in each configuration. The complete
+working-baseline PX4IO translation unit compiles with the fix: unlinked text
+9,809 bytes versus 9,801 before. No firmware link, flash or hardware operation.
+The acknowledgment proves register transport acceptance only. Production sink/
+supervisor integration, selected-state health, owner arbitration and physical
+expiry remain open. Evidence and reproducible recipes are linked in that record.
+Previous uncommitted software: [scheduled output integration](STABILIZED_MANUAL_SCHEDULED_OUTPUT.md)
+adds a reusable driver-handled acknowledgment/revoke boundary and a private native
+prototype through separate PX4 work queues, uORB and the actual mixer into a
+memory-only driver. Sixteen fresh native runs pass eight fault/handoff scenarios
+twice: 626 assertions and 329 handled acknowledgments. Every case verifies
+confirmed disarm before a new session and successor rate/hold operation.
+Debug/Release/ASan-UBSan each pass 126,064 checks; the existing observer regression
+passes 9,007 checks on the same new binary. ARM/NuttX 11 compilation of the new
+driver wrapper passes (570-byte unlinked text object). No new ARM image or
+hardware operation. Evidence `/var/tmp/research-stabilized-output-native-20261019`
+manifest `68ad5e5afe5d76837579b676b55e10afaa249c975ebcd0c23140227e49db1984`;
+275 evidence files and 112 ARM dependencies independently rehash without mismatch.
+The production hardware sink/supervisor, actual selected-state health and owner
+arbitration remain open. A blocked consumer cannot enforce physical expiry until
+it runs again; driver-handled feedback is not electrical/position feedback.
+Previous committed increment: [portable output contract](STABILIZED_MANUAL_OUTPUT_CONTRACT.md)
 adds explicit producer/consumer sessions, calibrated four-servo mapping, matching
 acknowledgments and independently expiring leases. Permission loss suppresses
 fallback until deliberate recovery. Debug/Release/ASan-UBSan each pass 126,013
@@ -27,7 +451,7 @@ Evidence is `/var/tmp/research-stabilized-host-lx60q8nq` and
 independently rehash with zero mismatches. Next software work is the runtime
 supervisor/transport, independent driver consumer, actual application/revoke
 acknowledgments and scheduled transition/loss verification. No hardware operated.
-Latest staged hardware candidate: [G9 output-disabled hardware observer](STABILIZED_MANUAL_HARDWARE_OBSERVER.md)
+Earlier staged hardware candidate: [G9 output-disabled hardware observer](STABILIZED_MANUAL_HARDWARE_OBSERVER.md)
 now builds on the working `e8ea98b404`/NuttX 11 baseline. Final Debug/Release/
 ASan-UBSan each pass 123,083 control plus 193 profile checks; native module
 input/fault/recovery verification passes 9,015 checks with no actuator publication.
@@ -64,10 +488,69 @@ readback matches the staged fixture, start reports Ready/state0, both permission
 snapshots remain disarmed/prearmed with fault flags clear, and IO reports current
 PWM zero and first-four disarmed/failsafe zeros. Stop reports not running. The
 [hardware Ready-only result](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-profile-ready-result-20261019.json)
-passes that subset; no enabled session or pin measurement is claimed. No scope/
-pulse instrument is currently available (scope possible later), so the next
-stage is profile byte-integrity evidence and G4 signal capture preparation.
-Enable, full lifecycle and physical timing/fault tests remain pending equipment.
+retains its earlier Ready-only scope. The later
+[R01..R08 user report](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-joystick-signal-report-20261020.json)
+confirms readbacks/profile/input/prearm, Active centered1500 us/50 Hz on the scope,
+all signed axes/intermediate positions, R06/R07 stop/loss/recovery and closeout.
+No repeat of those completed cases is requested. Numerical fault timings and raw
+captures were not supplied in that reply; the remaining G4 fault matrix is not
+marked independently reviewed. The latest [R09/R10 operator report](MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md)
+records **R09 PASS** and **R10 PASS** on the operator's explicit instruction:
+all servos closely matched manufacturer documentation. The following calibration
+and fixture paragraphs retain their earlier preparation/diagnostic chronology.
+No numerical measurements, exact tested profile/hash or load state accompany the
+closeout; the acceptance is operator-reported, with no invented data.
+The servo is EMAX ES3059MD, with reported4.8..6.0 V and maximum supply capacity12 A;
+actual voltage must be measured. A physical power switch is available but no
+independent PWM tester. The [ES3059MD R09/R10 procedure](MANUAL_BENCH_ES3059MD_R09_R10.md)
+therefore prepares a separate 1450..1550 us/5 us/s normal-slew characterization
+fixture, one unloaded servo with linkage detached, scope/angle/power references.
+It is an explicit alternative to the independent-source R09 method, not installed
+calibration or independent controller validation. Its existing-native Ready-only
+parser check passes; no enable/physical driver or new build was used. Original
+ARM/profile receipts remain unchanged. R09/R10 are now operator-reported passes;
+the numerical calibration/profile details and separate applicable G4 review were
+not supplied by that closeout statement.
+The calibration profile is now installed and its Ready/Active-neutral console
+is retained in hardware-es3059md-active-neutral-report-20261020.json. The user
+reports no servo motion. A later held-roll follow-up in
+hardware-es3059md-revoked-report-20261020.json confirms valid roll+1 from255:190,
+but owner state2 and IO1500us. The latch explains continued neutral; its trigger
+is unknown. Pitch+/-0.082 during movement is not itself a runtime-range failure.
+The subsequent hardware-es3059md-reset-command-report-20261020.json confirms
+centered state1 and fresh changing enabled frames in one session, latest47.36s
+after session start. The latch is cleared for this session. Frames correspond
+to only1498.61..1507.70us demanded, not measured pin widths. The subsequent
+hardware-es3059md-held-pwm-report-20261020.json confirms roll+1/pitch+0.13,
+same-session enabled+0.05, Active, IO1550us and user-measured MAIN1 1550us.
+Positive input-to-pin delivery works for this point. The operator now reports
+the no-motion issue resolved: bounded motion was too small to notice by eye,
+retained in hardware-es3059md-motion-resolution-report-20261020.json. Next use
+a light pointer/fixed angle reference and collect per-servo R09 measured PWM,
+angle/direction/repeatability, voltage/current and slow response within1450..1550us.
+No numerical calibration or connector-voltage data is supplied by that resolution.
+The user now explicitly requests a wider fixture before those measurements.
+[Wider R09](MANUAL_BENCH_ES3059MD_WIDE_R09.md) stages
+es3059md-unloaded-wide-r09.txt:1250/1500/1750 us, normal50 us/s, all-identical
+R/P/Y mix, one servo with linkage detached. Existing-native Ready-only parsing
+passes; the new file is not yet installed or physically verified. Preparation
+receipt es3059md-wide-r09-preparation-20261020.json binds file/recipe/log and math.
+No flash/parameter change is needed. Scope-check the wider pins with energy off,
+then expand powered roll targets from+/-0.24 in stages while measuring actual
+angle/voltage/current. This supersedes the provisional narrow-measurement-before-
+expansion plan; no arming or R09/R10 acceptance is inferred.
+The user additionally requests no visible ramp. Optional
+es3059md-unloaded-step-r09.txt retains1250/1500/1750 us and uses model rates
+10000/10000, admitting the full normalized span in one due20ms update. Zero
+rates are rejected; no slew-off flag exists. Existing-native Ready-only passes;
+recipe/preparation and step-timing explanation are linked from the wider R09 doc.
+Hardware steps/latency remain unmeasured. First scope-check with servo energy off;
+then one unloaded servo and small signed steps. No flash/parameter change.
+The subsequent operator closeout supersedes that pending R09/R10 disposition:
+**R09 PASS; R10 PASS**, with all servos reported close to manufacturer documentation.
+See [R09/R10 operator report](MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md) for the acceptance scope and evidence fields.
+The [operator run sheet](MANUAL_BENCH_JOYSTICK_RUN_SHEET.md) and
+[blank report form](templates/MANUAL_BENCH_JOYSTICK_TEST_REPORT.md) retain R01-R10.
 A USB-bound 44-token synthetic profile is staged and
 passes a native Ready-only parse/start/stop check without enable or hardware.
 The fresh console matches candidate runtime identities
@@ -274,7 +757,7 @@ selected gyro and rate ages at most 84 ms. It can narrow a future recurrence,
 but the original stall did not recur and remains unexplained.
 [SM5 allocation-input preparation](STABILIZED_MANUAL_SM5_ALLOCATION_INPUT_CONTRACT.md)
 now checks a one-condition body-FRD moment/servo data contract. The synthetic
-fixture reconstructs its existing 3×4 matrix exactly; no measured vehicle
+fixture reconstructs its existing 3Ãƒâ€”4 matrix exactly; no measured vehicle
 profile or physical acceptance is claimed.
 [A separate generated-allocation SITL variant](STABILIZED_MANUAL_SM5_GENERATED_SITL.md)
 now consumes the sealed synthetic profile and reports its full input hash at
@@ -459,7 +942,7 @@ Preserve `mm7_zto8` and every failed/exploratory predecessor with their correcte
 historical profile interpretation. Next: repeatability, mixed-axis inputs,
 bias/delay/transport perturbations and broader publisher/epoch identity.
 The [noise/bias probe record](STABILIZED_MANUAL_SM4_ROBUSTNESS_PROBES.md)
-adds two other seeds and three logged ±0.0010182 rad/s gyro-bias observations
+adds two other seeds and three logged Ã‚Â±0.0010182 rad/s gyro-bias observations
 of the hardest nose-up maneuver. All five observed checks pass across 32,370
 cycles; the closest biased physical hold result is 0.019376 rad against 0.02.
 The 219-file exploratory receipt independently rehashes clean, and the
@@ -899,7 +1382,7 @@ a received MAVLink packet nor passing diagnostic tests proves acceleration track
 | Clock provider | [source proof candidate](C1E_NATIVE_CLOCK_QUALIFICATION.md), [P3A deployment](C1E_P3A_CLOCK_DEPLOYMENT.md) | `clock_deployment_capture`, `clock_deployment_checker`, `native_clock_provider`, `native_clock_representation`, `native_clock_alias` |
 | Geometry/plant | [Intake review](GAZEBO_GEOMETRY_INTAKE_REVIEW.md), [requirements](RESEARCH_VEHICLE_REQUIREMENTS.md) | `Tools/research_sitl/geometry/check_sdf_intake.py` |
 | Control/allocation | [Control architecture](CONTROL_ARCHITECTURE.md), [foundation](EDF_CANARD_CONTROL_FOUNDATION.md) | `frames`, `fixed_array`, `limiter`, `effectiveness_model`, `authority_analysis`, `control_pipeline`, `runtime_owner`, `px4_control_runtime`, `manual_control_input`, `px4_manual_control_input`, `manual_control_schema`, `manual_control_selector`, `manual_control_owner`, `mavlink_receiver`, `actuator_command_build`; future validated-acceleration-input and active-control seams in architecture |
-| Manual wind-tunnel bench | [Working-baseline bench port](MANUAL_BENCH_WORKING_BASE_PORT.md), [stock reference](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md), [startup diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md), [commissioning procedure](MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md) | `bench_working_base_port_record`, `bench_rollback_hardware_boot_report`, `bench_rollback_io_cold_result`, `bench_rollback_usb_ready_result`, `bench_rollback_usb_ready_console`, `bench_rollback_usb_ready_plan`, `bench_rollback_output_configuration_result`, `bench_rollback_io_failsafe_followup`, `bench_rollback_io_cold_readback`, `bench_rollback_output_configuration_plan`, `bench_rollback_usb_setup_commands`, `bench_rollback_usb_readback_commands`, `bench_rollback_usb_input_correction`, `bench_rollback_usb_signal_profile`, `bench_rollback_usb_profile_validation`, `bench_rollback_usb_input_assessment`, `bench_rollback_usb_input_followup`, `bench_rollback_runtime_listener`, `bench_rollback_runtime_mavlink_main`, `bench_rollback_runtime_telemetry_schema`, `bench_rollback_runner`, `bench_rollback_candidate_receipt`, `bench_rollback_qualification_receipt`, `bench_rollback_port_source_manifest`, `bench_rollback_port_patch`, `bench_rollback_artifact_validation`, `bench_rollback_reference_hardware_acceptance`, `bench_active_fixture`, `bench_px4_module`, `bench_output_provider`; software qualified, startup/USB input/disarmed/buttons-zero recorded, corrected roll sign accepted; finite parser check complete; FMU setup/current IO zeros match and hardware profile-content/Ready/start/stop subset passes; module stopped; next profile byte-integrity evidence and G4 signal captures; scope unavailable, enable/physical outputs pending |
+| Manual wind-tunnel bench | [Working-baseline bench port](MANUAL_BENCH_WORKING_BASE_PORT.md), [stock reference](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md), [startup diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md), [commissioning procedure](MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md) | `bench_working_base_port_record`, `bench_rollback_signal_test_report`, `bench_es3059md_r09_r10`, `bench_rollback_es3059md_profile`, `bench_rollback_es3059md_preparation`, `bench_rollback_es3059md_active_neutral`, `bench_rollback_es3059md_revoked`, `bench_rollback_es3059md_reset_command`, `bench_rollback_es3059md_held_pwm`, `bench_rollback_es3059md_motion_resolution`, `bench_es3059md_wide_r09`, `bench_rollback_es3059md_wide_profile`, `bench_rollback_es3059md_wide_preparation`, `bench_rollback_es3059md_step_profile`, `bench_rollback_es3059md_step_preparation`, `bench_r09_r10_operator_report`, `bench_rollback_r09_r10_operator_pass`, `bench_joystick_run_sheet`, `bench_joystick_report_form`, `bench_rollback_hardware_boot_report`, `bench_rollback_io_cold_result`, `bench_rollback_usb_ready_result`, `bench_rollback_usb_ready_console`, `bench_rollback_usb_ready_plan`, `bench_rollback_output_configuration_result`, `bench_rollback_io_failsafe_followup`, `bench_rollback_io_cold_readback`, `bench_rollback_output_configuration_plan`, `bench_rollback_usb_setup_commands`, `bench_rollback_usb_readback_commands`, `bench_rollback_usb_input_correction`, `bench_rollback_usb_signal_profile`, `bench_rollback_usb_profile_validation`, `bench_rollback_usb_input_assessment`, `bench_rollback_usb_input_followup`, `bench_rollback_runtime_listener`, `bench_rollback_runtime_mavlink_main`, `bench_rollback_runtime_telemetry_schema`, `bench_rollback_runner`, `bench_rollback_candidate_receipt`, `bench_rollback_qualification_receipt`, `bench_rollback_port_source_manifest`, `bench_rollback_port_patch`, `bench_rollback_artifact_validation`, `bench_rollback_reference_hardware_acceptance`, `bench_active_fixture`, `bench_px4_module`, `bench_output_provider`; software qualified; user confirms R01-R08 including Active1500us/50Hz scope, signed/intermediate joystick and stop/loss/recovery; ES3059MD/physical power cut identified, no independent tester; bounded R09 fixture installed and Active-neutral confirmed; earlier latch cleared; same-session Active held-positive command+0.05, IO1550us and user-measured MAIN1 1550us; operator requests wider travel;1250..1750us/50us/s unloaded profile staged and native Ready-only passes, latest R09/R10 PASS operator-reported, all servos close to manufacturer documentation; raw numeric data/exact tested profile not supplied, separate G4 cases unchanged |
 | Baseline/evidence | [first-operator closure](SITL_BASELINE_FIRST_OPERATOR_CLOSURE.md), [2026-09-27 diagnostic](SITL_BASELINE_DIAGNOSTIC_20260927.md), [baseline procedure](SITL_BASELINE_REPRODUCIBILITY.md), [test specification](SITL_TEST_SPECIFICATION.md) | `baseline_source_packager`, `baseline_capture`, `baseline_interval_scorer`, `baseline_acceptance_checker`, `baseline_checkpoint_checker` |
 | Phase exit criteria | [Roadmap](CUSTOM_VEHICLE_SITL_ROADMAP.txt), [Phase 2 audit](PHASE_2_EXIT_AUDIT.md) | Read the relevant phase, not historical agent assignments |
 
@@ -1140,11 +1623,75 @@ source/ELF command support and exact local echo reconstruction. The later
 hardware-usb-profile-ready-result-20261019.json confirms matching complete cat
 content, Ready/state0, two armedfalse/prearmedtrue snapshots with fault flags clear,
 IO current PWM zero and first4 disarmed/failsafe zeros, then not running. This
-passes the hardware Ready-only subset. No installed-byte hash or pin measurement
-is claimed. Next obtain host/card hash or verified transfer evidence and prepare
-G4 MAIN1..4 plus AUX4 capture with calibrated equipment; retain pre-enable pin
-baselines. Scope unavailable, so enable/full lifecycle and physical tests remain
-pending. No hardware command issued by Codex; module is stopped.
+passes the earlier hardware Ready-only subset. A later user report in
+hardware-joystick-signal-report-20261020.json confirms R01-R08, including Active
+1500us/50Hz on the scope, all signed/intermediate axes, R06/R07 and closeout.
+Original source-version snapshots are preserved with that report. No need to
+repeat those completed checks; remaining G4 fault review is not inferred.
+EMAX ES3059MD is identified, reported4.8..6.0V and supply max12A, physical power
+switch available, no independent tester. MANUAL_BENCH_ES3059MD_R09_R10.md supplies
+a bounded unloaded R09 alternative using a new1450..1550us/5us/s fixture with
+independent scope/angle/power measurements. Stage es3059md-unloaded-calibration.txt
+SHA08c5939868de46a9674fa508603fd7b04e58b87d5c5e0c329ccaf6fd8580549a;
+es3059md-calibration-preparation-20261020.json records user details, EMAX primary
+specification, math and unchanged-native Ready-only pass. No enable, new build
+or hardware drivers. Normal disable/loss fallback to neutral bypasses normal
+5us/s slew. The fixture is not a measured angle profile or vehicle allocation.
+Latest calibration console is hardware-es3059md-active-neutral-report-20261020.json:
+new file content matches, Ready then Active, centered input and neutral IO1500us.
+User reports no servo motion. hardware-es3059md-revoked-report-20261020.json then
+shows valid held roll+1 but state2/IO1500us, not a failed joystick. The revocation
+trigger is unknown; restoring traffic does not clear it. The later centered-reset
+report hardware-es3059md-reset-command-report-20261020.json confirms state1 and
+fresh changing same-session enabled frames, latest47.36s after session start.
+The earlier latch is cleared in this session; demanded PWM is1498.61..1507.70us,
+not a physical measurement. Latest hardware-es3059md-held-pwm-report-20261020.json
+now confirms roll+1/pitch+0.13, same-session enabled controls+0.05, state1,
+IO1550us first4 and user-measured MAIN1 1550us. This verifies the positive
+input-to-pin point. hardware-es3059md-motion-resolution-report-20261020.json now
+records the operator's resolution: movement is too small to notice by eye. No
+quantified angle/current or connector-voltage readings accompany that report.
+Next R09 uses a light pointer/fixed angle reference, one labeled servo at a time,
+measured PWM/angle/voltage/current and repeated signed points/both approaches
+within1450..1550us. The procedure adds a proposed5s settled dwell/three cycles;
+record uncertainty and actual response, not model-field angles or faster slew.
+The user subsequently requests wider travel before initial measurements. Current
+next R09 fixture is es3059md-unloaded-wide-r09.txt, SHA
+674f2f8e8b8d9772ab7a105fed4389126043076cf331f0dad5a6583f25c44f9d:
+1250/1500/1750us and normal50us/s, model10deg/rates2deg/s, same USB2/255:190 and
+all1 R/P/Y mix. MANUAL_BENCH_ES3059MD_WIDE_R09.md gives staged+/-50..250us tests
+for one servo with linkage detached. Existing-native Ready-only check passes
+in es3059md-wide-ready-9r0k84kr, no enable/Commander/drivers/build; preparation
+receipt es3059md-wide-r09-preparation-20261020.json binds math/file/recipe/log.
+Original narrow evidence remains unchanged. Wider hardware install and physical
+pin/ramp/angle/power checks remain pending. No flash/parameter change required;
+neutral1500 and transport/routing unchanged. First verify pins with servo energy
+off, then start powered at about+/-0.24 roll and extend only within declared
+current/supply/clearance limits. The model angle is not physical calibration.
+This explicit user-requested expansion replaces the provisional narrow-measurement
+prerequisite. Pitch offsets during Active do not violate neutral entry tolerance.
+Optional latest request is a step-response profile without visible slew:
+es3059md-unloaded-step-r09.txt, same1250/1500/1750us and model10deg, rates10000
+in both directions. Profile zero rates are invalid. Normalized1000/s times
+minimum20ms due cycle admits20 units, more than full span2; this is limiter
+reasoning, not measured hardware latency or physical servo speed. Existing-native
+Ready-only passes; recipe/log/receipt es3059md-step-r09-preparation-20261020.json
+retained. No enable/Commander/drivers/build/flash/parameter changes. Wider R09 doc
+adds step procedure; first scope-test energy off, then one unloaded servo, measured
+small steps. Those preparation receipts retain their original software-only scope;
+original slow-wide and narrow files remain preserved.
+LATEST OPERATOR CLOSEOUT: R09 PASS and R10 PASS, explicitly requested by the user.
+All servos closely matched manufacturer documentation. Record
+hardware-r09-r10-operator-pass-20261020.json and human report
+MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md bind the exact statement, prior
+R01..R08 report and pre-update procedure/form snapshots. R01..R10 are now
+operator-reported passes for the stated servo bench scope. Numerical readings,
+raw captures, exact tested profile/card hash and load/linkage details were not
+supplied; do not invent calibration values or treat prepared files as proven
+installed. Separate unreported G4 cases, wind and stabilized hardware acceptance
+are unchanged. No firmware/parameter/profile changes or Codex hardware commands.
+The R01-R10 report form remains blank for future runs; the actual operator report
+contains the two PASS entries.
 Earlier status snapshots add 1,015 received
 and 9,435 missed messages, but source proves the percentage is misformatted:
 missed/received is printed directly with %. The counter's cause is unresolved.

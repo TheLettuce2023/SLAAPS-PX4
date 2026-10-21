@@ -48,6 +48,20 @@ functions:
       count: 4
       exclude_from_actuator_testing: true
 
+    Research_Stabilized:
+      start: 10010
+      count: 4
+      exclude_from_actuator_testing: true
+
+    SLAAPS_Canard:
+      start: 10100
+      count: 4
+      exclude_from_actuator_testing: true
+
+    SLAAPS_EDF:
+      start: 10104
+      exclude_from_actuator_testing: true
+
     # Add your own here:
     #MyCustomFunction: 10000
 

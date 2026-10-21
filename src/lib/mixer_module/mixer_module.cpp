@@ -52,6 +52,9 @@ struct FunctionProvider {
 };
 
 static constexpr FunctionProvider all_function_providers[] = {
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	{OutputFunction::Research_Stabilized1, OutputFunction::Research_Stabilized4, &FunctionResearchStabilized::allocate},
+#endif
 #if defined(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
 	{OutputFunction::Research_Bench1, OutputFunction::Research_Bench4, &FunctionBenchServos::allocate},
 #endif
@@ -270,7 +273,11 @@ bool MixingOutput::updateSubscriptions(bool allow_wq_switch)
 
 	cleanupFunctions();
 
-	const FunctionProviderBase::Context context{_interface, _param_thr_mdl_fac.reference()};
+	const FunctionProviderBase::Context context{_interface, _param_thr_mdl_fac.reference()
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+			, _research_transaction
+#endif
+						   };
 	int provider_indexes[MAX_ACTUATORS] {};
 	int next_provider = 0;
 	int subscription_callback_provider_index = INT_MAX;
@@ -287,6 +294,16 @@ bool MixingOutput::updateSubscriptions(bool allow_wq_switch)
 		}
 
 		for (int p = 0; p < (int)(sizeof(all_function_providers) / sizeof(all_function_providers[0])); ++p) {
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+
+			if (_function_assignment[i] >= OutputFunction::Research_Stabilized1
+			    && _function_assignment[i] <= OutputFunction::Research_Stabilized4
+			    && (strcmp(_param_prefix, "PWM_MAIN") != 0 || !_research_transaction || i >= 4
+				|| (int)_function_assignment[i] != (int)OutputFunction::Research_Stabilized1 + i)) {
+				break;
+			}
+
+#endif
 #if defined(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
 
 			// Bench functions cannot route to AUX (including the EDF), CAN,
@@ -436,6 +453,10 @@ void MixingOutput::unregister()
 
 bool MixingOutput::update()
 {
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	_research_dispatch_started = true;
+#endif
+
 	// check arming state
 	if (_armed_sub.update(&_armed)) {
 		_armed.in_esc_calibration_mode &= _support_esc_calibration;
@@ -493,7 +514,14 @@ bool MixingOutput::update()
 	}
 
 	// Send output if any function mapped or one last disabling sample
-	if (!all_disabled || !_was_all_disabled) {
+	bool require_output = !all_disabled || !_was_all_disabled;
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	// An attached owner still needs a real disarm write and completion if its
+	// functions disappear. Routing changes cannot bypass its ownership barrier.
+	require_output = require_output || _research_transaction;
+#endif
+
+	if (require_output) {
 		if (!_armed.armed && !_armed.kill) {
 			_actuator_test.overrideValues(outputs, _max_num_outputs);
 		}
@@ -564,7 +592,25 @@ MixingOutput::limitAndUpdateOutputs(float outputs[MAX_ACTUATORS], bool has_updat
 	}
 
 	/* now return the outputs to the driver */
-	if (_interface.updateOutputs(_current_output_value, _max_num_outputs, has_updates)) {
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	const bool candidate_valid = !_research_transaction
+				     || _research_transaction->validate(_current_output_value, _max_num_outputs, _armed);
+
+	if (!candidate_valid) {
+		// Dedicated PWM bank only. Never send a mismatched command first and
+		// discover the configuration/permission failure after its application.
+		for (unsigned i = 0; i < _max_num_outputs; ++i) { _current_output_value[i] = 0.0F; }
+	}
+
+#endif
+	const bool handled = _interface.updateOutputs(_current_output_value, _max_num_outputs, has_updates);
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+
+	if (_research_transaction) { _research_transaction->complete(candidate_valid && handled, hrt_absolute_time()); }
+
+#endif
+
+	if (handled) {
 		actuator_outputs_s actuator_outputs{};
 		setAndPublishActuatorOutputs(_max_num_outputs, actuator_outputs);
 
@@ -590,7 +636,12 @@ float MixingOutput::output_limit_calc_single(int i, float value) const
 	     || (_function_assignment[i] >= OutputFunction::Gimbal_Roll
 		 && _function_assignment[i] <= OutputFunction::Gimbal_Yaw)
 	     || (_function_assignment[i] >= OutputFunction::Research_Bench1
-		 && _function_assignment[i] <= OutputFunction::Research_Bench4))
+		 && _function_assignment[i] <= OutputFunction::Research_Bench4)
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	     || (_function_assignment[i] >= OutputFunction::Research_Stabilized1
+		 && _function_assignment[i] <= OutputFunction::Research_Stabilized4)
+#endif
+	    )
 	    && _param_handles[i].center != PARAM_INVALID
 	    && _center_value[i] >= _min_value[i]
 	    && _center_value[i] <= _max_value[i]) {

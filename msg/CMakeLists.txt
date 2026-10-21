@@ -45,6 +45,8 @@ set(msg_files
 	ActuatorTest.msg
 	BenchServoCommand.msg
 	StabilizedObserverStatus.msg
+	StabilizedGrantRequest.msg
+	StabilizedGrantResponse.msg
 	AdcReport.msg
 	Airspeed.msg
 	AirspeedWind.msg
@@ -57,6 +59,11 @@ set(msg_files
 	CanInterfaceStatus.msg
 	CellularStatus.msg
 	CollisionConstraints.msg
+	SlaapsStatus.msg
+	SlaapsOutputBank.msg
+	SlaapsManualCommand.msg
+	SlaapsManualAck.msg
+	SlaapsManualPreparation.msg
 	ControlAllocatorStatus.msg
 	Cpuload.msg
 	DatamanRequest.msg

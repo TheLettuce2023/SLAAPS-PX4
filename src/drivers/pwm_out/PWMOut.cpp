@@ -129,6 +129,10 @@ bool PWMOut::update_pwm_out_state(bool on)
 
 bool PWMOut::updateOutputs(float outputs[MAX_ACTUATORS], unsigned num_outputs, unsigned num_control_groups_updated)
 {
+	// Report register handling, not electrical output. An unavailable driver
+	// or any rejected channel write must not release a handled-command ack.
+	bool handled = _pwm_initialized;
+
 	/* output to the servos */
 	if (_pwm_initialized) {
 		for (size_t i = 0; i < num_outputs; i++) {
@@ -138,7 +142,9 @@ bool PWMOut::updateOutputs(float outputs[MAX_ACTUATORS], unsigned num_outputs, u
 			}
 
 			if (_pwm_mask & (1 << i)) {
-				up_pwm_servo_set(i, static_cast<uint16_t>(lroundf(outputs[i])));
+				if (up_pwm_servo_set(i, static_cast<uint16_t>(lroundf(outputs[i]))) != 0) {
+					handled = false;
+				}
 			}
 		}
 	}
@@ -150,7 +156,7 @@ bool PWMOut::updateOutputs(float outputs[MAX_ACTUATORS], unsigned num_outputs, u
 		up_pwm_update(_pwm_mask);
 	}
 
-	return true;
+	return handled;
 }
 
 void PWMOut::Run()
@@ -188,6 +194,25 @@ void PWMOut::Run()
 	}
 
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)
+#if defined(CONFIG_MODULES_SLAAPS)
+
+	if (_mixing_output.slaapsInventoryDue()) {
+		uint16_t rates[16] {};
+
+		for (unsigned channel = 0; channel < _num_outputs && channel < 16; ++channel) {
+			for (unsigned timer = 0; timer < MAX_IO_TIMERS; ++timer) {
+				if ((up_pwm_servo_get_rate_group(timer) & (1U << channel)) && _timer_rates[timer] > 0
+				    && _timer_rates[timer] <= UINT16_MAX) {
+					rates[channel] = _timer_rates[timer];
+				}
+			}
+		}
+
+		_mixing_output.reportSlaapsInventory(_num_outputs, _pwm_mask, rates, _pwm_initialized && _pwm_on);
+	}
+
+#endif
+
 	_mixing_output.updateSubscriptions(true);
 
 	perf_end(_cycle_perf);

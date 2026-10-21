@@ -21,6 +21,10 @@
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include <modules/research_stabilized_manual/PublisherBinding.hpp>
+#include <modules/research_stabilized_manual/SelectedStateInput.hpp>
+#include <px4_platform_common/px4_work_queue/WorkItem.hpp>
+#include <uORB/topics/orb_test.h>
 
 extern "C" int research_stabilized_manual_main(int argc, char *argv[]);
 namespace
@@ -37,14 +41,66 @@ int command(const char *operation, const char *profile = nullptr)
 	char *args[] = {const_cast<char *>("research_stabilized_manual"), const_cast<char *>(operation), const_cast<char *>(profile)};
 	return research_stabilized_manual_main(profile ? 3 : 2, args);
 }
+template<typename Message>
+class TestPublication : public uORB::Publication<Message>
+{
+public:
+	using uORB::Publication<Message>::Publication;
+	bool restart()
+	{
+		uORB::Subscription subscription{this->get_topic()};
+		Message message{};
+
+		if (!subscription.copy(&message) || !this->unadvertise()) { return false; }
+
+		this->_handle = nullptr;
+		return this->publish(message);
+	}
+};
+void lifecycleContract()
+{
+	using namespace research_stabilized_manual;
+	orb_test_s message{};
+	message.val = 11;
+	auto handle = orb_advertise(ORB_ID(orb_test), &message);
+	PublisherSubscription subscription{ORB_ID(orb_test)};
+	orb_test_s copied{};
+	unsigned first{}, next{};
+	check(handle && subscription.copyBound(&copied, first) && first && copied.val == 11, "bound initial payload");
+	message.val = 22;
+	check(orb_publish(ORB_ID(orb_test), handle, &message) == 0
+	      && subscription.copyBound(&copied, next) && next == first && copied.val == 22, "continuous publication retains revision");
+	check(orb_unadvertise(handle) == 0 && !subscription.copyBound(&copied, next)
+	      && !next && !subscription.revision(), "withdrawal invalidates retained payload");
+	handle = orb_advertise(ORB_ID(orb_test), nullptr);
+	check(handle && subscription.revision() > first && !subscription.copyBound(&copied, next),
+	      "empty re-advertisement cannot relabel old data");
+	check(orb_publish(ORB_ID(orb_test), handle, &message) == 0
+	      && subscription.copyBound(&copied, next) && next > first, "new lifecycle requires newly published payload");
+	PublisherBinding binding;
+	unsigned tuple[PublisherBinding::kTopics] {};
+
+	for (unsigned &value : tuple) { value = first; }
+
+	check(binding.observe(tuple) == 1 && binding.observe(tuple) == 1, "stable complete tuple");
+
+	for (unsigned i = 0; i < PublisherBinding::kTopics; ++i) {
+		tuple[i] = next;
+		check(binding.observe(tuple) == i + 2, "each input lifecycle advances epoch");
+	}
+
+	tuple[0] = 0;
+	check(binding.observe(tuple) == 0, "incomplete tuple rejected");
+	check(orb_unadvertise(handle) == 0, "test topic cleanup");
+}
 struct Fixture {
-	uORB::Publication<manual_control_setpoint_s> manual{ORB_ID(manual_control_setpoint)};
-	uORB::Publication<vehicle_attitude_s> attitude{ORB_ID(vehicle_attitude)};
-	uORB::Publication<vehicle_angular_velocity_s> rate{ORB_ID(vehicle_angular_velocity)};
-	uORB::Publication<sensor_selection_s> selection{ORB_ID(sensor_selection)};
-	uORB::Publication<estimator_status_s> estimator{ORB_ID(estimator_status)};
-	uORB::Publication<estimator_status_flags_s> flags{ORB_ID(estimator_status_flags)};
-	uORB::Publication<actuator_armed_s> armed{ORB_ID(actuator_armed)};
+	TestPublication<manual_control_setpoint_s> manual{ORB_ID(manual_control_setpoint)};
+	TestPublication<vehicle_attitude_s> attitude{ORB_ID(vehicle_attitude)};
+	TestPublication<vehicle_angular_velocity_s> rate{ORB_ID(vehicle_angular_velocity)};
+	TestPublication<sensor_selection_s> selection{ORB_ID(sensor_selection)};
+	TestPublication<estimator_status_s> estimator{ORB_ID(estimator_status)};
+	TestPublication<estimator_status_flags_s> flags{ORB_ID(estimator_status_flags)};
+	TestPublication<actuator_armed_s> armed{ORB_ID(actuator_armed)};
 	uORB::Subscription status{ORB_ID(stabilized_observer_status)};
 	uORB::Subscription bench{ORB_ID(bench_servo_command)};
 	uORB::Subscription servos{ORB_ID(actuator_servos)};
@@ -121,12 +177,124 @@ struct Fixture {
 	// NotDue dispatches deliberately publish no candidate. Verify an actual
 	// successful calculation observed in this interval as well as current state.
 	bool holding() const { return last.state == 3 && last.inputs_valid && saw_candidate && candidate.state == 3; }
+	bool restart(unsigned topic)
+	{
+		switch (topic) {
+		case 0: return attitude.restart();
+
+		case 1: return rate.restart();
+
+		case 2: return estimator.restart();
+
+		case 3: return flags.restart();
+
+		case 4: return manual.restart();
+
+		case 5: return selection.restart();
+
+		case 6: return armed.restart();
+		}
+
+		return false;
+	}
 };
+constexpr px4::wq_config_t kObserverQueue{"wq:stabilized_observer", 6000, -5};
+class HiddenRestart : public px4::WorkItem
+{
+public:
+	HiddenRestart(Fixture &fixture, unsigned topic) : WorkItem("hidden_restart", kObserverQueue), _fixture(fixture), _topic(topic) {}
+	void Run() override
+	{
+		// Runs serially on the observer's queue: withdrawal and republication
+		// both finish between its input snapshots, with identical payload.
+		const auto before = hrt_absolute_time();
+		success = _fixture.restart(_topic);
+		duration = hrt_absolute_time() - before;
+		done.store(true);
+	}
+	px4::atomic_bool done{false};
+	bool success{};
+	hrt_abstime duration{};
+private:
+	Fixture &_fixture;
+	unsigned _topic;
+};
+}
+
+static void selectedInputContract(Fixture &fixture, const char *path)
+{
+	using namespace research_stabilized_manual;
+	ObserverProfile profile{};
+	FILE *stream = fopen(path, "r");
+	const bool valid = readObserverProfile(stream, profile);
+
+	if (stream) { fclose(stream); }
+
+	check(valid, "sampler uses actual explicit observer profile");
+
+	if (!valid) { return; }
+
+	SelectedStateInput input;
+	auto snapshot = input.capture(profile);
+	check(snapshot.state.valid && !snapshot.prearmed_servo_condition, "observation validity does not grant servo prearm");
+	check(snapshot.now >= snapshot.state.attitude_timestamp_us && snapshot.now >= snapshot.state.rate_timestamp_us,
+	      "sampler evaluates clock after copying state");
+	actuator_armed_s armed{};
+	armed.timestamp = hrt_absolute_time();
+	armed.prearmed = true;
+	check(fixture.armed.publish(armed), "publish disarmed prearm prerequisite");
+	snapshot = input.capture(profile);
+	check(snapshot.state.valid && snapshot.prearmed_servo_condition, "fresh prearm distinguished from observation only");
+
+	for (unsigned fault = 0; fault < 8; ++fault) {
+		armed = {};
+		armed.timestamp = hrt_absolute_time();
+		armed.prearmed = true;
+
+		if (fault == 0) { armed.armed = true; }
+
+		if (fault == 1) { armed.kill = true; }
+
+		if (fault == 2) { armed.lockdown = true; }
+
+		if (fault == 3) { armed.termination = true; }
+
+		if (fault == 4) { armed.in_esc_calibration_mode = true; }
+
+		if (fault == 5) { armed.timestamp = 0; }
+
+		if (fault == 6) { armed.timestamp += 1000000; }
+
+		if (fault == 7) { armed.timestamp -= profile.maximum_permission_age_us + 1; }
+
+		check(fixture.armed.publish(armed), "publish permission fault");
+		snapshot = input.capture(profile);
+		check(!snapshot.state.valid && !snapshot.prearmed_servo_condition, "permission fault suppresses both input conditions");
+	}
+
+	armed = {};
+	armed.timestamp = hrt_absolute_time();
+	check(fixture.armed.publish(armed), "restore diagnostic-only permission");
+	snapshot = input.capture(profile);
+	check(snapshot.state.valid && !snapshot.prearmed_servo_condition, "sampler facts recover without granting ownership");
+	uint32_t epoch = snapshot.state.source_epoch;
+
+	for (unsigned topic = 0; topic < PublisherBinding::kTopics; ++topic) {
+		check(fixture.restart(topic), "restart a selected input publisher");
+		snapshot = input.capture(profile);
+		check(snapshot.state.valid && snapshot.state.source_epoch > epoch, "sampler records every selected publisher lifetime change");
+		epoch = snapshot.state.source_epoch;
+	}
+
+	profile.maximum_permission_age_us = 0;
+	check(!input.capture(profile).state.valid, "unspecified permission freshness rejected");
 }
 
 extern "C" __EXPORT int stabilized_observer_test_main(int argc, char *argv[])
 {
 	if (argc != 2) { return 1; }
+
+	lifecycleContract();
 
 	for (const char *name : {"EKF2_MULTI_IMU", "EKF2_MULTI_MAG", "SENS_IMU_MODE", "SENS_MAG_MODE"}) {
 		const int32_t value = strncmp(name, "SENS", 4) == 0 ? 1 : 0;
@@ -136,6 +304,8 @@ extern "C" __EXPORT int stabilized_observer_test_main(int argc, char *argv[])
 	check(command("start", argv[1]) == 0, "start Ready");
 	f.steps(0.0F);
 	check(f.last.state == 1 && !f.last.candidate_valid && f.last.session == 0, "no automatic observation");
+	selectedInputContract(f, argv[1]);
+	f.steps(0.0F);
 	check(command("enable") != 0, "no output enable command");
 	check(command("observe") == 0, "explicit observation");
 	f.steps(0.0F);
@@ -181,6 +351,32 @@ extern "C" __EXPORT int stabilized_observer_test_main(int argc, char *argv[])
 		f.steps(0.0F);
 		check(f.last.state == 4 && command("observe") != 0, "valid samples cannot clear latch");
 		check(command("stop") == 0, "faulted stop");
+	}
+
+	for (unsigned topic = 0; topic < research_stabilized_manual::PublisherBinding::kTopics; ++topic) {
+		check(command("start", argv[1]) == 0, "lifecycle restart Ready");
+		f.steps(0.0F);
+		check(command("observe") == 0, "lifecycle explicit session");
+		f.steps(0.0F);
+		check(f.holding() && f.last.source_epoch != 0, "lifecycle initial hold");
+		const auto before = f.last;
+		// Retain the completed work item until process exit; do not race the
+		// older work queue's return from Run with a destructor.
+		auto *restart = new HiddenRestart(f, topic);
+		restart->ScheduleNow();
+		const auto start = hrt_absolute_time();
+
+		while (!restart->done.load() && hrt_absolute_time() - start < 1000000) { px4_usleep(1000); }
+
+		check(restart->done.load() && restart->success && restart->duration < 20000, "hidden lifecycle completes promptly");
+		f.steps(0.0F);
+		check(f.last.state == 4 && !f.last.candidate_valid && f.last.session == before.session, "hidden restart revokes same session");
+		check(f.last.inputs_valid && f.last.source_epoch != before.source_epoch
+		      && f.last.publisher_revision[topic] > before.publisher_revision[topic], "fresh same-ID state exposes changed publisher epoch");
+		check(command("observe") != 0, "publisher restart cannot recover implicitly");
+		PX4_INFO("OBSERVER_LIFECYCLE topic=%u before=%u after=%u elapsed=%llu", topic,
+			 before.publisher_revision[topic], f.last.publisher_revision[topic], (unsigned long long)restart->duration);
+		check(command("stop") == 0, "lifecycle stop");
 	}
 
 	PX4_INFO("OBSERVER_RESULT checks=%u failures=%u", checks, failures);

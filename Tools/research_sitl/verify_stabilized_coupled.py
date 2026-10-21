@@ -14,7 +14,7 @@ RATE_PHASE_US = 8000000
 INTEGRAL_AUDIT_EPSILON = 2e-7  # Log decimal/float roundoff, not a gain or control tolerance.
 
 
-def coupled(evidence, nose_up, sign, seed=campaigns.SEED):
+def coupled(evidence, nose_up, sign, seed=campaigns.SEED, *, dispatch_diagnostics=True):
     fixture = campaigns.Fixture(evidence, f'coupled-{"up" if nose_up else "level"}-{sign:+d}-seed{seed}',
                                 nose_up, seed=seed)
     fixture.result.update(coupled=True, sign=sign, exploratory_only=(seed != campaigns.SEED),
@@ -83,8 +83,11 @@ def coupled(evidence, nose_up, sign, seed=campaigns.SEED):
                 violations += int((positive and change > INTEGRAL_AUDIT_EPSILON)
                                   or (negative and change < -INTEGRAL_AUDIT_EPSILON))
     magnetic_angle, _ = campaigns.magnetic_rigidity(fixture.work, truth)
-    duplicates = sum(row['action'] == 'dispatch_not_due'
-                     for row in campaigns.rows(fixture.work / 'control.csv.events.csv'))
+    # Informational legacy-owner diagnostic; never an acceptance criterion.
+    # The integrated session owner has no events CSV: report unavailable, not zero.
+    duplicates = (sum(row['action'] == 'dispatch_not_due'
+                      for row in campaigns.rows(fixture.work / 'control.csv.events.csv'))
+                  if dispatch_diagnostics else None)
     checks = dict(rate_tracking=max(errors) < campaigns.RATE_TOLERANCE,
                   capture=capture < 2e-5, retention=retention < 1e-6,
                   final_physical_error=physical_error < campaigns.FINAL_ANGLE_LIMIT,

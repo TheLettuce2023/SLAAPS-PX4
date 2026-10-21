@@ -1,0 +1,165 @@
+# Private native capture parameters only. No physical output driver starts.
+module_name: stabilized_output_test
+parameters:
+- group: Private stabilized output verification
+  definitions:
+    PWM_MAIN_MIN1:
+      description: {short: Synthetic channel 1 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX1:
+      description: {short: Synthetic channel 1 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT1:
+      description: {short: Synthetic channel 1 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS1:
+      description: {short: Synthetic channel 1 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL1:
+      description: {short: Synthetic channel 1 failsafe}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN2:
+      description: {short: Synthetic channel 2 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX2:
+      description: {short: Synthetic channel 2 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT2:
+      description: {short: Synthetic channel 2 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS2:
+      description: {short: Synthetic channel 2 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL2:
+      description: {short: Synthetic channel 2 failsafe}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN3:
+      description: {short: Synthetic channel 3 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX3:
+      description: {short: Synthetic channel 3 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT3:
+      description: {short: Synthetic channel 3 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS3:
+      description: {short: Synthetic channel 3 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL3:
+      description: {short: Synthetic channel 3 failsafe}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN4:
+      description: {short: Synthetic channel 4 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX4:
+      description: {short: Synthetic channel 4 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT4:
+      description: {short: Synthetic channel 4 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS4:
+      description: {short: Synthetic channel 4 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL4:
+      description: {short: Synthetic channel 4 failsafe}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN5:
+      description: {short: Synthetic channel 5 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX5:
+      description: {short: Synthetic channel 5 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT5:
+      description: {short: Synthetic channel 5 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS5:
+      description: {short: Synthetic channel 5 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL5:
+      description: {short: Synthetic channel 5 failsafe}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN6:
+      description: {short: Synthetic channel 6 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX6:
+      description: {short: Synthetic channel 6 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT6:
+      description: {short: Synthetic channel 6 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS6:
+      description: {short: Synthetic channel 6 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL6:
+      description: {short: Synthetic channel 6 failsafe}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN7:
+      description: {short: Synthetic channel 7 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX7:
+      description: {short: Synthetic channel 7 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT7:
+      description: {short: Synthetic channel 7 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS7:
+      description: {short: Synthetic channel 7 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL7:
+      description: {short: Synthetic channel 7 failsafe}
+      type: int32
+      default: 0
+    PWM_MAIN_MIN8:
+      description: {short: Synthetic channel 8 minimum}
+      type: int32
+      default: 500
+    PWM_MAIN_MAX8:
+      description: {short: Synthetic channel 8 maximum}
+      type: int32
+      default: 2500
+    PWM_MAIN_CENT8:
+      description: {short: Synthetic channel 8 center}
+      type: int32
+      default: 1500
+    PWM_MAIN_DIS8:
+      description: {short: Synthetic channel 8 disarmed}
+      type: int32
+      default: 0
+    PWM_MAIN_FAIL8:
+      description: {short: Synthetic channel 8 failsafe}
+      type: int32
+      default: 0

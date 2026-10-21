@@ -2,6 +2,8 @@
 uint64 timestamp
 uint64 timestamp_sample
 uint64 session
+uint32 source_epoch        # Session-local mapping of the complete publisher revision tuple
+uint32[7] publisher_revision # attitude, rate, estimator, flags, manual, selection, permission
 uint32 gyro_device_id
 uint32 accel_device_id
 uint32 cycles

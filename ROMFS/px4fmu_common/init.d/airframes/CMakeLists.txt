@@ -58,6 +58,10 @@ if(CONFIG_MODULES_SIMULATION_PWM_OUT_SIM)
 	endif()
 endif()
 
+if(CONFIG_MODULES_SLAAPS)
+	px4_add_romfs_files(22001_slaaps)
+endif()
+
 if(CONFIG_MODULES_MC_RATE_CONTROL)
 	px4_add_romfs_files(
 		# [4000, 4999] Quadrotor x

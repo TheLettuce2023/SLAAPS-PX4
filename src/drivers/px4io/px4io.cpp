@@ -378,10 +378,11 @@ bool PX4IO::updateOutputs(float outputs[MAX_ACTUATORS], unsigned num_outputs, un
 
 	if (!_test_fmu_fail) {
 		/* output to the servos */
-		io_reg_set(PX4IO_PAGE_DIRECT_PWM, 0, hw_outputs, num_outputs);
+		return io_reg_set(PX4IO_PAGE_DIRECT_PWM, 0, hw_outputs, num_outputs) == OK;
 	}
 
-	return true;
+	// Suppressed or failed writes must not report a handled output update.
+	return false;
 }
 
 int PX4IO::init()
@@ -641,6 +642,34 @@ void PX4IO::Run()
 	ScheduleDelayed(20_ms);
 
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)
+#if defined(CONFIG_MODULES_SLAAPS)
+
+	if (_mixing_output.slaapsInventoryDue()) {
+		uint16_t rates[16] {};
+		uint16_t groups[4] {};
+		uint16_t effective_rates[4] {};
+		bool valid = _timer_rates_configured
+			     && io_reg_get(PX4IO_PAGE_PWM_INFO, PX4IO_RATE_MAP_BASE, groups, 4) == OK
+			     && io_reg_get(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_PWM_RATE_GROUP0, effective_rates, 4) == OK;
+		uint32_t mask{};
+
+		for (unsigned group = 0; group < 4; ++group) {
+			if (mask & groups[group]) { valid = false; }
+
+			mask |= groups[group];
+
+			for (unsigned channel = 0; channel < _max_actuators && channel < 16; ++channel) {
+				if (groups[group] & (1U << channel)) { rates[channel] = effective_rates[group]; }
+			}
+		}
+
+		// Serial servo output is outside the supported PWM inventory.
+		valid &= _param_pwm_sbus_mode.get() == 0;
+		_mixing_output.reportSlaapsInventory(_max_actuators, mask, rates, valid);
+	}
+
+#endif
+
 	_mixing_output.updateSubscriptions(true);
 
 	perf_end(_cycle_perf);

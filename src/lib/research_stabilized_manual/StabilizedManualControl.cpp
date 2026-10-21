@@ -1,14 +1,12 @@
 #include "StabilizedManualControl.hpp"
+#include "StabilizedInputValidation.hpp"
 
 #include <cmath>
-#include <cstring>
 
 namespace research_stabilized_manual
 {
 namespace
 {
-float clamp(float value, float lower, float upper) { return ::fmaxf(lower, ::fminf(upper, value)); }
-
 bool boundedVector(const Vector3f &value, const Vector3f &limit)
 {
 	for (unsigned axis = 0; axis < 3; ++axis) {
@@ -17,6 +15,8 @@ bool boundedVector(const Vector3f &value, const Vector3f &limit)
 
 	return true;
 }
+
+float clamp(float value, float lower, float upper) { return ::fmaxf(lower, ::fminf(upper, value)); }
 
 bool centered(const ManualSample &sample, float limit)
 {
@@ -27,22 +27,7 @@ bool centered(const ManualSample &sample, float limit)
 	return true;
 }
 
-bool fresh(TimeUs now, TimeUs publication, TimeUs sample, TimeUs age)
-{
-	return sample != 0 && publication >= sample && now >= publication && now - sample <= age;
-}
 
-template<typename T>
-bool same(const T &left, const T &right, unsigned size)
-{
-	for (unsigned i = 0; i < size; ++i) {
-		const float left_value = left(i), right_value = right(i);
-
-		if (std::memcmp(&left_value, &right_value, sizeof(float)) != 0) { return false; }
-	}
-
-	return true;
-}
 }
 
 Status StabilizedManualControl::configure(const Configuration &configuration)
@@ -75,19 +60,7 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 		    || configuration.maximum_normalized_moment(axis) > 1.0F) { return Status::InvalidConfiguration; }
 	}
 
-	research_actuator_command::ManualControlConfiguration input{};
-	input.required_axis_mask = research_actuator_command::kAttitudeManualAxesMask;
-	input.source_policy = research_actuator_command::ManualSourcePolicy::MavlinkOnly;
-	input.maximum_sample_age_us = configuration.maximum_manual_age_us;
-	input.mavlink_instance = configuration.mavlink_instance;
-	input.mavlink_system_id = configuration.source_system_id;
-	input.mavlink_component_id = configuration.source_component_id;
-
-	// Unity maps reuse the existing raw-input validator only. Its mapped output
-	// is discarded; it is not interpreted as a flight wrench or actuator demand.
-	for (unsigned axis = 0; axis < 3; ++axis) { input.demand_map[axis][axis] = 1.0F; }
-
-	if (_manual.configure(input) != research_actuator_command::ManualControlStatus::Ok) { return Status::InvalidConfiguration; }
+	if (configureStabilizedManualInput(configuration, _manual) != research_actuator_command::ManualControlStatus::Ok) { return Status::InvalidConfiguration; }
 
 	_configuration = configuration;
 	_rate_control = RateControl{};
@@ -97,6 +70,7 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 	_last_command = configuration.allocation.trim;
 	_last_sample = {};
 	_last_cycle_us = 0;
+	_last_observed_us = 0;
 	_rate_setpoint.zero();
 	_fault = Status::Ok;
 	_state = State::Ready;
@@ -105,42 +79,7 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 
 Status StabilizedManualControl::validateState(TimeUs now, const StateSample &sample, Quaternion &attitude) const
 {
-	if (!sample.valid || sample.source_epoch == 0
-	    || !fresh(now, sample.attitude_timestamp_us, sample.attitude_sample_us, _configuration.maximum_state_age_us)
-	    || !fresh(now, sample.rate_timestamp_us, sample.rate_sample_us, _configuration.maximum_state_age_us)) { return Status::StateRejected; }
-
-	const auto skew = sample.attitude_sample_us > sample.rate_sample_us ? sample.attitude_sample_us - sample.rate_sample_us
-			  : sample.rate_sample_us - sample.attitude_sample_us;
-
-	if (skew > _configuration.maximum_state_skew_us
-	    || !boundedVector(sample.rate_rad_s, _configuration.maximum_measured_rate_rad_s)
-	    || !boundedVector(sample.angular_accel_rad_s2, _configuration.maximum_measured_accel_rad_s2)) { return Status::StateRejected; }
-
-	double norm_squared = 0.0;
-
-	for (unsigned i = 0; i < 4; ++i) {
-		if (!std::isfinite(sample.attitude(i))) { return Status::StateRejected; }
-
-		norm_squared += static_cast<double>(sample.attitude(i)) * static_cast<double>(sample.attitude(i));
-	}
-
-	const double norm = std::sqrt(norm_squared);
-
-	if (!std::isfinite(norm) || std::fabs(norm - 1.0) > static_cast<double>(_configuration.quaternion_norm_tolerance)) { return Status::StateRejected; }
-
-	if (_last_cycle_us != 0) {
-		if (sample.source_epoch != _last_sample.source_epoch || sample.attitude_reset_counter != _last_sample.attitude_reset_counter) { return Status::StateChanged; }
-
-		if (sample.attitude_sample_us < _last_sample.attitude_sample_us || sample.rate_sample_us < _last_sample.rate_sample_us
-		    || sample.attitude_timestamp_us < _last_sample.attitude_timestamp_us || sample.rate_timestamp_us < _last_sample.rate_timestamp_us
-		    || (sample.attitude_sample_us == _last_sample.attitude_sample_us && !same(sample.attitude, _last_sample.attitude, 4))
-		    || (sample.rate_sample_us == _last_sample.rate_sample_us && (!same(sample.rate_rad_s, _last_sample.rate_rad_s, 3)
-				    || !same(sample.angular_accel_rad_s2, _last_sample.angular_accel_rad_s2, 3)))) { return Status::StateRejected; }
-	}
-
-	for (unsigned i = 0; i < 4; ++i) { attitude(i) = static_cast<float>(static_cast<double>(sample.attitude(i)) / norm); }
-
-	return Status::Ok;
+	return validateStabilizedState(now, sample, _configuration, _last_cycle_us ? &_last_sample : nullptr, attitude);
 }
 
 Status StabilizedManualControl::reject(Status reason)
@@ -171,17 +110,18 @@ Status StabilizedManualControl::enable(TimeUs now, const ManualSample &manual, c
 	_reference = attitude;
 	_last_sample = sample;
 	_last_cycle_us = now;
+	_last_observed_us = now;
 	_state = State::Hold;
 	return Status::Ok;
 }
 
-Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report)
+Status StabilizedManualControl::inspect(TimeUs now, const ManualSample &manual, const StateSample &sample,
+					Quaternion &attitude)
 {
 	if (!eligible()) { return Status::InvalidState; }
 
-	if (now <= _last_cycle_us || now - _last_cycle_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
+	if (now < _last_observed_us || now - _last_cycle_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
 
-	Quaternion attitude;
 	const Status status = validateState(now, sample, attitude);
 
 	if (status != Status::Ok) { return reject(status); }
@@ -190,6 +130,28 @@ Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, co
 	research_actuator_command::ManualControlReport input_report{};
 
 	if (_manual.evaluate(now, manual, discarded, input_report) != research_actuator_command::ManualControlStatus::Ok) { return reject(Status::InputRejected); }
+
+	_last_sample = sample;
+	_last_observed_us = now;
+	return Status::Ok;
+}
+
+Status StabilizedManualControl::monitor(TimeUs now, const ManualSample &manual, const StateSample &sample)
+{
+	Quaternion attitude;
+	return inspect(now, manual, sample, attitude);
+}
+
+Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report)
+{
+	if (!eligible()) { return Status::InvalidState; }
+
+	if (now <= _last_cycle_us) { return reject(Status::InvalidTime); }
+
+	Quaternion attitude;
+	const Status status = inspect(now, manual, sample, attitude);
+
+	if (status != Status::Ok) { return status; }
 
 	if (now - _last_cycle_us < _configuration.minimum_cycle_us) { return Status::NotDue; }
 
@@ -283,6 +245,7 @@ void StabilizedManualControl::disable()
 	_manual.reset();
 	_rate_control.resetIntegral();
 	_last_cycle_us = 0;
+	_last_observed_us = 0;
 	_state = State::Disabled;
 	_fault = Status::Ok;
 }

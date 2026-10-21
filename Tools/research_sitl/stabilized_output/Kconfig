@@ -1,0 +1,3 @@
+config EXAMPLES_STABILIZED_OUTPUT_TEST
+	bool "stabilized_output_test"
+	default n

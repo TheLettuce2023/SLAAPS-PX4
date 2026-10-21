@@ -1,4 +1,5 @@
 #include "StabilizedOutput.hpp"
+#include "StabilizedOutputDriver.hpp"
 #include "ObserverProfile.hpp"
 
 #include <cmath>
@@ -486,6 +487,191 @@ void controllerIntegration()
 	check(pair.consumer.sample(pair.report.timestamp_us + pair.config.lease_us, true).disposition == OutputDisposition::Fallback,
 	      "producer failure independently expires final command");
 }
+
+void driverTests()
+{
+	struct Sink : StabilizedOutputSink {
+		TimeUs completed{kStart};
+		bool handled{true};
+		OutputCandidate last{};
+		OutputWriteResult write(const OutputCandidate &candidate) override
+		{
+			last = candidate;
+			return {completed, handled};
+		}
+	};
+	const auto config = fixtureConfiguration();
+	StabilizedOutputDriver driver;
+	Sink sink;
+	check(driver.begin(kStart, kStart, config, true) == OutputStatus::InvalidState, "grant requires confirmed initial disarm");
+	check(driver.dispatch(kStart, true, nullptr, sink).revoke_acknowledged, "sink-confirmed initial disarm");
+	check(driver.begin(kStart, kStart, config, true) == OutputStatus::Ok, "grant after confirmed initial disarm");
+	check(driver.begin(kStart + 1, kStart + 1, config, true) == OutputStatus::InvalidState, "competing grant cannot replace session");
+	OutputFrame frame{kStart, kStart + kTick, 1, {0.5F, -0.5F, 0.5F, -0.5F}};
+	sink.completed = frame.timestamp_us + 100;
+	const auto applied = driver.dispatch(frame.timestamp_us, true, &frame, sink);
+	check(applied.command_acknowledged && applied.acknowledgement.accepted_us == sink.completed, "ack uses driver completion time");
+	check(applied.handled && sink.last.disposition == OutputDisposition::Command && near(sink.last.pwm_us[0], 1775.0F),
+	      "sink sees complete calibrated candidate");
+	driver.revoke();
+	check(!driver.disarmedConfirmed() && driver.begin(sink.completed, sink.completed, config, true) == OutputStatus::InvalidState,
+	      "revoke request alone cannot release ownership");
+	sink.handled = false;
+	check(!driver.dispatch(sink.completed, true, nullptr, sink).revoke_acknowledged
+	      && !driver.disarmedConfirmed(), "rejected disarm prevents handoff");
+	sink.handled = true;
+	check(driver.dispatch(sink.completed, true, nullptr, sink).revoke_acknowledged
+	      && driver.disarmedConfirmed(), "successful disarm permits deliberate handoff");
+	check(driver.begin(sink.completed, sink.completed, config, true) == OutputStatus::Ok, "new session after driver-confirmed revoke");
+	check(!driver.dispatch(sink.completed, true, &frame, sink).command_acknowledged, "old-session traffic cannot acquire new output grant");
+
+	for (unsigned failure = 0; failure < 5; ++failure) {
+		StabilizedOutputDriver faulty;
+		Sink test;
+		check(faulty.dispatch(kStart, true, nullptr, test).revoke_acknowledged, "fault fixture confirmed disarm");
+		check(faulty.begin(kStart, kStart, config, true) == OutputStatus::Ok, "fault fixture grant");
+		test.completed = frame.timestamp_us;
+
+		switch (failure) {
+		case 0: test.handled = false; break;
+
+		case 1: test.completed = frame.timestamp_us - 1; break;
+
+		case 2: test.completed = frame.timestamp_us + config.acknowledgement_us; break;
+
+		case 3: test.completed = frame.timestamp_us + config.lease_us; break;
+
+		case 4: break; // Current permission loss.
+		}
+
+		const auto rejected = faulty.dispatch(frame.timestamp_us, failure != 4, &frame, test);
+		check(!rejected.command_acknowledged && rejected.acknowledgement.session == 0
+		      && faulty.state() == DriverState::Fault, "sink rejection timing or permission failure suppresses ack");
+		test.handled = true;
+		test.completed = frame.timestamp_us + config.lease_us + 1;
+		check(faulty.dispatch(test.completed, true, nullptr, test).candidate.disposition == OutputDisposition::Disarmed,
+		      "failed driver path independently dispatches disarmed output");
+		check(faulty.begin(test.completed, test.completed, config, true) == OutputStatus::InvalidState,
+		      "driver recovery cannot automatically grant");
+		faulty.revoke();
+		check(faulty.dispatch(test.completed, true, nullptr, test).revoke_acknowledged, "explicit recovery reaches sink");
+		check(faulty.begin(test.completed, test.completed, config, true) == OutputStatus::Ok, "explicit new session after fault");
+	}
+
+	StabilizedOutputDriver expired;
+	Sink test;
+	check(expired.dispatch(kStart, true, nullptr, test).revoke_acknowledged, "expiry fixture disarmed");
+	check(expired.begin(kStart, kStart, config, true) == OutputStatus::Ok, "expiry fixture grant");
+	test.completed = frame.timestamp_us;
+	check(expired.dispatch(test.completed, true, &frame, test).command_acknowledged, "expiry fixture applies command");
+	test.completed += config.lease_us;
+	auto result = expired.dispatch(test.completed, true, nullptr, test);
+	check(result.handled && !result.command_acknowledged && result.candidate.disposition == OutputDisposition::Fallback,
+	      "producer silence independently dispatches configured fallback");
+	++test.completed;
+	check(expired.dispatch(test.completed, false, nullptr, test).candidate.disposition == OutputDisposition::Disarmed,
+	      "permission loss supersedes already applied fallback");
+}
+
+void splitDriverTests()
+{
+	const auto config = fixtureConfiguration();
+	StabilizedOutputDriver driver;
+	DriverWrite initial{}, competing{};
+	check(!driver.complete(1, {kStart, true}, true).revoke_acknowledged, "orphan completion cannot confirm disarm");
+	check(driver.prepare(kStart, true, nullptr, initial) && driver.pending(initial.ticket),
+	      "initial disarm prepared with nonzero ticket");
+	check(!driver.disarmedConfirmed(), "preparation alone never confirms physical-driver handling");
+	check(!driver.prepare(kStart, true, nullptr, competing) && !competing.ticket && driver.pending(initial.ticket),
+	      "overlapping preparation leaves first pending write intact");
+	check(!driver.complete(initial.ticket + 1, {kStart, true}, true).handled && driver.pending(initial.ticket),
+	      "wrong completion cannot consume pending write");
+	check(driver.complete(initial.ticket, {kStart, true}, false).revoke_acknowledged,
+	      "disarm can complete while permission is absent");
+	check(!driver.complete(initial.ticket, {kStart, true}, true).revoke_acknowledged,
+	      "duplicate disarm completion cannot acknowledge twice");
+	check(driver.begin(kStart, kStart, config, true) == OutputStatus::Ok, "split path grant");
+	OutputFrame frame{kStart, kStart + kTick, 1, {0.5F, -0.5F, 0.5F, -0.5F}};
+	DriverWrite command{};
+	check(driver.prepare(frame.timestamp_us, true, &frame, command) && command.ticket > initial.ticket
+	      && command.candidate.disposition == OutputDisposition::Command, "prepare exact mapped command");
+	check(!driver.complete(initial.ticket, {frame.timestamp_us, true}, true).command_acknowledged
+	      && driver.pending(command.ticket), "old callback cannot acknowledge current command");
+	auto result = driver.complete(command.ticket, {frame.timestamp_us + 10, true}, true);
+	check(result.command_acknowledged && result.acknowledgement.sequence == 1
+	      && result.acknowledgement.accepted_us == frame.timestamp_us + 10, "matching completion acknowledges once");
+	check(!driver.complete(command.ticket, {frame.timestamp_us + 10, true}, true).command_acknowledged,
+	      "duplicate command completion ignored");
+
+	for (unsigned fault = 0; fault < 4; ++fault) {
+		StabilizedOutputDriver item;
+		DriverWrite write{};
+		check(item.prepare(kStart, true, nullptr, write)
+		      && item.complete(write.ticket, {kStart, true}, true).revoke_acknowledged, "phase fault initial disarm");
+		check(item.begin(kStart, kStart, config, true) == OutputStatus::Ok, "phase fault grant");
+		check(item.prepare(frame.timestamp_us, true, &frame, write), "phase fault command prepared");
+		const uint64_t old_ticket = write.ticket;
+
+		if (fault == 0) {
+			item.revoke();
+			check(!item.pending(old_ticket), "revoke invalidates a not-yet-started write");
+			result = item.complete(old_ticket, {frame.timestamp_us + 10, true}, true);
+			check(result.handled && !result.command_acknowledged && !result.revoke_acknowledged,
+			      "in-flight command completion cannot masquerade as revoke acknowledgment");
+
+		} else if (fault == 1) {
+			check(!item.cancel(old_ticket + 1) && item.pending(old_ticket), "wrong cancellation cannot abandon current write");
+			check(item.cancel(old_ticket) && !item.pending(old_ticket), "matching abandoned write canceled");
+			check(!item.complete(old_ticket, {frame.timestamp_us + 10, true}, true).command_acknowledged,
+			      "abandoned completion cannot acknowledge");
+
+		} else if (fault == 2) {
+			result = item.complete(old_ticket, {frame.timestamp_us + 10, true}, false);
+			check(result.handled && !result.command_acknowledged && item.state() == DriverState::Fault,
+			      "permission lost during driver handling suppresses acknowledgment");
+
+		} else {
+			result = item.complete(old_ticket, {frame.timestamp_us + config.acknowledgement_us, true}, true);
+			check(result.handled && !result.command_acknowledged && item.state() == DriverState::Fault,
+			      "completion-time deadline remains enforced");
+		}
+
+		const TimeUs recovered = frame.timestamp_us + config.lease_us;
+		check(item.begin(recovered, recovered, config, true) == OutputStatus::InvalidState,
+		      "completion fault cannot release ownership");
+		item.revoke();
+		check(item.prepare(recovered, true, nullptr, write) && write.ticket > old_ticket
+		      && write.candidate.disposition == OutputDisposition::Disarmed, "new disarm follows invalidated command");
+		check(!item.complete(old_ticket, {recovered, true}, true).revoke_acknowledged && item.pending(write.ticket),
+		      "delayed command completion cannot complete newer disarm");
+		check(item.begin(recovered, recovered, config, true) == OutputStatus::InvalidState,
+		      "pending disarm blocks new grant");
+		check(item.complete(write.ticket, {recovered, true}, true).revoke_acknowledged,
+		      "matching new disarm completion permits handoff");
+		check(item.begin(recovered, recovered, config, true) == OutputStatus::Ok, "fresh grant after split completion");
+	}
+
+	// A synchronous sink can trigger a lifecycle decision before returning.
+	// Its command write must never be mistaken for the newly requested disarm.
+	struct RevokingSink : StabilizedOutputSink {
+		StabilizedOutputDriver owner{};
+		TimeUs now{kStart};
+		OutputWriteResult write(const OutputCandidate &candidate) override
+		{
+			if (candidate.disposition == OutputDisposition::Command) { owner.revoke(); }
+
+			return {now, true};
+		}
+	} sink;
+	check(sink.owner.dispatch(kStart, true, nullptr, sink).revoke_acknowledged, "reentrant sink initial disarm");
+	check(sink.owner.begin(kStart, kStart, config, true) == OutputStatus::Ok, "reentrant sink grant");
+	sink.now = frame.timestamp_us;
+	result = sink.owner.dispatch(sink.now, true, &frame, sink);
+	check(result.handled && !result.command_acknowledged && !result.revoke_acknowledged
+	      && !sink.owner.disarmedConfirmed(), "synchronous command cannot acknowledge a revoke requested during its write");
+	check(sink.owner.dispatch(++sink.now, true, nullptr, sink).revoke_acknowledged,
+	      "next synchronous disarm confirms actual revoke");
+}
 }
 
 int main()
@@ -495,6 +681,8 @@ int main()
 	corruptionTests();
 	permissionAndClockTests();
 	controllerIntegration();
+	driverTests();
+	splitDriverTests();
 	printf("Stabilized output: %u checks, %u failures\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

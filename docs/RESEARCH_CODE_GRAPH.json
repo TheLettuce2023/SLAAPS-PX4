@@ -1,10 +1,1342 @@
 {
     "schema_version":  1,
-    "as_of":  "2026-10-19",
-    "px4_head":  "bde4aea3214eae9364534ca450bfd98da95f34d5",
+    "as_of":  "2026-10-20",
+    "px4_head":  "472a7d6786fcbb475c8396cd7e7a3b4d407d17fc",
     "kind":  "curated component dependency graph; not exhaustive or an AST call graph",
     "freshness":  "sha256 fingerprints exact anchor bytes, including untracked files; revalidate changed nodes and adjacent edges, never use HEAD alone",
     "nodes":  [
+{
+    "id": "slaaps_activation_barrier",
+    "path": "src/lib/slaaps/ManualActivationBarrier.hpp",
+    "scope": "all_bank_activation_completion_explicit_first_command_budget_no_permission_or_physical_driver",
+    "sha256": "24d670133867e30e0a07b0a245e535db62944cb23d22c14b361659f8e4f64c01"
+},
+{
+    "id": "slaaps_observed_routing_binding",
+    "path": "src/lib/slaaps/ObservedRoutingBinding.hpp",
+    "scope": "explicit_freshness_and_latched_driver_identity_routing_binding_no_permission",
+    "sha256": "7158cd60d4ac541ffc031d059c90f6dcc724a04069dadef77410826d299fb8af"
+},
+{
+    "id": "slaaps_output_routing_observation",
+    "path": "src/lib/slaaps/OutputRoutingObservation.hpp",
+    "scope": "all_instance_atomic_report_lifetime_copies_two_pass_generation_check_no_output_permission",
+    "sha256": "d1c0c2052ef40a311b6c485f78e687d2268bd08ab8385650d381a5924aaba43b"
+},
+{
+    "id": "slaaps_preparation_coordinator",
+    "path": "src/lib/slaaps/ManualPreparationCoordinator.hpp",
+    "scope": "non_actuating_all_bank_readiness_collection_exact_proposal_and_lifetime_checks_no_flight_admission",
+    "sha256": "87ae0f2b70c04459a911e53bd116aca6490d07d3cacb2d4d54e04b886cce0ebc"
+},
+{
+    "id": "slaaps_preparation_endpoint",
+    "path": "src/lib/slaaps/ManualPreparationEndpoint.hpp",
+    "scope": "serialized_bank_proposal_readiness_duplicate_handling_cancel_and_trusted_activation_no_physical_driver",
+    "sha256": "d6f32b60321f667c10ebec2fa8f40ec60cfece2e936c6629d8234863345fbd7d"
+},
+{
+    "id": "slaaps_preparation_codec",
+    "path": "src/lib/slaaps/ManualPreparationTransport.hpp",
+    "scope": "proposal_and_readiness_wire_validation_exact_echo_no_admission",
+    "sha256": "74f48e3da355a0c1612c7e114276775e96ca06090d1645dfc0f4415cadd108c5"
+},
+{
+    "id": "slaaps_preparation_message",
+    "path": "msg/SlaapsManualPreparation.msg",
+    "scope": "separate_prepare_MAIN_AUX_readiness_topics_non_actuating",
+    "sha256": "32b9ccf13e121b5485c2ead2b67ad622eda0ec9670cd5f3ef430eede4232a652"
+},
+{
+    "id": "slaaps_manual_bank_preparation",
+    "path": "src/lib/slaaps/ManualBankPreparation.hpp",
+    "scope": "non_actuating_one_use_proposal_exact_routing_and_command_reply_lifetimes_no_wire_admission",
+    "sha256": "11663cf076055103abde25129249d845d4dd35f76fac759e1009b417441321f2"
+},
+{
+    "id": "slaaps_active_board_verification",
+    "path": "build/slaaps_firmware/active-loop-headroom-20261020/independent-verification.json",
+    "scope": "pre_preparation_full_board_package_ELF_22712B_headroom_88_source_anchors_no_boot",
+    "sha256": "3d7f3d9e242181a4d14a799e30e08dd35ef3fbbc54caff9a840d63590502996b"
+},
+{
+    "id": "slaaps_active_board_symbols",
+    "path": "build/slaaps_firmware/active-loop-headroom-20261020/active-path-verification.json",
+    "scope": "active_controller_EDF_linked_stock_VTOL_and_native_tests_absent",
+    "sha256": "34552ba7c13b7ce122d06049bcd275df38759e256f7116d403f03fd029877e32"
+},
+{
+    "id": "slaaps_manual_execution",
+    "path": "src/lib/slaaps/ManualExecution.hpp",
+    "scope": "serialized_execution_gate_and_requested_schedule_no_flight_admission",
+    "sha256": "022a1b53a4eb9fef2ee186eba3e3098c213138aeaf1b11a7d1063f72beb1a77e"
+},
+{
+    "id": "slaaps_selected_manual_input",
+    "path": "src/lib/slaaps/SelectedManualInput.hpp",
+    "scope": "session_metadata_and_observed_armed_guard_faults_latch_no_flight_admission",
+    "sha256": "df3fd07dfa63191ccb1c23ae89e34961b89ecae01e03973ae3676c3022c0d463"
+},
+{
+    "id": "stabilized_shared_binding",
+    "path": "src/lib/research_stabilized_manual/PublisherBinding.hpp",
+    "scope": "shared_monotonic_publisher_epoch_not_authentication",
+    "sha256": "c9b46004472b34f3db41024b84dea6f02e528764c3c05ee821361c83edb44737"
+},
+{
+    "id": "stabilized_shared_observation",
+    "path": "src/lib/research_stabilized_manual/SelectedStateObservation.hpp",
+    "scope": "single_estimator_metadata_and_separate_permission_observation_no_flight_admission",
+    "sha256": "3a36710e7944ebb03c157ba2567b701c01352ae68603e3edecf50e8240aa7ebd"
+},
+{
+    "id": "slaaps_active_target_probe",
+    "path": "Tools/slaaps/active_target/ActiveTransportCompile.cpp",
+    "scope": "forced_worker_and_bank_lifecycles_actual_ARM_compile_unlinked",
+    "sha256": "789bea8da809395a68cdfa0f487a9c7d5c07c401e4e0aeeeb0724c148f7fde36"
+},
+{
+    "id": "slaaps_active_target_verifier",
+    "path": "Tools/slaaps/probe_active_target.py",
+    "scope": "read_only_board_flags_current_headers_dependency_hashes_and_static_resource_probe",
+    "sha256": "a435dcbd1cda75f5fa13f865d06080475320065aac9bcc4508364d1de290602d"
+},
+{
+    "id": "slaaps_manual_worker_transport",
+    "path": "src/lib/slaaps/ManualWorkerTransport.hpp",
+    "scope": "native_worker_command_publication_bound_ack_drain_reentry_and_stop_no_supervisor_admission",
+    "sha256": "df2ae4dbfba3827500cd92f1937000144ee2f3c7733f956106ec6f03c0a1de76"
+},
+{
+    "id": "slaaps_board_verifier",
+    "path": "Tools/slaaps/verify_board.py",
+    "scope": "package_ELF_binary_version_linker_capacity_and_current_production_hashes_no_hardware",
+    "sha256": "4c79b8077fef27ecf1af27eddf4d88de86c6fd7df7d70996c88fc17e1bb9eedf"
+},
+{
+    "id": "slaaps_pwm_handling_test",
+    "path": "Tools/slaaps/pwm_output/PwmOutputTest.cpp",
+    "scope": "injected_register_calls_verbatim_driver_method_25_checks",
+    "sha256": "22df88e0e6f308ef691d14227ab3ec22f42b82cb3c1ca8aa2339b9a17a3cff36"
+},
+{
+    "id": "slaaps_pwm_handling_verifier",
+    "path": "Tools/slaaps/verify_pwm_output.py",
+    "scope": "baseline_nine_failures_corrected_debug_release_sanitizer_source_bound_no_hardware",
+    "sha256": "0a4deb2c972ef535efc41a4810bb2b319e633c296c8d80c5ea8beca0ab6922b1"
+},
+{
+    "id": "slaaps_manual_bank_transport",
+    "path": "src/lib/slaaps/ManualBankTransport.hpp",
+    "scope": "native_bank_dispatch_handled_ack_and_retained_command_reentry_no_physical_driver",
+    "sha256": "70f0620eed471d587cd2188eb3f08364a5b490aacb5acc1d383ffda278aead9e"
+},
+{
+    "id": "slaaps_bound_subscription",
+    "path": "src/lib/slaaps/BoundSubscription.hpp",
+    "scope": "explicit_atomic_lifetime_binding_initial_wait_and_strict_copy_not_authentication",
+    "sha256": "34a53880ed84812178a0b850b1d41f619644dfe8c73c42bc00c72e27f47b0153"
+},
+{
+    "id": "slaaps_manual_transport",
+    "path": "src/lib/slaaps/ManualTransport.hpp",
+    "scope": "wire_validation_and_mapping_not_publisher_authority",
+    "sha256": "4be11829d4e0b6e412be41ed6cbc1808593d20540581f7e2347b140453b86ee5"
+},
+{
+    "id": "slaaps_manual_command_message",
+    "path": "msg/SlaapsManualCommand.msg",
+    "scope": "combined_command_original_deadline_and_full_owner_routing_identity",
+    "sha256": "d8636a5cdab618c5148af864409aff2d92c9368fd7721b740e51a89624f6d2c9"
+},
+{
+    "id": "slaaps_manual_ack_message",
+    "path": "msg/SlaapsManualAck.msg",
+    "scope": "separate_MAIN_AUX_handled_reply_topics_no_electrical_feedback",
+    "sha256": "e2690015e2eab10e516362893999158e380b3c5e5fc0afb377c80853c4dba135"
+},
+                  {
+                      "id": "bench_r09_r10_operator_report",
+                      "path": "docs/MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md",
+                      "scope": "actual_operator_R09_R10_PASS_record_all_servos_close_to_manufacturer_no_numeric_measurements_or_exact_tested_profile_claim",
+                      "sha256": "4321618aab5889b4857d177e42401da0ab8de182b571eac8a9e3d37cbd0f1c9a"
+                  },
+                  {
+                      "id": "bench_rollback_r09_r10_operator_pass",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/hardware-r09-r10-operator-pass-20261020.json",
+                      "scope": "immutable_exact_user_R09_R10_pass_statement_prior_context_and_procedure_snapshots_no_raw_measurement_or_wind_stabilized_acceptance",
+                      "sha256": "3ae06623cf46bb4e0bec899c44c5f923a8a81f4fa8694b6835c38a43cff1a63b"
+                  },
+{
+    "id": "slaaps_manual_output",
+    "path": "src/lib/slaaps/ManualOutput.hpp",
+    "scope": "shared_combined_frame_ack_and_routing_binding_contract",
+    "sha256": "55cf1b1e756de932113c7fff81e52c163889552531f6de01e6ed81f136e567f7"
+},
+{
+    "id": "slaaps_manual_output_bank",
+    "path": "src/lib/slaaps/ManualOutputBank.hpp",
+    "scope": "independent_bank_prepare_exact_ticket_handled_confirmation_expiry_no_native_driver",
+    "sha256": "eba87daf19d6d8d1065125a0e24c3507578a9578096a579101bd17e499e1e2e0"
+},
+                  {
+                      "id": "bench_rollback_es3059md_step_profile",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-unloaded-step-r09.txt",
+                      "scope": "44_tokens_1250_1500_1750us_model10_rates10000_full_span_admitted_one_due_cycle_not_instant_physical_servo",
+                      "sha256": "30d59fa7e25ee8931a9c8ad67f41636642fa70b1da6d761d3b28241472622def"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_step_console",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-step-r09-create-console.txt",
+                      "scope": "separate_step_profile_stop_create_cat_no_enable_or_parameter_writes",
+                      "sha256": "32bf6e256bf42c7d1780739e476971c2929709c424a127e59b377fd4684bb485"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_step_native_ready",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-step-r09-native-ready.log",
+                      "scope": "existing_native31810_ready_start_stop_pass_no_enable_or_physical_drivers",
+                      "sha256": "1b9d80fe1a216398d76dfc3f71dc4403a4240eb8ba1e819f7cab2418b53b411f"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_step_preparation",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-step-r09-preparation-20261020.json",
+                      "scope": "user_requested_step_profile_source_reasoning_native_ready_only_no_measured_latency_R09_or_R10_acceptance",
+                      "sha256": "d30828fe8c4eceb27599124ace36ad5e08872c146bab9df902ba3f5ac1909345"
+                  },
+{
+    "id": "slaaps_manual_worker",
+    "path": "src/lib/slaaps/ManualWorker.hpp",
+    "scope": "combined_control_propulsion_per_bank_ack_gate_live_health_no_native_publication",
+    "sha256": "d7ad5be3b4599bee097d8bb61d4f07ede078453dc3cb27cca0446c5809939835"
+},
+{
+    "id": "slaaps_manual_edf_input",
+    "path": "src/lib/slaaps/ManualEdfInput.hpp",
+    "scope": "selected_throttle_expiring_requests_host_verified_not_native_output",
+    "sha256": "6939404e5340d83b71b2bab89a7de3e2af29bce9a0bcc2061d7658d002604748"
+},
+                  {
+                      "id": "bench_es3059md_wide_r09",
+                      "path": "docs/MANUAL_BENCH_ES3059MD_WIDE_R09.md",
+                      "scope": "R09_R10_operator_pass_current_status_wider_and_step_preparation_retained_exact_tested_profile_unspecified",
+                      "sha256": "1d3eca5859c20a5b1566ff51337a60a87a3d951c3515e3c130e72ec3dde74d9f"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_wide_profile",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-unloaded-wide-r09.txt",
+                      "scope": "44_tokens_USB2_sender255190_common_RPY_1250_1500_1750us_model10_rates2_normal50us_per_s_no_installed_angle_claim",
+                      "sha256": "674f2f8e8b8d9772ab7a105fed4389126043076cf331f0dad5a6583f25c44f9d"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_wide_console",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-wide-r09-create-console.txt",
+                      "scope": "separate_wide_profile_stop_create_cat_recipe_no_enable_or_parameter_writes",
+                      "sha256": "1ce4adb8106be6287085d5b1df17a08fc938e577ecf9bd6fb97b1c7e4a8d2146"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_wide_native_ready",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-wide-r09-native-ready.log",
+                      "scope": "existing_native31809_ready_start_stop_pass_no_enable_Commander_or_physical_drivers",
+                      "sha256": "8fc3652bf3b428f11150d91065c26c71fd92aef64fa8bd3cbf925edeaff55a8d"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_wide_preparation",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-wide-r09-preparation-20261020.json",
+                      "scope": "explicit_user_wider_request_bindings_native_ready_and_math_no_hardware_install_or_R09_R10_acceptance",
+                      "sha256": "1c1a41d4eb3e841ed7923b3832efc9a81f551802a54f7a15556488393f650e1c"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_motion_resolution",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-motion-resolution-report-20261020.json",
+                      "scope": "operator_reports_small_motion_explains_no_motion_concern_no_quantified_angle_power_R09_data_yet",
+                      "sha256": "db406d2af55a3eec793b631818b8e8e9a989b28a869282cdfd8faad622baabf5"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_held_pwm",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-held-pwm-report-20261020.json",
+                      "scope": "user_held_roll_plus1_pitch0p13_same_session_Active_control0p05_IO1550_and_MAIN1_scope1550us_no_powered_motion",
+                      "sha256": "72b52e62c3e98854c966133e026e26aa3d89bd0c0dde92bd83555bb90db0a4cc"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_reset_command",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-reset-command-report-20261020.json",
+                      "scope": "user_centered_reset_state1_seven_fresh_enabled_same_session_frames_latest47s_after_entry_demand1498p61_1507p7us_no_held_full_axis_or_pin_result",
+                      "sha256": "3f249f19f1f298f0e450f69cdf265bad001f07e1606de5ab1bc1b1ed8b927a49"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_active_neutral",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-active-neutral-report-20261020.json",
+                      "scope": "user_new_profile_content_ready_active_enabled_neutral_USB_input_within_deadzone_IO1500_and_no_servo_motion_separate_snapshots_no_held_sample_or_pin_acceptance",
+                      "sha256": "e6eb7e76758cf444657d61834e13fd9b7e0a5c36e8c406d8a14b9c68afe40933"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_revoked",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-revoked-report-20261020.json",
+                      "scope": "user_held_roll_plus1_valid_correct_sender_owner_revoked_state2_IO1500_latched_neutral_trigger_unknown_centered_reset_observation_pending",
+                      "sha256": "7a5cc356422e811c9c11f9f38aad56fef6c334444c6fe9969ffc44eeab837f4f"
+                  },
+                  {
+                      "id": "bench_rollback_signal_test_report",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/hardware-joystick-signal-report-20261020.json",
+                      "scope": "user_report_R01_R08_center1500us50Hz_axes_intermediate_stop_loss_closeout_accepted_scope_no_raw_numeric_fault_review_R09_R10_pending_original_doc_versions_preserved",
+                      "sha256": "3059da4927e30866c18a5150633b6723ce3e25af2481d348b631c9b1e0ce14b4"
+                  },
+                  {
+                      "id": "bench_es3059md_r09_r10",
+                      "path": "docs/MANUAL_BENCH_ES3059MD_R09_R10.md",
+                      "scope": "R09_R10_operator_pass_current_status_with_historical_narrow_method_and_wider_profile_navigation",
+                      "sha256": "34655f3a93c1431c00d76525857fcce170bd5624faccdecb88c7a53049db01a7"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_profile",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-unloaded-calibration.txt",
+                      "scope": "44_tokens_USB2_sender255190_common_waveform_all_axis_map1450_1500_1550_normal5us_per_s_model_angle_not_measured_only_one_unloaded_servo",
+                      "sha256": "08c5939868de46a9674fa508603fd7b04e58b87d5c5e0c329ccaf6fd8580549a"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_console",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-calibration-create-console.txt",
+                      "scope": "stop_and_create_new_R09_fixture_no_enable_parameter_write_or_power_command_original_signal_profile_preserved",
+                      "sha256": "5d019fd412fe09e65b9415986e2d73cd13e52571fc9cd1f626395811c5e43acc"
+                  },
+                  {
+                      "id": "bench_rollback_es3059md_preparation",
+                      "path": "build/bench_commissioning/bench-e8ea98b404-step3/es3059md-calibration-preparation-20261020.json",
+                      "scope": "user_ES3059MD_reported4p8_6V_supply_max12A_physical_cut_no_tester_primary_spec_and_slew_math_native_ready_only_pass_rejected_roll_only_retained_no_code_build_or_hardware",
+                      "sha256": "013b15c2fef7cfe4741595e175775057ee4cbaac7b1cfb9c319a2ad7caa44684"
+                  },
+                  {
+                      "id": "bench_joystick_run_sheet",
+                      "path": "docs/MANUAL_BENCH_JOYSTICK_RUN_SHEET.md",
+                      "scope": "operator_run_sheet_R01_R10_reported_passes_numeric_R09_R10_data_not_supplied_blank_template_preserved",
+                      "sha256": "88f331b28fcbe6ffa463ddb829876940cdd15d511de88c2933065dbbc41123aa"
+                  },
+                  {
+                      "id": "bench_joystick_report_form",
+                      "path": "docs/templates/MANUAL_BENCH_JOYSTICK_TEST_REPORT.md",
+                      "scope": "blank_R01_R10_results_with_R09_source_method_scope_and_underlying_measured_PWM_angle_power_points_no_completed_report_fabricated",
+                      "sha256": "90a8c0a9438f850586dcf1deea24421ec5ff6aa62fdea824c6e919d17cc27a1e"
+                  },
+{
+    "id": "slaaps_reported_routing_api",
+    "path": "src/lib/slaaps/ReportedRouting.hpp",
+    "scope": "driver_bank_observation_contract_not_output_admission",
+    "sha256": "7d12cd7999b7d3f2340760ca65bab0cb49cc80f59b3632a121112a14ba54869e"
+},
+{
+    "id": "slaaps_reported_routing_core",
+    "path": "src/lib/slaaps/ReportedRouting.cpp",
+    "scope": "fresh_complete_unique_bank_inventory_to_logical_routing",
+    "sha256": "a270de2bc061e6480061fb251b6cc0721ad87152395c21c6d223305687a44613"
+},
+{
+    "id": "slaaps_bank_message",
+    "path": "msg/SlaapsOutputBank.msg",
+    "scope": "effective_pwm_inventory_no_electrical_feedback",
+    "sha256": "99f4ac2767948ead97839117f370baae55ffba1d82a9b9085819bb84391f8bff"
+},
+{
+    "id": "slaaps_bank_publisher",
+    "path": "src/lib/mixer_module/SlaapsOutputInventory.cpp",
+    "scope": "serialized_mixer_calibration_and_driver_hardware_observation",
+    "sha256": "264f6dee6bb6d8f203f66aa6444b5a5c1ae37c99cced3b4d04ba70a0a67e65a5"
+},
+{
+    "id": "slaaps_pwm_driver",
+    "path": "src/drivers/pwm_out/PWMOut.cpp",
+    "scope": "physical_inventory_and_truthful_register_handling_result_not_electrical_feedback",
+    "sha256": "ca2cdda2c9058fa89a50b2bb79885b682ffe5c3629018ed5cdad5428e3a8e6e2"
+},
+{
+    "id": "slaaps_routing_fixture",
+    "path": "src/modules/slaaps/SlaapsRoutingTest.cpp",
+    "scope": "native_test_only_synthetic_bank_publisher",
+    "sha256": "d155045c12554f816229701d97a4cadab27f8e29af09089be13c6f987827d624"
+},
+{
+    "id": "slaaps_board_builder",
+    "path": "Tools/slaaps/build_board_snapshot.py",
+    "scope": "sealed_board_build_explicit_new_source_refresh_and_embedded_version_gate",
+    "sha256": "49709d3ed457293d91dfbbff11fe77e688098be15c24fa204377a3ca8fd092e9"
+},
+{
+    "id": "slaaps_edf_api",
+    "path": "src/lib/slaaps/EdfOwner.hpp",
+    "scope": "common_propulsion_request_contract_no_physical_output",
+    "sha256": "42e6de64fb5399757129917a555f9901fe605ab1b0aba7643172437bef3f42cc"
+},
+{
+    "id": "slaaps_edf_core",
+    "path": "src/lib/slaaps/EdfOwner.cpp",
+    "scope": "mode_session_units_deadline_slew_owner_not_yet_attached",
+    "sha256": "2e01a3a3c40d74f8e1f2582bcb8230cfdca7e5922f4971d2dd65a205f472e908"
+},
+{
+    "id": "slaaps_acceleration_port",
+    "path": "src/lib/slaaps/AccelerationControllerPort.hpp",
+    "scope": "unavailable_future_controller_boundary_existing_request_types",
+    "sha256": "2408e98c27ae7c59fac8f0bac76393cc30bb6b98a8b14b4561797c27b7d66c1d"
+},
+{
+    "id": "slaaps_native_anchor_0",
+    "path": "src/modules/slaaps/Px4ConfigurationSource.hpp",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "0968d524af98275993ddcab2c9f15982a5cbec0d8a020009c42c6bdcfabd8948"
+},
+{
+    "id": "slaaps_native_anchor_1",
+    "path": "src/modules/slaaps/CMakeLists.txt",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "896aac80021600e46925f0b960a6ca6ad8ea83df08b1aff8fee2b2455fe2bc6f"
+},
+{
+    "id": "slaaps_native_anchor_2",
+    "path": "src/modules/slaaps/Kconfig",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "c15f0cc575d903107b576bf30161215a9c45af3e091ab743385a9a2a5a1bf01e"
+},
+{
+    "id": "slaaps_native_anchor_3",
+    "path": "src/lib/slaaps/Airframe.hpp",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "95e4918e54641dae5896b4fd7c3a4c42b3ae9baff8ef33d31d71d59364f97f4c"
+},
+{
+    "id": "slaaps_native_anchor_4",
+    "path": "msg/SlaapsStatus.msg",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "9b648c69ffc09deb6e6f32c5015efb911b3217a1cd7a6b63003ad8e4698d54ff"
+},
+{
+    "id": "slaaps_native_anchor_5",
+    "path": "boards/px4/sitl/slaaps.px4board",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "7e09b5bc989e7ff8a6c01c610b0bd73f9c40729fe24919ebf87e9c521f3fda98"
+},
+{
+    "id": "slaaps_native_anchor_6",
+    "path": "boards/px4/sitl/slaaps-test.px4board",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "be74cf242c8ab4cdda67847083d1db2ab9e47027062d0d82f4c408d6e085fa86"
+},
+{
+    "id": "slaaps_native_anchor_7",
+    "path": "boards/px4/fmu-v6x/slaaps.px4board",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "c11dde5dcb48062ec9223f1612c5bb32295c89c32b1362753b165c091d78395b"
+},
+{
+    "id": "slaaps_native_anchor_8",
+    "path": "src/modules/commander/HealthAndArmingChecks/checks/slaapsCheck.hpp",
+    "scope": "native_supervisor_integration_no_active_outputs",
+    "sha256": "4f6b8f6fdb7b7b2da2bbfe86f82f6c86dc222df1a29d21bfc334f69523c63f75"
+},
+{
+    "id": "slaaps_native_supervisor",
+    "path": "src/modules/slaaps/Slaaps.cpp",
+    "scope": "native_mode_scaffolding_active_outputs_pending",
+    "sha256": "2f0efe006a94aa292ad6f7349129b0f89e8acb3a904feac61b9d2ead429ec0b4"
+},
+{
+    "id": "slaaps_parameter_capture",
+    "path": "src/modules/slaaps/Px4ConfigurationSource.cpp",
+    "scope": "native_mode_scaffolding_active_outputs_pending",
+    "sha256": "86afd98d4693644e3ee2ed45ddf1b86939a7bbe63c6907f13fc4ea0767f2ea5c"
+},
+{
+    "id": "slaaps_native_gate",
+    "path": "src/modules/commander/HealthAndArmingChecks/checks/slaapsCheck.cpp",
+    "scope": "native_mode_scaffolding_active_outputs_pending",
+    "sha256": "c9968d30f448f9538848b3840f65ca5e2ce852d2b219a69079add6aee0434200"
+},
+{
+    "id": "slaaps_airframe",
+    "path": "ROMFS/px4fmu_common/init.d/airframes/22001_slaaps",
+    "scope": "native_mode_scaffolding_active_outputs_pending",
+    "sha256": "2ac67f6a0c8f52f4b8d32c073b3b383fdc40060a41000f0d5071902a1bbb32b8"
+},
+{
+    "id": "slaaps_startup",
+    "path": "ROMFS/px4fmu_common/init.d/rc.slaaps_apps",
+    "scope": "native_mode_scaffolding_active_outputs_pending",
+    "sha256": "4026d98a037a332c7c5e9689bb3ae63f83e0b648b5e8874ab236a6e3e4940cf7"
+},
+{
+    "id": "slaaps_native_build",
+    "path": "Tools/slaaps/build_native.py",
+    "scope": "sealed_native_build_and_explicit_recorded_fork_refreshes",
+    "sha256": "e993dbbb4a2c4ff1a12fe8e0cf1b383c5547dd20c9913653a5e0643e575d8d70"
+},
+{
+    "id": "slaaps_native_test",
+    "path": "Tools/slaaps/verify_native.py",
+    "scope": "native_control_suite_and_supervisor_lifecycle_no_driver_transport",
+    "sha256": "d22aab5e3104effa33b944d27e4c5439da8c2d1bcbbd339ed6be15293ca9056c"
+},
+{
+    "id": "slaaps_configuration_record",
+    "path": "docs/SLAAPS_CONFIGURATION_INTEGRATION.md",
+    "scope": "configuration_routing_native_and_board_evidence_no_flight_acceptance",
+    "sha256": "08a2fd2c0a9e2c7e413e6607ee10366ddbda97e30e94aecca666c8782ac7ba91"
+},
+{
+    "id": "slaaps_configuration_api",
+    "path": "src/lib/slaaps/VehicleConfiguration.hpp",
+    "scope": "typed_vehicle_profile_and_immutable_store",
+    "sha256": "58c93f073dd5cab3bc823304fec7e7ab9c2edb9d442bd7cb458f4379b7748d11"
+},
+{
+    "id": "slaaps_configuration_core",
+    "path": "src/lib/slaaps/VehicleConfiguration.cpp",
+    "scope": "validated_existing_controller_adapters_and_edf_curve",
+    "sha256": "5a2af21afdb1476a3677bb493370f00ebb032c41ad4d80e40d78989c11a99ad7"
+},
+{
+    "id": "slaaps_parameter_schema",
+    "path": "src/lib/slaaps/VehicleParameters.def",
+    "scope": "canonical_173_qgc_scalar_parameters_unconfigured_defaults",
+    "sha256": "d91f2f03d91c259840000ad7db87785f0889771dbc1e160f77eb5062db47416a"
+},
+{
+    "id": "slaaps_parameter_metadata",
+    "path": "src/modules/slaaps/module.yaml",
+    "scope": "generated_175_px4_parameters_registered_by_slaaps_module",
+    "sha256": "3c08991d37686bcbba749cea1f66c57138b0fe093c4a25bf67d05f2670294e76"
+},
+{
+    "id": "slaaps_parameter_generator",
+    "path": "Tools/slaaps/generate_parameters.py",
+    "scope": "canonical_schema_to_px4_qgc_metadata",
+    "sha256": "c14da6ae24f06bcc7621f8dcd8c4a75ebb96d9e87881e7540753f0b23763239f"
+},
+{
+    "id": "slaaps_routing_api",
+    "path": "src/lib/slaaps/ActuatorRouting.hpp",
+    "scope": "logical_pwm_routing_driver_observations_available_final_write_admission_pending",
+    "sha256": "323214da3181887101497fd4fa498de3ed380b75cee008ed9ea9a2b5ab10a167"
+},
+{
+    "id": "slaaps_routing_core",
+    "path": "src/lib/slaaps/ActuatorRouting.cpp",
+    "scope": "main_aux_mapping_validation_no_driver_provider",
+    "sha256": "6058abe53d275651d6fe092d3ab817e76895611040f377674831fd291b1b5e75"
+},
+{
+    "id": "slaaps_configuration_build",
+    "path": "src/lib/slaaps/CMakeLists.txt",
+    "scope": "excluded_by_default_px4_library",
+    "sha256": "32e3bcd53e89e82cd6b17a831ef3f56e22a1e0c631eb7acf7a1def6efe8c31d1"
+},
+{
+    "id": "slaaps_configuration_test_build",
+    "path": "Tools/slaaps/configuration/CMakeLists.txt",
+    "scope": "actual_controller_and_generated_header_host_test_build",
+    "sha256": "4d66a202dccf03a9dfebfddea7907498664ff2b7a8e093e13ec42a105dd2cb84"
+},
+{
+    "id": "slaaps_configuration_tests",
+    "path": "Tools/slaaps/configuration/VehicleConfigurationTest.cpp",
+    "scope": "1997_host_2651_native_observation_bound_preparation_no_physical_driver",
+    "sha256": "684a2a787b08646cc39bf78f48f855eda578e69bf83f9fc8de9262fdaa097318"
+},
+{
+    "id": "slaaps_configuration_verifier",
+    "path": "Tools/slaaps/verify_configuration.py",
+    "scope": "debug_release_sanitizers_and_actual_metadata_pipeline",
+    "sha256": "a05b8c9a2a527d4dd80285c9e0193cf79fcb4b3c628a397aec5c87dc90f6ef8a"
+},
+{
+    "id": "slaaps_airframe_goal",
+    "path": "docs/SLAAPS_AIRFRAME_GOAL.md",
+    "scope": "active_goal_qgc_modes_configurable_vehicle_data_routing_edf_ownership_implementation_pending",
+    "sha256": "e6aeb807c6f8d55bec607cd1e511ea333b638171a04b40e8af3ca90deeb14c4a"
+},
+{
+    "id": "session_request_owner_build",
+    "path": "Tools/research_sitl/session_request/CMakeLists.txt",
+    "scope": "transport_independent_request_lifecycle_not_integrated",
+    "sha256": "9171e46cadae7d06a0a8da362aff6a276ad628f3e5765e0193a0b7828d84d3d7"
+},
+{
+    "id": "session_request_owner_test",
+    "path": "Tools/research_sitl/session_request/SessionRequestTest.cpp",
+    "scope": "transport_independent_request_lifecycle_not_integrated",
+    "sha256": "8ad01885d5415f5be6836a27b4d7b2ec93af6d7ced7a37646b1888685cb5be9a"
+},
+{
+    "id": "session_request_owner",
+    "path": "src/modules/research_stabilized_manual/SessionRequestOwner.hpp",
+    "scope": "transport_independent_request_lifecycle_not_integrated",
+    "sha256": "cbcb271d295313d0f457cedfbca981e5d27a6a6e636b5bb5ed4d4404fb054ee8"
+},
+{
+    "id": "stabilized_manual_production_ownership",
+    "path": "docs/STABILIZED_MANUAL_PRODUCTION_OWNERSHIP.md",
+    "scope": "production_scope_pending_and_shared_owner_integration_contract",
+    "sha256": "abb14a2c1e3d347cb1d8095fc1537d8fd278976d85fbc88ddce992e316f099a5"
+},
+{
+    "id": "slaaps_research_board_variant",
+    "path": "boards/px4/fmu-v6x/slaaps-research.px4board",
+    "scope": "separate_observer_research_target_no_stock_autotune_no_output_authority",
+    "sha256": "40cf64b15ecaf801d9e17f31522c827e1c0bd0a690bcbafb23f9ecff8dcf444b"
+},
+{
+    "id": "explore_stabilized_session_robustness",
+    "path": "Tools/research_sitl/explore_stabilized_session_robustness.py",
+    "scope": "synthetic_candidate_exploration_not_qualification",
+    "sha256": "387f7a0b0a19b5d9dc830f99d624a5f98c3d8bdbb503ceeeb98d5c080ce5fe6a"
+},
+{
+    "id": "diagnose_stabilized_session_release",
+    "path": "Tools/research_sitl/diagnose_stabilized_session_release.py",
+    "scope": "synthetic_candidate_exploration_not_qualification",
+    "sha256": "d18a84466a1606f7ce785819e9755ee1ad88dadc4a672d722ce028bade8b4b5e"
+},
+{
+    "id": "stabilized_session_qualification_record",
+    "path": "docs/STABILIZED_MANUAL_SESSION_QUALIFICATION.md",
+    "scope": "30_case_integrated_candidate_and_console_no_hardware",
+    "sha256": "4fc7dec2109f39f5d9259a58fe6e204bcaa4a1f3c4881519c564931f255f2c8f"
+},
+{
+    "id": "stabilized_session_console_verifier",
+    "path": "Tools/research_sitl/verify_stabilized_session_console.py",
+    "scope": "30_case_integrated_candidate_and_console_no_hardware",
+    "sha256": "b43d7c7f8ad331024ef285826cb6bfbc7c61d0bd70148f2dc296c4ad18512884"
+},
+{
+    "id": "stabilized_session_console",
+    "path": "Tools/research_sitl/stabilized_session_console.py",
+    "scope": "30_case_integrated_candidate_and_console_no_hardware",
+    "sha256": "9d2a723d796ba576c4e9d2f0707d505ea3002a68f350e468e9ee00edf3c06ec8"
+},
+{
+    "id": "stabilized_session_qualification_runner",
+    "path": "Tools/research_sitl/qualify_stabilized_session.py",
+    "scope": "30_case_integrated_candidate_and_console_no_hardware",
+    "sha256": "3a57f4d9d9176717ce91c5f446aee71f350c3d886b8f820ecfaf127bc05ee6ac"
+},
+{
+    "id": "stabilized_session_transport_relay",
+    "path": "Tools/research_sitl/session_transport_relay.py",
+    "scope": "external_command_ack_grant_disarm_loss_delay_injection_only",
+    "sha256": "08ad44105569968660ea4c2e61e7b7efc4ad2b69b26cc4373f3c391ec6efe3d0"
+},
+{
+    "id": "stabilized_session_maneuver_runner",
+    "path": "Tools/research_sitl/verify_stabilized_session_maneuvers.py",
+    "scope": "sixteen_integrated_single_and_coupled_cases_passed_not_full_qualification",
+    "sha256": "9c0c51b602532ed87bb9ecb39b2121e2d456d8de15008a807e7a78652ed85304"
+},
+{
+    "id": "stabilized_session_runtime_verifier",
+    "path": "Tools/research_sitl/verify_stabilized_session_runtime.py",
+    "scope": "two_queue_runtime_smoke_not_full_qualification",
+    "sha256": "e149e9d71d3d6b73913f05210a2c9a658035816df79728a2ea9de0edb1ba923b"
+},
+{
+    "id": "stabilized_px4_session_producer",
+    "path": "Tools/research_sitl/stabilized_session/Px4SessionSITL.cpp",
+    "scope": "two_queue_runtime_smoke_passed_full_qualification_pending",
+    "sha256": "b8046d570f9c580f3a1628f646fd952eeadae8ce28a5daa32a274d0e5679d694"
+},
+{
+    "id": "stabilized_session_checkout_builder",
+    "path": "Tools/research_sitl/build_stabilized_session_checkout.py",
+    "scope": "fresh_PX4_link_and_registration_only_no_consumer_runtime",
+    "sha256": "4504fea19f5a2e7ec1bab239256f39153ef1d15f2c3493d849104a5002457903"
+},
+{
+    "id": "stabilized_session_link_verifier",
+    "path": "Tools/research_sitl/verify_stabilized_session_link.py",
+    "scope": "fresh_PX4_link_and_registration_only_no_consumer_runtime",
+    "sha256": "5abcc5a98d57a940f60fc366887d6753b2efa7394b63872515a8caff7781e11d"
+},
+{
+    "id": "stabilized_session_link_record",
+    "path": "docs/STABILIZED_MANUAL_SESSION_LINK.md",
+    "scope": "two_queue_runtime_smoke_passed_full_qualification_pending",
+    "sha256": "58c68c54cbffd3b02baa65ff07f528c0ff72af89e5d1f96923108ca02864b041"
+},
+{
+    "id": "stabilized_px4_session_consumer",
+    "path": "Tools/research_sitl/stabilized_session/Px4SessionConsumer.hpp",
+    "scope": "two_queue_runtime_smoke_passed_full_qualification_pending",
+    "sha256": "8268eef655794cfa3c8c6b68cd77adb50e80cd327f9e16eb1b3da57de72194a1"
+},
+{
+    "id": "stabilized_px4_session_consumer_entry",
+    "path": "Tools/research_sitl/stabilized_session/Px4SessionConsumer.cpp",
+    "scope": "PX4_consumer_translation_unit_compile_only_runtime_pending",
+    "sha256": "709c62f55ff89b48c5ae8fe2223829e965999cd2a9594330fa5d3a555106baef"
+},
+{
+    "id": "stabilized_session_output_configuration",
+    "path": "Tools/research_sitl/stabilized_session/OutputConfiguration.hpp",
+    "scope": "PX4_consumer_translation_unit_compile_only_runtime_pending",
+    "sha256": "05f9ccc865486f92013c941472d4a98c9e19197413f1f98e08ab5f86efe7b3bd"
+},
+{
+    "id": "stabilized_px4_session_consumer_cmake",
+    "path": "Tools/research_sitl/stabilized_session/px4_external/src/research_session_consumer/CMakeLists.txt",
+    "scope": "PX4_consumer_translation_unit_compile_only_runtime_pending",
+    "sha256": "daba8b0971a9a8acfd2ee96f255b29cb1dd91bfe2953edff89df0a4923b30bbb"
+},
+{
+    "id": "stabilized_px4_session_consumer_compile",
+    "path": "Tools/research_sitl/verify_stabilized_session_consumer_compile.py",
+    "scope": "PX4_consumer_translation_unit_compile_only_runtime_pending",
+    "sha256": "1bdb4e76995a9fe54bbd64a356753e2f465299d275c5b60f7ed2f55eaabf8b93"
+},
+{
+    "id": "stabilized_px4_session_consumer_record",
+    "path": "docs/STABILIZED_MANUAL_PX4_SESSION_CONSUMER.md",
+    "scope": "PX4_consumer_translation_unit_compile_only_runtime_pending",
+    "sha256": "87b1a32aa255001a6f6b0030af1d07bff3bc1be8d14a8e738b68af35a1867f1b"
+},
+{
+    "id": "stabilized_remote_completion",
+    "path": "Tools/research_sitl/stabilized_session/RemoteCompletion.hpp",
+    "scope": "nonblocking_remote_gate_host_and_Gazebo_no_PX4",
+    "sha256": "09ad2d6c9a4a82916223849ecc0d9da76eba99f651387addaaa20783e61807c9"
+},
+{
+    "id": "stabilized_remote_completion_test",
+    "path": "Tools/research_sitl/stabilized_session/RemoteCompletionTest.cpp",
+    "scope": "nonblocking_remote_gate_host_and_Gazebo_no_PX4",
+    "sha256": "2948bed6cf9d9dab465ecee4d00eb3062f4fb346528127d073058f9fe327b869"
+},
+{
+    "id": "stabilized_remote_completion_record",
+    "path": "docs/STABILIZED_MANUAL_REMOTE_COMPLETION.md",
+    "scope": "nonblocking_remote_gate_host_and_Gazebo_no_PX4",
+    "sha256": "af96e2b016c901d6eaad4f6f2eddea3aa858ec0c1fa8eacf650126d0ed34a32b"
+},
+{
+    "id": "stabilized_session_gazebo_transport",
+    "path": "Tools/research_sitl/stabilized_session/GazeboPlantTransport.hpp",
+    "scope": "real_Gazebo_session_plant_open_loop_no_PX4_no_hardware",
+    "sha256": "9f9166dad4a0211cbc5fa7c3ad47a6d5d84b49e33d5f2b692b1a9252b8777d3e"
+},
+{
+    "id": "stabilized_session_plugin_probe",
+    "path": "Tools/research_sitl/stabilized_session/PluginProbe.cpp",
+    "scope": "real_Gazebo_session_plant_open_loop_no_PX4_no_hardware",
+    "sha256": "35b98c063f39ff4eae25b5a15eca354fbc4d167ea2653a235a634e6bb1543283"
+},
+{
+    "id": "stabilized_session_plugin_transform",
+    "path": "Tools/research_sitl/stabilized_session/make_plugin.py",
+    "scope": "real_Gazebo_session_plant_open_loop_no_PX4_no_hardware",
+    "sha256": "c6406411048dae87eb4f520195b3d68f6eb23c4fd9c8a9ea92ad785821f7e035"
+},
+{
+    "id": "stabilized_session_plugin_runner",
+    "path": "Tools/research_sitl/verify_stabilized_session_plugin.py",
+    "scope": "real_Gazebo_session_plant_open_loop_no_PX4_no_hardware",
+    "sha256": "fa4fdb8908b4107083e5a3edfca8edbeb44165fbd4d691dbd7b55efcb55d824a"
+},
+{
+    "id": "stabilized_session_plugin_record",
+    "path": "docs/STABILIZED_MANUAL_SESSION_PLUGIN.md",
+    "scope": "real_Gazebo_session_plant_open_loop_no_PX4_no_hardware",
+    "sha256": "7ad540ba638bf3b6cb2ff8ebdc13b4d4a182064f0221a7bc780eb42181021d45"
+},
+{
+    "id": "stabilized_plant_endpoint",
+    "path": "Tools/research_sitl/stabilized_session/PlantEndpoint.hpp",
+    "scope": "private_plant_endpoint_transactions_not_dynamic_integration",
+    "sha256": "7c5553a9ee99a7b6d28f1695d49472fbb8b4d7fe48ab7e0273842a30e86834dc"
+},
+{
+    "id": "stabilized_plant_endpoint_test",
+    "path": "Tools/research_sitl/stabilized_session/PlantEndpointTest.cpp",
+    "scope": "private_plant_endpoint_transactions_not_dynamic_integration",
+    "sha256": "b6cda0814d712125d927c460d0bcf4e9f463aedc7f3da93bea434becd23cbc2d"
+},
+{
+    "id": "stabilized_plant_endpoint_record",
+    "path": "docs/STABILIZED_MANUAL_PLANT_ENDPOINT.md",
+    "scope": "private_plant_endpoint_transactions_not_dynamic_integration",
+    "sha256": "b52471e7aad92bbc4f41ba0c5fea7814ea6dc8773f8c06a4a8c5d70ab65ca1bf"
+},
+{
+    "id": "stabilized_session_transport",
+    "path": "Tools/research_sitl/stabilized_session/Transport.hpp",
+    "scope": "private_unintegrated_Gazebo_session_codec_no_hardware",
+    "sha256": "5a2a7fd1599a0009d0ce1912a0b49f08d5fa93936f52df0fe200f31881d374db"
+},
+{
+    "id": "stabilized_session_transport_test",
+    "path": "Tools/research_sitl/stabilized_session/TransportTest.cpp",
+    "scope": "private_unintegrated_Gazebo_session_codec_no_hardware",
+    "sha256": "b116d1a02c4ba0a2166a8b0f891926080154722ded18d1e189ca1e3f6e38684e"
+},
+{
+    "id": "stabilized_session_transport_build",
+    "path": "Tools/research_sitl/stabilized_session/CMakeLists.txt",
+    "scope": "private_unintegrated_Gazebo_session_codec_no_hardware",
+    "sha256": "f30a475e5469d3b89e947b64f44083dfbde25803e60f3bbbc40c041642c99e48"
+},
+{
+    "id": "stabilized_session_transport_runner",
+    "path": "Tools/research_sitl/verify_stabilized_session_transport.py",
+    "scope": "private_unintegrated_Gazebo_session_codec_no_hardware",
+    "sha256": "34a4aa12a82117951437cb952c96dbe9fae53c9976fc4a1e15e6f37474b6a6f2"
+},
+{
+    "id": "stabilized_session_transport_record",
+    "path": "docs/STABILIZED_MANUAL_SESSION_TRANSPORT.md",
+    "scope": "private_unintegrated_Gazebo_session_codec_no_hardware",
+    "sha256": "04c67f782ad0b80b715fdf10b1790be97a1d2cfad0a8bf98b2d8045fbbb4cc66"
+},
+{
+    "id": "stabilized_validator_requalification",
+    "path": "docs/STABILIZED_MANUAL_VALIDATOR_REQUALIFICATION.md",
+    "scope": "dynamic_shared_validator_requalification_no_hardware",
+    "sha256": "f79ea98874dd189a947ede3aef8c144b617a6b3d6a1f895e46a508cf2ec46d73"
+},
+{
+    "id": "stabilized_validator_requalification_verification",
+    "path": "build/stabilized_selected_health/20261020-requalification/verification.json",
+    "scope": "dynamic_shared_validator_requalification_no_hardware",
+    "sha256": "a00206fd1b50bd3fbc704441a699d8c0fce10ba5ecbbe5d573cf521ab0bfddd6"
+},
+{
+    "id": "stabilized_validator_previous_profile",
+    "path": "build/stabilized_selected_health/20261020-requalification/previous-qualified-console-profile.json",
+    "scope": "dynamic_shared_validator_requalification_no_hardware",
+    "sha256": "95787599b399e72b62e2d00d302df834d2a78dd1f1679fbac55c3b3deb50f8e4"
+},
+{
+    "id": "stabilized_input_validation_header",
+    "path": "src/lib/research_stabilized_manual/StabilizedInputValidation.hpp",
+    "scope": "selected_health_native_and_unlinked_ARM_no_hardware",
+    "sha256": "81ab0dbaf4b17223a3fcb8f2d2f40a2c96acce3b9b44c7ece4e5ed0d7883b3e0"
+},
+{
+    "id": "stabilized_input_validation",
+    "path": "src/lib/research_stabilized_manual/StabilizedInputValidation.cpp",
+    "scope": "selected_health_native_and_unlinked_ARM_no_hardware",
+    "sha256": "56f0e57d546be06b0ccaecaf085a9df97561b7cb0500c4ec0fbb30c3868dd921"
+},
+{
+    "id": "stabilized_selected_state_guard",
+    "path": "src/modules/research_stabilized_manual/SelectedStateGuard.hpp",
+    "scope": "selected_health_native_and_unlinked_ARM_no_hardware",
+    "sha256": "63ba39e078453070ccefdc40c6f9a47aaffbab7d7ac2ec788dccd5422d54380f"
+},
+{
+    "id": "stabilized_selected_health_record",
+    "path": "docs/STABILIZED_MANUAL_SELECTED_HEALTH.md",
+    "scope": "selected_health_native_and_unlinked_ARM_no_hardware",
+    "sha256": "6ad208af9fa197ec2cfca1af815e04e743ac5eedda7a4ff794ef9e2a2346694e"
+},
+{
+    "id": "stabilized_selected_health_arm_recipe",
+    "path": "build/stabilized_selected_health/20261020-final/check_arm.py",
+    "scope": "selected_health_native_and_unlinked_ARM_no_hardware",
+    "sha256": "5e131539553649ea2a062d11c99151e5cfc634e126a14f25c6144c37c966799a"
+},
+{
+    "id": "stabilized_selected_health_arm_receipt",
+    "path": "build/stabilized_selected_health/20261020-final/arm-receipt.json",
+    "scope": "selected_health_native_and_unlinked_ARM_no_hardware",
+    "sha256": "3f952307add7ebcf93cd32aeadaebf465debe08f9c7a603c11dc808e34c1bc60"
+},
+{
+    "id": "stabilized_selected_health_verification",
+    "path": "build/stabilized_selected_health/20261020-final/combined-verification.json",
+    "scope": "selected_health_native_and_unlinked_ARM_no_hardware",
+    "sha256": "4087c6a552950803e6a3dcba066293c4b8c5e6bfb478a4c069a8360f84ac3d88"
+},
+{
+    "id": "stabilized_selected_state_input",
+    "path": "src/modules/research_stabilized_manual/SelectedStateInput.hpp",
+    "scope": "shared_selected_input_observer_native_and_unlinked_ARM_no_hardware",
+    "sha256": "1c7d86123d2279c3f45943a8aada373c49fdadce09eb336ecae3d2c000558198"
+},
+{
+    "id": "stabilized_selected_input_record",
+    "path": "docs/STABILIZED_MANUAL_SELECTED_INPUT.md",
+    "scope": "shared_selected_input_observer_native_and_unlinked_ARM_no_hardware",
+    "sha256": "eb5685494401652ef76579db57db719b04d300fa559322417740b5b599ec9a12"
+},
+{
+    "id": "stabilized_selected_input_arm_recipe",
+    "path": "build/stabilized_selected_input/20261020/check_arm.py",
+    "scope": "shared_selected_input_observer_native_and_unlinked_ARM_no_hardware",
+    "sha256": "37c34d4ac3be4d153f35488f8924bd7f8de200247da5e578beff5af0bed4cbb2"
+},
+{
+    "id": "stabilized_selected_input_arm_receipt",
+    "path": "build/stabilized_selected_input/20261020/arm-receipt.json",
+    "scope": "shared_selected_input_observer_native_and_unlinked_ARM_no_hardware",
+    "sha256": "8029f1dc88715addee6467041d765baf46fbec02c1ea8df7166d94bda079241e"
+},
+{
+    "id": "stabilized_selected_input_verification",
+    "path": "build/stabilized_selected_input/20261020/combined-verification.json",
+    "scope": "shared_selected_input_observer_native_and_unlinked_ARM_no_hardware",
+    "sha256": "e58dde38beccf6d8b73a33b3fdc78fa59032658c2c9d2c4d2e9c3fb0d96d2e14"
+},
+{
+    "id": "stabilized_handshake_firmware_record",
+    "path": "docs/STABILIZED_MANUAL_HANDSHAKE_FIRMWARE.md",
+    "scope": "current_core_grant_schema_output_disabled_ARM_link_no_hardware",
+    "sha256": "de4085f1c867cd980aacf840c2f4390ad472d928aff89199e35df0a1d90900c7"
+},
+{
+    "id": "stabilized_handshake_firmware_recipe",
+    "path": "build/stabilized_handshake_firmware/e8ea-20261020/resource_arm_stage.py",
+    "scope": "current_core_grant_schema_output_disabled_ARM_link_no_hardware",
+    "sha256": "04f10669cb13a379ed2fadd68e68c645a6cadcc3566dca6a59a396f6919d1f47"
+},
+{
+    "id": "stabilized_handshake_firmware_layout_recipe",
+    "path": "build/stabilized_handshake_firmware/e8ea-20261020/resource_arm_layout.py",
+    "scope": "current_core_grant_schema_output_disabled_ARM_link_no_hardware",
+    "sha256": "f759f16353e842cb87313799d70c9b659a18dc178b468bc23e5a4ca1b868f0dc"
+},
+{
+    "id": "stabilized_handshake_firmware_receipt",
+    "path": "build/stabilized_handshake_firmware/e8ea-20261020/firmware-receipt.json",
+    "scope": "current_core_grant_schema_output_disabled_ARM_link_no_hardware",
+    "sha256": "391b55fe9e1bde9ad1d1aacff933bc6e32f3806726a7d938afa94a3325a6adf5"
+},
+{
+    "id": "stabilized_handshake_firmware_layout",
+    "path": "build/stabilized_handshake_firmware/e8ea-20261020/layout/layout-receipt.json",
+    "scope": "current_core_grant_schema_output_disabled_ARM_link_no_hardware",
+    "sha256": "b66c2c0b81bc8a85192d83bedf10f27d60ab57b6ba87426f4c610e822bcb7ab9"
+},
+{
+    "id": "stabilized_handshake_firmware_verification",
+    "path": "build/stabilized_handshake_firmware/e8ea-20261020/verification.json",
+    "scope": "current_core_grant_schema_output_disabled_ARM_link_no_hardware",
+    "sha256": "eba6de282d1fe9e1753e98735c8ad9949229a4a74233832f8da9bc6b19afe3c9"
+},
+{
+    "id": "stabilized_handshake_firmware_package",
+    "path": "build/stabilized_handshake_firmware/e8ea-20261020/artifacts/px4_fmu-v6x_default_e8ea98b404_dirty_observer_handshake_20261020.px4",
+    "scope": "current_core_grant_schema_output_disabled_ARM_link_no_hardware",
+    "sha256": "1f47ee9ea8d12f428b3edc8682149c034a7d0ade52ab7eaed5f4afd356ed3b15"
+},
+{
+    "id": "stabilized_grant_request_message",
+    "path": "msg/StabilizedGrantRequest.msg",
+    "scope": "coherent_grant_handshake_native_and_unlinked_ARM_no_hardware",
+    "sha256": "c00baa655a2839880fca624ecc15d5b33d6d553c07ced496eb00dcad8ce16107"
+},
+{
+    "id": "stabilized_grant_response_message",
+    "path": "msg/StabilizedGrantResponse.msg",
+    "scope": "coherent_grant_handshake_native_and_unlinked_ARM_no_hardware",
+    "sha256": "187885dc4aeb1c1ef337552bd7db7d74df3ec1652de8b00d00b52e93c6cc2143"
+},
+{
+    "id": "stabilized_grant_handshake",
+    "path": "src/modules/research_stabilized_manual/GrantHandshake.hpp",
+    "scope": "coherent_grant_handshake_native_and_unlinked_ARM_no_hardware",
+    "sha256": "1be5aa9686cb139c9d0619ab2307a774777c7019f7db876040483fdbd6b81994"
+},
+{
+    "id": "stabilized_grant_handshake_record",
+    "path": "docs/STABILIZED_MANUAL_GRANT_HANDSHAKE.md",
+    "scope": "coherent_grant_handshake_native_and_unlinked_ARM_no_hardware",
+    "sha256": "a4befc5e30689f2295945ef671e1c6543aca249cf9087a1405e78b162e74adc2"
+},
+{
+    "id": "stabilized_handshake_arm_recipe",
+    "path": "build/stabilized_grant_handshake/20261020/check_arm.py",
+    "scope": "coherent_grant_handshake_native_and_unlinked_ARM_no_hardware",
+    "sha256": "d29c3c0645f2043b95ebb28d3dc27b34d62e574bbf6d93d5dd0e8095723069ad"
+},
+{
+    "id": "stabilized_handshake_arm_receipt",
+    "path": "build/stabilized_grant_handshake/20261020/arm-receipt.json",
+    "scope": "coherent_grant_handshake_native_and_unlinked_ARM_no_hardware",
+    "sha256": "f8cc662e765c849748deb2d394899d4e07290d569f107792f0540ea180f3b60a"
+},
+{
+    "id": "stabilized_handshake_verification",
+    "path": "build/stabilized_grant_handshake/20261020/combined-verification.json",
+    "scope": "coherent_grant_handshake_native_and_unlinked_ARM_no_hardware",
+    "sha256": "b3687992bfe83a87fa0abbefdd436c95ffa05fa66bdd75218af6b1ad22ad5dfd"
+},
+{
+    "id": "stabilized_grant_deadline_record",
+    "path": "docs/STABILIZED_MANUAL_GRANT_DEADLINE.md",
+    "scope": "immutable_grant_deadline_native_and_unlinked_ARM_no_hardware",
+    "sha256": "c1866b19951948d6e2649aac84ef3abe37a537ae36c0c95795fb6fca8c587af2"
+},
+{
+    "id": "stabilized_grant_arm_recipe",
+    "path": "build/stabilized_output_grant/20261020-final/check_arm.py",
+    "scope": "immutable_grant_deadline_native_and_unlinked_ARM_no_hardware",
+    "sha256": "340eb74250d6b7be6c0eb0ddd48b765b8e7d1141e536e75d3c2faf7f3506ba35"
+},
+{
+    "id": "stabilized_grant_arm_receipt",
+    "path": "build/stabilized_output_grant/20261020-final/arm-receipt.json",
+    "scope": "immutable_grant_deadline_native_and_unlinked_ARM_no_hardware",
+    "sha256": "77cbdb4321b1d65e4a0383a7dbabdc188c431819a58b1f296788ee8075f13775"
+},
+{
+    "id": "stabilized_grant_verification",
+    "path": "build/stabilized_output_grant/20261020-final/combined-verification.json",
+    "scope": "immutable_grant_deadline_native_and_unlinked_ARM_no_hardware",
+    "sha256": "34eb4a408347ee3691d4eca9b895d89368c953660a0051e8c55a4195e777e385"
+},
+{
+    "id": "stabilized_session_requalification_record",
+    "path": "docs/STABILIZED_MANUAL_SESSION_REQUALIFICATION.md",
+    "scope": "updated_core_31_fresh_dynamic_cases_console_pass_no_hardware",
+    "sha256": "4e63cbd5afba7bf556c3e15c6fc4a211c2459e16f7495597b54bbf065be61a8c"
+},
+{
+    "id": "stabilized_session_dynamic_verification",
+    "path": "build/stabilized_manual_session/20261020/dynamic-verification.json",
+    "scope": "updated_core_31_fresh_dynamic_cases_console_pass_no_hardware",
+    "sha256": "c10490883169eecef8ff8adfdec12e17195f5eefffc55ffe6d54bd4751ed8091"
+},
+{
+    "id": "stabilized_session_previous_console_profile",
+    "path": "build/stabilized_manual_session/20261020/previous-qualified-console-profile.json",
+    "scope": "updated_core_31_fresh_dynamic_cases_console_pass_no_hardware",
+    "sha256": "d4c58c6402801840f9adea681c6172569b59ec0f25bda3904366d3bbf10dbe07"
+},
+{
+    "id": "stabilized_manual_session_header",
+    "path": "src/lib/research_stabilized_manual/StabilizedManualSession.hpp",
+    "scope": "controller_session_ack_lifetime_native_and_unlinked_ARM_only",
+    "sha256": "d9ff81212310d5b37e5d3c82fcac6ca47d86d61818541bd20fb58964bb09ca7e"
+},
+{
+    "id": "stabilized_manual_session",
+    "path": "src/lib/research_stabilized_manual/StabilizedManualSession.cpp",
+    "scope": "controller_session_ack_lifetime_native_and_unlinked_ARM_only",
+    "sha256": "d5d1c063b2e46345f182d30499a605654ab6eb7ec996afad9f5f667c508942cf"
+},
+{
+    "id": "stabilized_manual_session_tests",
+    "path": "src/lib/research_stabilized_manual/StabilizedManualSessionTest.cpp",
+    "scope": "controller_session_ack_lifetime_native_and_unlinked_ARM_only",
+    "sha256": "154568eb58ced3344b0c2c7497c6244fe1b10e9ba3794f1c84adb9c34b9dc3fb"
+},
+{
+    "id": "stabilized_manual_session_record",
+    "path": "docs/STABILIZED_MANUAL_CONTROLLER_SESSION.md",
+    "scope": "controller_session_ack_lifetime_native_and_unlinked_ARM_only",
+    "sha256": "69a4c51d9dc6da21612e3b81ec015f0c2114666c961e7f6a9ac5c0c310ac8e9a"
+},
+{
+    "id": "stabilized_manual_session_arm_recipe",
+    "path": "build/stabilized_manual_session/20261020/check_arm.py",
+    "scope": "controller_session_ack_lifetime_native_and_unlinked_ARM_only",
+    "sha256": "6432b5953b81c7b33d4d39a76d6c230057f9bebff1fa2516a5f58885c81dfff9"
+},
+{
+    "id": "stabilized_manual_session_arm_receipt",
+    "path": "build/stabilized_manual_session/20261020/arm-receipt.json",
+    "scope": "controller_session_ack_lifetime_native_and_unlinked_ARM_only",
+    "sha256": "321ef4c0a9ce0461cfc34e6718337bcc39200455d9cd81dae935d8ebd141b498"
+},
+{
+    "id": "stabilized_manual_session_verification",
+    "path": "build/stabilized_manual_session/20261020/combined-verification.json",
+    "scope": "controller_session_ack_lifetime_native_and_unlinked_ARM_only",
+    "sha256": "37306f9c9c23b8ffec96ab6d5bec468c7b9efc488aa8ac625befde52a55b46c3"
+},
+{
+    "id": "stabilized_research_subscription",
+    "path": "platforms/common/uORB/ResearchSubscription.hpp",
+    "scope": "shared_atomic_payload_revision_copy_POSIX_flat_NuttX_lifecycle_not_authentication",
+    "sha256": "a93ac2fc7ec41e5b6cda4f30e96e79ecd908148c5e6519be83b4c9b238bdbb13"
+},
+{
+    "id": "stabilized_source_ownership_record",
+    "path": "docs/STABILIZED_MANUAL_SOURCE_OWNERSHIP.md",
+    "scope": "62_native_runs_source_bound_grant_revoke_disarm_successor_and_ARM_probe",
+    "sha256": "cc561e5a354c26e12c5c9abe25b92aed25fa9ff4c60d866a42689168bfab4756"
+},
+{
+    "id": "stabilized_output_source_arm_recipe",
+    "path": "build/stabilized_output_source/20261020-final/check_arm.py",
+    "scope": "consistent_uORB_header_overlay_adapter_subscription_and_layout_compilation",
+    "sha256": "35cfcf5d5dd06b9289dca8819dcc53f19286317231b4ecbc6af7b43a6c44496f"
+},
+{
+    "id": "stabilized_output_source_arm_receipt",
+    "path": "build/stabilized_output_source/20261020-final/arm-receipt.json",
+    "scope": "316_ARM_files_adapter_1681_text_848_instance_disabled_mixer_equivalence",
+    "sha256": "d6b723784117b8fa3756017acec30b0c27f1c9e00de0ce4c255a9cc9ceecd7a2"
+},
+{
+    "id": "stabilized_output_source_verification",
+    "path": "build/stabilized_output_source/20261020-final/verification.json",
+    "scope": "809_native_files_316_ARM_files_rehashed_observer_bound_to_final_ELF",
+    "sha256": "56eaa302ffe86fb7dc62da2f6dd2564dfbec403e6d16189c510a544187967b59"
+},
+{
+    "id": "stabilized_dedicated_provider",
+    "path": "src/lib/mixer_module/functions/FunctionResearchStabilized.hpp",
+    "scope": "attached_prepared_candidate_only_no_topic_subscription",
+    "sha256": "5c05350a47349b09adbb1f42456476b3d0b3ab256483b4dc9bd79f79fa758bd5"
+},
+{
+    "id": "mixer_provider_context",
+    "path": "src/lib/mixer_module/functions/FunctionProviderBase.hpp",
+    "scope": "conditional_research_transaction_pointer_stock_layout_preserved_when_disabled",
+    "sha256": "4ab3a55f3f370448dc90015316b62f54de4ff4c3c7c177f858f4d17203c2114d"
+},
+{
+    "id": "stabilized_dedicated_routing_record",
+    "path": "docs/STABILIZED_MANUAL_DEDICATED_ROUTING.md",
+    "scope": "48_native_runs_exclusive_mixer_value_source_ARM_disabled_equivalence",
+    "sha256": "38c9ac1fe4d708095ec2f670dce7aba98ea8cc72ca1f9b822012f63304f35c7b"
+},
+{
+    "id": "stabilized_output_routing_arm_recipe",
+    "path": "build/stabilized_output_routing/20261020/check_arm.py",
+    "scope": "five_ARM_translation_units_and_existing_function_index_check",
+    "sha256": "b220759d384ef5db0aba423ac8f78021f3d70d9246ad242973f6f8053060b9df"
+},
+{
+    "id": "stabilized_output_routing_arm_receipt",
+    "path": "build/stabilized_output_routing/20261020/arm-receipt.json",
+    "scope": "288_ARM_files_disabled_equivalent_enabled_mixer_8661_adapter_1297",
+    "sha256": "639fce881d98b0f9b0267376140172b74a95d9aeee4906aed3598bbfb203704d"
+},
+{
+    "id": "stabilized_output_routing_verification",
+    "path": "build/stabilized_output_routing/20261020/verification.json",
+    "scope": "400_native_files_and_288_ARM_files_rehashed",
+    "sha256": "b6a6b2001a75b24be059d7104fa3f4df127e2b42cadfd0c837c76cdced3831a9"
+},
+{
+    "id": "stabilized_mixer_adapter_api",
+    "path": "src/lib/mixer_module/ResearchStabilizedOutput.hpp",
+    "scope": "serialized_MAIN_adapter_injected_permission_no_scheduler_or_auto_grant",
+    "sha256": "139f985fcfa8a753f159c75463f4ffb874c0087bb1570e924947d5f9b2ea3eb1"
+},
+{
+    "id": "stabilized_mixer_adapter_core",
+    "path": "src/lib/mixer_module/ResearchStabilizedOutput.cpp",
+    "scope": "immutable_calibration_final_bank_deadline_checks_matching_completion_and_once_only_result",
+    "sha256": "c6c79e9cde27a801e744f5bf833490d015b0d09a31c7bd4c67384415616e2079"
+},
+{
+    "id": "stabilized_mixer_adapter_record",
+    "path": "docs/STABILIZED_MANUAL_MIXER_ADAPTER.md",
+    "scope": "40_native_runs_eight_channel_memory_driver_ARM_object_no_hardware",
+    "sha256": "db26d3b3bde7e1e9a9d27e6975c45014de5296c83176b7322a0a04425a0e0950"
+},
+{
+    "id": "stabilized_mixer_adapter_arm_recipe",
+    "path": "build/stabilized_mixer_adapter/20261020-final/check_arm.py",
+    "scope": "actual_ARM_adapter_translation_unit_and_compiled_instance_layout",
+    "sha256": "fd0d1e28afd4733e761e971ba00b287855faca2efab8f833d528a7c7beada0c6"
+},
+{
+    "id": "stabilized_mixer_adapter_arm_receipt",
+    "path": "build/stabilized_mixer_adapter/20261020-final/arm-receipt.json",
+    "scope": "1209_text_bytes_848_instance_bytes_no_full_link",
+    "sha256": "5a085a18217ea13bf1f0ae43b7f04c0749781d2355904d87124d98341074aaa1"
+},
+{
+    "id": "stabilized_mixer_adapter_verification",
+    "path": "build/stabilized_mixer_adapter/20261020-final/verification.json",
+    "scope": "647_native_files_225_ARM_dependencies_247_stage_files",
+    "sha256": "4e9c6f62b8215b2f7dd0b0e2ed2bae2828a3bb104f4ca2a5d8a6072275882705"
+},
+{
+    "id": "stabilized_mixer_transaction_api",
+    "path": "src/lib/mixer_module/ResearchOutputTransaction.hpp",
+    "scope": "serialized_final_bank_validation_actual_driver_completion_default_off",
+    "sha256": "bada7fa376b9b004541021990ba8903f7daa4dbc6c76114340c62fe769ef5022"
+},
+{
+    "id": "stabilized_mixer_transaction_record",
+    "path": "docs/STABILIZED_MANUAL_MIXER_TRANSACTION.md",
+    "scope": "26_native_runs_ARM_default_off_equivalence_no_hardware",
+    "sha256": "20b6493b4947e4705fd645a869c6e0088fac3a3b08e09947ef64573848863cd0"
+},
+{
+    "id": "stabilized_mixer_hook_arm_recipe",
+    "path": "build/stabilized_mixer_hook/20261020/check_arm.py",
+    "scope": "baseline_disabled_enabled_complete_ARM_mixer_translation_units",
+    "sha256": "512baafae4d1b1d7a6ee2f6229a1075ac7022330d78f5d61eeca4e6e9660a12f"
+},
+{
+    "id": "stabilized_mixer_hook_arm_receipt",
+    "path": "build/stabilized_mixer_hook/20261020/arm-receipt.json",
+    "scope": "baseline_disabled_equivalent_enabled_plus_140_text_no_link",
+    "sha256": "c47e10938c40baacaed47f662fa364c183c7de052268a2b02b4ff67250b6b8d4"
+},
+{
+    "id": "stabilized_mixer_hook_verification",
+    "path": "build/stabilized_mixer_hook/20261020/verification.json",
+    "scope": "405_native_and_246_ARM_files_independently_rehashed",
+    "sha256": "b5facc9ab6fd9b450c10696698b6bea9cb1b79a6ed976c94cfd584ada3858073"
+},
+{
+    "id": "stabilized_output_phases_record",
+    "path": "docs/STABILIZED_MANUAL_OUTPUT_COMPLETION.md",
+    "scope": "matching_output_completion_native_memory_sink_actual_PX4IO_methods_ARM_object_no_hardware",
+    "sha256": "0db8aedc65a88153a10a1d4ebe6eb9836f4874591cae88d8947cda01e34d217b"
+},
+{
+    "id": "stabilized_output_phases_arm_recipe",
+    "path": "build/stabilized_output_phases/20261019/check_arm.py",
+    "scope": "matching_output_completion_native_memory_sink_actual_PX4IO_methods_ARM_object_no_hardware",
+    "sha256": "443b570a8abb8458eefe854d1b6de1e4bb0ff91520441ebda9dbcad04d93f26b"
+},
+{
+    "id": "stabilized_output_phases_arm_receipt",
+    "path": "build/stabilized_output_phases/20261019/arm-receipt.json",
+    "scope": "matching_output_completion_native_memory_sink_actual_PX4IO_methods_ARM_object_no_hardware",
+    "sha256": "b5b64751305fba786da93e280fc2eb738a787ce0dbbef45d2ac22fe08f854871"
+},
+{
+    "id": "stabilized_output_phases_negative_recipe",
+    "path": "build/stabilized_output_phases/20261019/check_revoke_regression.py",
+    "scope": "matching_output_completion_native_memory_sink_actual_PX4IO_methods_ARM_object_no_hardware",
+    "sha256": "fc6e94c4ad3547f5bb67a2288e87b2d585f9e34db81d3a8466925c73aa651cd9"
+},
+{
+    "id": "stabilized_output_phases_negative_fixture",
+    "path": "build/stabilized_output_phases/20261019/revoke_regression.cpp",
+    "scope": "matching_output_completion_native_memory_sink_actual_PX4IO_methods_ARM_object_no_hardware",
+    "sha256": "7f0fad4aec33ee623796be4cf31a5b18501143241cb0e09cd0a9cedb1363427f"
+},
+{
+    "id": "stabilized_output_phases_negative_receipt",
+    "path": "build/stabilized_output_phases/20261019/revoke-regression/receipt.json",
+    "scope": "matching_output_completion_native_memory_sink_actual_PX4IO_methods_ARM_object_no_hardware",
+    "sha256": "f7391580eb7c637f098cc6a8ae5c343fe12c584f628c9c8f7e70932b37adc049"
+},
+{
+    "id": "stabilized_output_phases_verification",
+    "path": "build/stabilized_output_phases/20261019/verification.json",
+    "scope": "matching_output_completion_native_memory_sink_actual_PX4IO_methods_ARM_object_no_hardware",
+    "sha256": "099c596fdd51e51328b89cd761e7729fed62504e877cdcba45319c760191e326"
+},
+{
+    "id": "stabilized_lifecycle_firmware_recipe",
+    "path": "Tools/research_sitl/stabilized_observer/lifecycle_arm_stage.py",
+    "scope": "clean_working_baseline_ARM_link_and_static_layout_no_active_stabilized_output_or_hardware_acceptance",
+    "sha256": "7fbdf673cb06b13fa807dd201e9888088501617b2bd2a275f65385b570308b95"
+},
+{
+    "id": "stabilized_lifecycle_layout_recipe",
+    "path": "Tools/research_sitl/stabilized_observer/lifecycle_arm_layout.py",
+    "scope": "clean_working_baseline_ARM_link_and_static_layout_no_active_stabilized_output_or_hardware_acceptance",
+    "sha256": "e0e23fdf5d5085a0dedac1caf86069c583a1b085a88ab40b4f83acc4e40a8d4f"
+},
+{
+    "id": "stabilized_lifecycle_firmware_inputs",
+    "path": "build/stabilized_lifecycle_firmware/e8ea-20261019/source-inputs.json",
+    "scope": "clean_working_baseline_ARM_link_and_static_layout_no_active_stabilized_output_or_hardware_acceptance",
+    "sha256": "f22998f791d0fa7feb88082cad236babff673699cfa8d0cfc5cc8e90f43c0cd3"
+},
+{
+    "id": "stabilized_lifecycle_firmware_receipt",
+    "path": "build/stabilized_lifecycle_firmware/e8ea-20261019/firmware-receipt.json",
+    "scope": "clean_working_baseline_ARM_link_and_static_layout_no_active_stabilized_output_or_hardware_acceptance",
+    "sha256": "a8e066bda786641be5efc3f40a7a3e6ae91e429dbe87c569ec260b26e06c3a64"
+},
+{
+    "id": "stabilized_lifecycle_layout_receipt",
+    "path": "build/stabilized_lifecycle_firmware/e8ea-20261019/layout/layout-receipt.json",
+    "scope": "clean_working_baseline_ARM_link_and_static_layout_no_active_stabilized_output_or_hardware_acceptance",
+    "sha256": "b32ca5733af5cbb325ecd32a74c19c526a63857d595935cd10dc34074548bff3"
+},
+{
+    "id": "stabilized_lifecycle_firmware_verification",
+    "path": "build/stabilized_lifecycle_firmware/e8ea-20261019/verification.json",
+    "scope": "clean_working_baseline_ARM_link_and_static_layout_no_active_stabilized_output_or_hardware_acceptance",
+    "sha256": "d8bcc779f7215fad299dc96adbc3da2f362649d6c03e2da4e8c54209abd74b36"
+},
+{
+    "id": "stabilized_lifecycle_firmware_record",
+    "path": "docs/STABILIZED_MANUAL_LIFECYCLE_FIRMWARE.md",
+    "scope": "clean_working_baseline_ARM_link_and_static_layout_no_active_stabilized_output_or_hardware_acceptance",
+    "sha256": "bb885e9ceddfa8d96abeebd855a75d3b8fee9e33e9f89e02ee813eccea80b5e3"
+},
+{
+    "id": "stabilized_observer_binding",
+    "path": "src/modules/research_stabilized_manual/PublisherBinding.hpp",
+    "scope": "observer_lifecycle_native_verified_flat_NuttX_compile_only_no_physical_outputs",
+    "sha256": "643d2030b4194ac268963e73068bc1146098d9e2452cf3f353d937cb5a287faa"
+},
+{
+    "id": "stabilized_observer_lifecycle_record",
+    "path": "docs/STABILIZED_MANUAL_OBSERVER_LIFECYCLE.md",
+    "scope": "observer_lifecycle_native_verified_flat_NuttX_compile_only_no_physical_outputs",
+    "sha256": "356e56fbec20ee4d650b0e7bd30378f29d6fc9f18b2897aaa0948a1f2e567f64"
+},
+{
+    "id": "stabilized_observer_lifecycle_arm_recipe",
+    "path": "build/stabilized_lifecycle/20261019/check_arm.py",
+    "scope": "observer_lifecycle_native_verified_flat_NuttX_compile_only_no_physical_outputs",
+    "sha256": "4e1cada3a127bb938e00ff737edfed5c8a52f09f77d50bd04394b3dddac41ea6"
+},
+{
+    "id": "stabilized_observer_lifecycle_arm_receipt",
+    "path": "build/stabilized_lifecycle/20261019/arm-receipt.json",
+    "scope": "observer_lifecycle_native_verified_flat_NuttX_compile_only_no_physical_outputs",
+    "sha256": "15c8eca74ea2472dd2ade36dabb874349477aea87323ab77b185f4208aa6be54"
+},
+{
+    "id": "stabilized_observer_lifecycle_verification",
+    "path": "build/stabilized_lifecycle/20261019/verification.json",
+    "scope": "observer_lifecycle_native_verified_flat_NuttX_compile_only_no_physical_outputs",
+    "sha256": "64a3eb1cfeb84102b58e99fb106ede74de9997d0aaeb3e1c114166247918a7be"
+},
+{
+    "id": "stabilized_px4io_driver",
+    "path": "src/drivers/px4io/px4io.cpp",
+    "scope": "register_transport_acceptance_only_no_hardware_or_firmware_link",
+    "sha256": "95dcfd6f5424764c3374ed2c693f6db05a38b09e775cd932c23d47e773878138"
+},
+{
+    "id": "stabilized_px4io_test",
+    "path": "Tools/research_sitl/px4io_output/Px4IOOutputTest.cpp",
+    "scope": "register_transport_acceptance_only_no_hardware_or_firmware_link",
+    "sha256": "da685197584497a64a01c379ec2186556ccd60013a729b4c3c3264e824139cd6"
+},
+{
+    "id": "stabilized_px4io_runner",
+    "path": "Tools/research_sitl/verify_px4io_output.py",
+    "scope": "register_transport_acceptance_only_no_hardware_or_firmware_link",
+    "sha256": "0016aa1ecd87aa5c81de897c0ce66736f7e0dcb1fc96e4d34bb602dde86c9d3b"
+},
+{
+    "id": "stabilized_px4io_record",
+    "path": "docs/STABILIZED_MANUAL_PX4IO_OUTPUT.md",
+    "scope": "register_transport_acceptance_only_no_hardware_or_firmware_link",
+    "sha256": "4c612192640dfb6a5966a7b7fa9d5b0a010185d72fec92259d1361751b82c0f9"
+},
+{
+    "id": "stabilized_px4io_arm_recipe",
+    "path": "build/stabilized_io/20261019/check_arm.py",
+    "scope": "register_transport_acceptance_only_no_hardware_or_firmware_link",
+    "sha256": "db2cadc43c334bde172ae8099a8fb2d92dc89e4066a4f66780e988d640ae9ceb"
+},
+{
+    "id": "stabilized_px4io_arm_receipt",
+    "path": "build/stabilized_io/20261019/arm-receipt.json",
+    "scope": "register_transport_acceptance_only_no_hardware_or_firmware_link",
+    "sha256": "7e4dcd4cc881ade070ec9dc9440a444ff608840c424e00c8889596f1fd7098cd"
+},
+{
+    "id": "stabilized_px4io_verification",
+    "path": "build/stabilized_io/20261019/verification.json",
+    "scope": "register_transport_acceptance_only_no_hardware_or_firmware_link",
+    "sha256": "55178556067391e7012063f8a2acb5df3f6aee1e553a58efb62661a42eec54d0"
+},
                   {
                       "id":  "bench_rollback_usb_ready_result",
                       "path":  "build/bench_commissioning/bench-e8ea98b404-step3/hardware-usb-profile-ready-result-20261019.json",
@@ -164,8 +1496,8 @@
                   {
                       "id":  "bench_working_base_port_record",
                       "path":  "docs/MANUAL_BENCH_WORKING_BASE_PORT.md",
-                      "scope":  "hardware_profile_content_and_ready_start_stop_pass_IO_zero_disarmed_prearmed_owner_stopped_G4_scope_and_byte_integrity_evidence_next_no_enable",
-                      "sha256":  "286078cfcabe4b0404de58111bb53d0de3a7c5ef9767342f7fdc71b52e2af495"
+                      "scope":  "latest_R09_R10_operator_pass_recorded_servo_close_match_manufacturer_prior_preparation_and_diagnostics_preserved",
+                      "sha256":  "d24a86aa59cf08966225ded83b7b68d652db0909806afec8903d022f97e0a27a"
                   },
                   {
                       "id":  "bench_rollback_runner",
@@ -374,8 +1706,8 @@
                   {
                       "id":  "bench_commissioning_procedure",
                       "path":  "docs/MANUAL_BENCH_FLASH_AND_TEST_PROCEDURE.md",
-                      "scope":  "g0_g10_current_IO_zero_and_hardware_ready_only_subset_pass_module_stopped_G4_capture_equipment_and_full_lifecycle_pending",
-                      "sha256":  "0168fa045d5d3fa3c3f28cf9aa69cf536f549814ff960a6e1d7f14bb595179c0"
+                      "scope":  "R01_R10_operator_reported_passes_R09_R10_servo_manufacturer_close_match_numeric_profile_load_details_unsupplied_separate_G4_wind_stabilized_unchanged",
+                      "sha256":  "493fd35e01b47014c159ef8c07b827fd9551f80dce91f56d792d57f6c11464a1"
                   },
                   {
                       "id":  "bench_acceptance_record_template",
@@ -387,13 +1719,13 @@
                       "id":  "stabilized_manual_api",
                       "path":  "src/lib/research_stabilized_manual/StabilizedManualControl.hpp",
                       "scope":  "output_disabled_single_owner_reference_state_input_and_pid_contract",
-                      "sha256":  "059bb7147b3b756288566716500211b9879df95c94fd9287c241f779f89bbdf6"
+                      "sha256":  "27543a88f3fe5f3eb5450e84562d96e810312310e74275a3e2dc5c0d2afc662e"
                   },
                   {
                       "id":  "stabilized_manual_core",
                       "path":  "src/lib/research_stabilized_manual/StabilizedManualControl.cpp",
                       "scope":  "host_verified_body_rate_quaternion_hold_pid_saturation_and_fault_latch",
-                      "sha256":  "804b685545ecc0a27d68f6cf976a31f66c66a13cd17b76fc952bdb9cb88467f1"
+                      "sha256":  "e45599672fb1c3fc5659d65a6e80dd692626d2751f2932d66342c3c2b3b3e85a"
                   },
                   {
                       "id":  "stabilized_manual_allocator_api",
@@ -417,7 +1749,7 @@
                       "id":  "stabilized_manual_build",
                       "path":  "src/lib/research_stabilized_manual/CMakeLists.txt",
                       "scope":  "standalone_strict_host_build_real_generated_rate_status_and_unmodified_pid",
-                      "sha256":  "fe754ad0650346303da26bb2d5f937da3ba68cc37db601a4b58145914f24635c"
+                      "sha256":  "cff895cdd8dcc8becc789a86a6d48565abf372f2cda4757b91b4952e237c47ae"
                   },
                   {
                       "id":  "stabilized_manual_runner",
@@ -555,7 +1887,7 @@
                       "id":  "project_context",
                       "path":  "docs/PROJECT_CONTEXT.md",
                       "scope":  "compact_current_handoff",
-                      "sha256":  "8f902e8515eabae6e0e2f399ae10b1841c71ac3977dc18a5a31f2d38d07c11fc"
+                      "sha256":  "8593e321f674c37e36c5be9bd4865e986bb359887d990ff9c42ff94a8e32acc6"
                   },
                   {
                       "id":  "phase_gate_status",
@@ -615,7 +1947,7 @@
                       "id":  "bench_msg_build",
                       "path":  "msg/CMakeLists.txt",
                       "scope":  "bench_topic_generation",
-                      "sha256":  "8af1e557816f26714921fcb3ad214f1b4716cbf139831a0f7e3ced7a8bdc6450"
+                      "sha256":  "97708e5c4ac108c67e090b66bbebd8be2edcf4249aa67c6658c44f611a32c870"
                   },
                   {
                       "id":  "bench_output_provider",
@@ -627,25 +1959,25 @@
                       "id":  "bench_mixer",
                       "path":  "src/lib/mixer_module/mixer_module.cpp",
                       "scope":  "main_only_routing_test_override_exclusion_stock_safety",
-                      "sha256":  "feddef569ffd718ed284c87d3c475a5ba9d018f94495020a940b2342b3007dfe"
+                      "sha256":  "b3d232648cd17b0ce84bcb4f9a59f7a909c2c6263b9b63af569a207d8ad85727"
                   },
                   {
                       "id":  "bench_mixer_api",
                       "path":  "src/lib/mixer_module/mixer_module.hpp",
                       "scope":  "conditional_bench_provider",
-                      "sha256":  "dd29edfe2d7f36a48965980992c9c948d1815d6a73c50b38e9a39e41c6f3fe93"
+                      "sha256":  "d03634a203400b1a87949b40c54c394807b101e81da86f47cd70dbb514805c61"
                   },
                   {
                       "id":  "bench_mixer_build",
                       "path":  "src/lib/mixer_module/CMakeLists.txt",
                       "scope":  "conditional_bench_library_dependency",
-                      "sha256":  "07d6aba638b09e15d79d969ac706ff025918bda95a784382377ce3ddfc0bca89"
+                      "sha256":  "68ca452de5ecd331a44a870aa5dc568781ccd3d924764fa187d7d7beaee97eca"
                   },
                   {
                       "id":  "bench_output_functions",
                       "path":  "src/lib/mixer_module/output_functions.yaml",
                       "scope":  "reserved_unassigned_bench_functions",
-                      "sha256":  "b72bf3a9ff3f6afecd5114f6d74e12b70a4e04ee1569fa02d83235df6235b5d7"
+                      "sha256":  "5e9f8a536163d8ee67c9fb22ccc574c8b6628553fed732ea047700c2b13ee122"
                   },
                   {
                       "id":  "bench_h8_runner",
@@ -927,7 +2259,7 @@
                       "id":  "actuator_command_px4_registration",
                       "path":  "src/lib/CMakeLists.txt",
                       "scope":  "px4_excluded_by_default_registration",
-                      "sha256":  "456d29b2edc7329b9f2b22392b86f20d266fd9967588de6a38c488172aea7d5b"
+                      "sha256":  "9d2e428c7184c5047f3654d983bd6ad02b447c03c20ff712d96766368414e63d"
                   },
                   {
                       "id":  "manual_control_input_api",
@@ -2271,7 +3603,7 @@
                       "id":  "stabilized_manual_coupled_runner",
                       "path":  "Tools/research_sitl/verify_stabilized_coupled.py",
                       "scope":  "four_declared_full_axis_cases_plus_exploratory_seed_variation_with_metadata_flag",
-                      "sha256":  "e15d712b2a16b10a3b7e70cf25fa7df9ab289c29d8cec4e8b9a4839fa8284aaf"
+                      "sha256":  "87d1685fe58078e7efc952e3ba3b76d3d28de0c78187547d03a8d00a8a46dc89"
                   },
                   {
                       "scope":  "audits_four_declared_full_axis_cases_and_rejects_exploratory_or_changed_seed",
@@ -2622,8 +3954,8 @@
                   {
                       "id":  "stabilized_manual_uorb_queue_copy",
                       "path":  "platforms/common/uORB/uORBDeviceNode.hpp",
-                      "scope":  "queued_subscription_copy_advances_one_unread_generation",
-                      "sha256":  "d1c7e0658d7777e6faa76e0f4e14144f793fdcfb974fd56d817a69090f74b708"
+                      "scope":  "queued_copy_plus_research_or_slaaps_atomic_payload_lifecycle_binding",
+                      "sha256":  "7dbc8076e0436e1603d7c877e5e06ca331fc0f50be690bfe8f205c9f00bede62"
                   },
                   {
                       "id":  "stabilized_manual_stock_rate_producer",
@@ -2908,9 +4240,9 @@
                       "id":  "stabilized_manual_publisher_epoch_audit"
                   },
                   {
-                      "scope":  "unmodified_unadvertise_clears_boolean_and_publication_generation_is_not_publisher_epoch",
+                      "scope":  "research_or_slaaps_gated_publication_revision_and_atomic_withdrawal_stock_behavior_preserved",
                       "path":  "platforms/common/uORB/uORBDeviceNode.cpp",
-                      "sha256":  "c5350440c959a2a56d50c9eb958d5710533408f624f2a33067a6358699175692",
+                      "sha256":  "d97a6a527bca139106726de9de01c4158a383c541dadcaf4a8c62403a570692d",
                       "id":  "stabilized_manual_uorb_device_node_lifecycle"
                   },
                   {
@@ -3012,13 +4344,13 @@
                   {
                       "scope":  "fresh_checkout_31_case_and_live_console_qualified_synthetic_default_no_physical_authority",
                       "path":  "Tools/research_sitl/stabilized_manual_default.json",
-                      "sha256":  "d4c58c6402801840f9adea681c6172569b59ec0f25bda3904366d3bbf10dbe07",
+                      "sha256":  "804f4009c425dfd24d9000d885f5e394e9178eb968c6d567e8b500bacd1d873f",
                       "id":  "stabilized_manual_default_profile"
                   },
                   {
                       "scope":  "default_runnable_synthetic_console_31_revision_cases_and_live_operator_check_pass_vehicle_inputs_and_source_only_packaging_open",
                       "path":  "docs/STABILIZED_MANUAL_ISOLATED_MODE.md",
-                      "sha256":  "12a04b564c455a303e841b7951e6ef5b6d5f02438cb21ed525ecc216d563d7e5",
+                      "sha256":  "13dd2e335c360e16a705464a2ca7d2bb2eec25dcff02c909ff351022c6b8003d",
                       "id":  "stabilized_manual_isolated_mode_record"
                   },
                   {
@@ -3054,7 +4386,7 @@
                   {
                       "scope":  "fresh_default_31_cases_68813_cycles_1475_artifacts_live_console_and_capture_observation_fix_vehicle_data_pending",
                       "path":  "docs/STABILIZED_MANUAL_CHECKOUT_QUALIFICATION.md",
-                      "sha256":  "9bce3e4b80bb5094c4d69120a33e69f521f0f90dadb8c4d883c5290d7f1c93c5",
+                      "sha256":  "e65a5e0bce8f468deb5587ab22cdb85383f82e44bb3495af9ae0a49fc608cbbb",
                       "id":  "stabilized_manual_checkout_qualification_record"
                   },
                   {
@@ -3085,7 +4417,7 @@
                       "id":  "stabilized_observer_module",
                       "path":  "src/modules/research_stabilized_manual/ResearchStabilizedManual.cpp",
                       "scope":  "default_off_nuttx_observer_selected_state_body_rate_hold_diagnostics_only_no_actuator_publisher",
-                      "sha256":  "d1b333f3ef2b2bc6d4608cd226d1c4328cc9cf41bd745a730827e116b06663a4"
+                      "sha256":  "8280789298a96a80b21c3774902df6341006eb77790003413241cf650958cd5b"
                   },
                   {
                       "id":  "stabilized_observer_module_build",
@@ -3097,19 +4429,19 @@
                       "id":  "stabilized_observer_kconfig",
                       "path":  "src/modules/research_stabilized_manual/Kconfig",
                       "scope":  "default_off_observer_no_startup",
-                      "sha256":  "241b85756ddeedf709c38e008ece87941a10a84ec5ca9ca9f23f5ac7792b0561"
+                      "sha256":  "a66c2e272e5ca72ec9c0f8bab87366c57bcff531cc55635bfb7033fcb208dfd0"
                   },
                   {
                       "id":  "stabilized_observer_status",
                       "path":  "msg/StabilizedObserverStatus.msg",
                       "scope":  "diagnostic_validity_reference_rate_allocation_session_fault_no_output_authority",
-                      "sha256":  "de88a095c85c37c4ed4e32eb8016639a5bdaa76d129717164218770607f68ba4"
+                      "sha256":  "b6634298d58c666c50f0579a2db4d8fbef40731b3579214744e454c7f7faecaa"
                   },
                   {
                       "id":  "stabilized_observer_native_test",
                       "path":  "Tools/research_sitl/stabilized_observer/ObserverIntegrationTest.cpp",
-                      "scope":  "final_actual_module_native_input_fault_recovery_9015_checks_no_actuation_no_physics",
-                      "sha256":  "d62cb960df5d08d4d274e0631691051732e57b710bc165e2cce02e1fee68dc53"
+                      "scope":  "actual_native_observer_fault_recovery_and_seven_hidden_publisher_restarts_no_actuation_no_physics",
+                      "sha256":  "a4f6db9d792fb4338a0109ae88389e1b73ec9e7f3f09841ce89625669811080a"
                   },
                   {
                       "id":  "stabilized_observer_native_build",
@@ -3127,7 +4459,7 @@
                       "id":  "stabilized_observer_verifier",
                       "path":  "Tools/research_sitl/verify_stabilized_observer.py",
                       "scope":  "isolated_working_base_prepare_host_native_test_and_seal_no_hardware",
-                      "sha256":  "34b345582a92e50cdbd486cdf1f834d361cf03bc75806196ff7407e5d966fab9"
+                      "sha256":  "0d7ae95e9f71fc178a2373a678a71fb8868361eaef74ec8014fe58a56012aabe"
                   },
                   {
                       "id":  "stabilized_observer_arm_stage",
@@ -3145,7 +4477,7 @@
                       "id":  "stabilized_observer_record",
                       "path":  "docs/STABILIZED_MANUAL_HARDWARE_OBSERVER.md",
                       "scope":  "partial_G9_observer_verified_4376_flash_bytes_remaining_active_outputs_and_hardware_open",
-                      "sha256":  "6c251384b5b710ffe7c72810d4a40cb6795ed4c534b154929834181a860a5a65"
+                      "sha256":  "7a4974dbd38b36579085d3d028f3516afafe223ccc0dfc77802203b67b149547"
                   },
                   {
                       "id":  "stabilized_observer_arm_receipt",
@@ -3175,13 +4507,13 @@
                       "id":  "stabilized_output_test",
                       "path":  "src/lib/research_stabilized_manual/StabilizedOutputTest.cpp",
                       "scope":  "synthetic_mapping_protocol_faults_and_actual_control_core_to_consumer_host_tests",
-                      "sha256":  "bbe92a33c4a4dbec54319a2b2ba5fa994c8ea37b4cc69214e3ffab1452ab0678"
+                      "sha256":  "9c8313f4cb4313e94120e2eefa3e9ccaef1e8445f8808ac068a7e1b9c533fb16"
                   },
                   {
                       "id":  "stabilized_output_record",
                       "path":  "docs/STABILIZED_MANUAL_OUTPUT_CONTRACT.md",
                       "scope":  "portable_G9_output_boundary_verified_no_PX4_runtime_driver_or_hardware_integration",
-                      "sha256":  "164b4e358d271f4a594e0410a5c881bf94c8f4f699e55e4530419d021ae5e099"
+                      "sha256":  "8fff6e2c2b135177e8eaff72fd49696f3492438ccb98d2c6e9abc972623c437d"
                   },
                   {
                       "id":  "stabilized_output_verification",
@@ -3206,9 +4538,1812 @@
                       "path":  "build/stabilized_output/20261019/docker-args.json",
                       "scope":  "read_only_firmware_volume_and_workspace_with_separate_writable_evidence",
                       "sha256":  "85403471b436c1a19cbd808a7460ae81fbb09afaff704ac5a573634385ebf496"
+                  },
+                  {
+                      "id":  "stabilized_driver_api",
+                      "path":  "src/lib/research_stabilized_manual/StabilizedOutputDriver.hpp",
+                      "scope":  "serialized_matching_prepare_complete_tickets_and_confirmed_disarm_before_session",
+                      "sha256":  "65fd2fef486e0e5d2223b48430bbaafe2d78cf29cbbf40eec2c15fbed2c47bc7"
+                  },
+                  {
+                      "id":  "stabilized_driver_core",
+                      "path":  "src/lib/research_stabilized_manual/StabilizedOutputDriver.cpp",
+                      "scope":  "matching_driver_completion_permission_and_deadline_checks_revoke_invalidates_pending_command",
+                      "sha256":  "5bf7d67ab445cc7d98d292d4f8a50bb56fc318f0272ac27bbe592cf5d7656b4f"
+                  },
+                  {
+                      "id":  "stabilized_runtime_test",
+                      "path":  "Tools/research_sitl/stabilized_output/ScheduledOutputTest.cpp",
+                      "scope":  "private_POSIX_work_queues_uORB_actual_mixer_memory_sink_faults_and_successor_handoff",
+                      "sha256":  "9a4296df04b9ade7ea25f01bdb2b18db1ff11fc6c61f9e59c16148062bf1d5e8"
+                  },
+                  {
+                      "id":  "stabilized_runtime_command",
+                      "path":  "Tools/research_sitl/stabilized_output/StabilizedOutputCommand.msg",
+                      "scope":  "private_native_four_canard_single_outstanding_frame_transport",
+                      "sha256":  "0a6b782847351bdcbaea069457b1bdbbd7012b65e964def299ac5b5d8b3b06df"
+                  },
+                  {
+                      "id":  "stabilized_runtime_ack",
+                      "path":  "Tools/research_sitl/stabilized_output/StabilizedOutputAck.msg",
+                      "scope":  "private_native_driver_handled_ack_not_electrical_feedback",
+                      "sha256":  "c114686cdf3c7ad185158d8f9f5aaf6a9cf437a23edb5e45c6c6c80dae6d8a4c"
+                  },
+                  {
+                      "id":  "stabilized_runtime_build",
+                      "path":  "Tools/research_sitl/stabilized_output/CMakeLists.txt",
+                      "scope":  "private_native_module_library_mixer_and_work_queue_dependencies",
+                      "sha256":  "90884901d3e03859d8210f8144991b12f74ebc9c4252693f28baedfa8633ffc3"
+                  },
+                  {
+                      "id":  "stabilized_runtime_kconfig",
+                      "path":  "Tools/research_sitl/stabilized_output/Kconfig",
+                      "scope":  "default_off_private_native_fixture",
+                      "sha256":  "9595568680180154e680aa055ffb3d0ead55ff6ccc75b0df824bcd2c2ffd0aab"
+                  },
+                  {
+                      "id":  "stabilized_runtime_params",
+                      "path":  "Tools/research_sitl/stabilized_output/test_params.yaml",
+                      "scope":  "synthetic_private_PWM_parameter_bank_no_physical_driver",
+                      "sha256":  "72198dbd1a06232d92525ea708a7e3a756fe54ae2b274c4326ba56e5f9868ee1"
+                  },
+                  {
+                      "id":  "stabilized_runtime_runner",
+                      "path":  "Tools/research_sitl/verify_stabilized_output_runtime.py",
+                      "scope":  "fresh_working_baseline_native_preparation_revision_preservation_62_case_verification_and_sealing",
+                      "sha256":  "f4e68fc0105f50cf9e338cfef2d1dd2654fb5d9f6496c3c53d86cf3ff6740dc3"
+                  },
+                  {
+                      "id":  "stabilized_runtime_record",
+                      "path":  "docs/STABILIZED_MANUAL_SCHEDULED_OUTPUT.md",
+                      "scope":  "driver_boundary_and_native_mixer_prototype_verified_production_IO_and_physical_expiry_open",
+                      "sha256":  "d93ef05480bc3b44ce23bb9afe639d02177551f2bea2bcd48319e20a0acdc4ac"
+                  },
+                  {
+                      "id":  "stabilized_runtime_verification",
+                      "path":  "build/stabilized_output_runtime/20261019/verification.json",
+                      "scope":  "16_native_runs_626_assertions_329_acks_9007_observer_126064_host_each_275_files_112_ARM_dependencies_rehashed",
+                      "sha256":  "b19b3337a9f33723a514e13c32ecf525510ca06d867229b9a88ae764a9365f7f"
+                  },
+                  {
+                      "id":  "stabilized_driver_arm_receipt",
+                      "path":  "build/stabilized_output_runtime/20261019/arm-receipt.json",
+                      "scope":  "unlinked_ARM_driver_wrapper_570_text_zero_static_data_bss_no_firmware_size_claim",
+                      "sha256":  "9d5c12da67679bb16a32e8d7a6ce4725a9d0b746084e2b440550e60f06578ada"
+                  },
+                  {
+                      "id":  "stabilized_driver_arm_recipe",
+                      "path":  "build/stabilized_output_runtime/20261019/check_arm.py",
+                      "scope":  "read_only_working_observer_NuttX11_build_context_one_object_full_header_snapshot",
+                      "sha256":  "443b570a8abb8458eefe854d1b6de1e4bb0ff91520441ebda9dbcad04d93f26b"
                   }
               ],
     "edges":  [
+{
+    "from": "slaaps_preparation_coordinator",
+    "to": "slaaps_observed_routing_binding",
+    "relation": "observed_entry_and_poll_require_current_capture_status_and_frozen_driver_identity"
+},
+{
+    "from": "slaaps_observed_routing_binding",
+    "to": "slaaps_reported_routing_api",
+    "relation": "validates_snapshot_age_driver_tokens_revisions_instances_and_report_times"
+},
+{
+    "from": "slaaps_native_supervisor",
+    "to": "slaaps_output_routing_observation",
+    "relation": "retains_validated_report_identity_and_effective_inventory_for_diagnostics"
+},
+{
+    "from": "slaaps_output_routing_observation",
+    "to": "slaaps_reported_routing_api",
+    "relation": "captures_complete_inventory_driver_tokens_revisions_instances_and_report_times"
+},
+{
+    "from": "slaaps_preparation_coordinator",
+    "to": "slaaps_preparation_codec",
+    "relation": "publishes_proposal_requires_exact_echoes_and_original_deadline"
+},
+{
+    "from": "slaaps_preparation_coordinator",
+    "to": "slaaps_preparation_endpoint",
+    "relation": "collects_each_required_bank_readiness_without_activation_authority"
+},
+{
+    "from": "slaaps_preparation_endpoint",
+    "to": "slaaps_preparation_codec",
+    "relation": "validates_bound_proposals_and_publishes_exact_readiness_echo"
+},
+{
+    "from": "slaaps_preparation_endpoint",
+    "to": "slaaps_manual_bank_transport",
+    "relation": "prepares_checks_and_consumes_once_with_independent_trusted_permission"
+},
+{
+    "from": "slaaps_preparation_codec",
+    "to": "slaaps_manual_bank_preparation",
+    "relation": "shares_request_metadata_validation"
+},
+{
+    "from": "slaaps_preparation_codec",
+    "to": "slaaps_preparation_message",
+    "relation": "encodes_generated_topics_with_original_deadline_and_exact_identity"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_preparation_codec",
+    "relation": "malformed_metadata_topic_roles_and_original_expiry_regressions"
+},
+{
+    "from": "slaaps_manual_bank_transport",
+    "to": "slaaps_manual_bank_preparation",
+    "relation": "prepares_without_outputs_then_consumes_once_before_independent_permission_checks"
+},
+{
+    "from": "slaaps_native_supervisor",
+    "to": "slaaps_active_board_verification",
+    "relation": "execution_path_full_board_link_predates_bank_preparation_not_boot_qualification"
+},
+{
+    "from": "slaaps_active_board_verification",
+    "to": "slaaps_active_board_symbols",
+    "relation": "supplemented_by_effective_configuration_and_linked_symbols"
+},
+{
+    "from": "slaaps_native_supervisor",
+    "to": "slaaps_manual_execution",
+    "relation": "requests_control_cadence_and_separates_slow_maintenance"
+},
+{
+    "from": "slaaps_manual_execution",
+    "to": "slaaps_manual_worker_transport",
+    "relation": "checks_configuration_mode_and_endpoint_before_selected_cycle"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_manual_execution",
+    "relation": "native_positive_cycles_and_revocation_regressions"
+},
+{
+    "from": "slaaps_native_supervisor",
+    "to": "slaaps_manual_worker_transport",
+    "relation": "owns_inactive_advertised_endpoint_and_shared_EDF_lifetime_no_flight_admission"
+},
+{
+    "from": "slaaps_manual_worker_transport",
+    "to": "slaaps_selected_manual_input",
+    "relation": "binds_selected_snapshot_before_cycle_and_revokes_on_fault"
+},
+{
+    "from": "slaaps_selected_manual_input",
+    "to": "stabilized_shared_observation",
+    "relation": "validates_original_metadata_and_permission_sample_times"
+},
+{
+    "from": "slaaps_native_supervisor",
+    "to": "stabilized_shared_observation",
+    "relation": "captures_metadata_only_without_output_admission"
+},
+{
+    "from": "stabilized_selected_state_input",
+    "to": "stabilized_shared_observation",
+    "relation": "retains_disarmed_bench_policy_over_shared_observation"
+},
+{
+    "from": "stabilized_observer_binding",
+    "to": "stabilized_shared_binding",
+    "relation": "compatibility_include"
+},
+{
+    "from": "stabilized_shared_observation",
+    "to": "stabilized_shared_binding",
+    "relation": "tracks_publisher_lifetime_epoch"
+},
+{
+    "from": "slaaps_active_target_verifier",
+    "to": "slaaps_active_target_probe",
+    "relation": "compiles_with_actual_board_flags_and_records_dependency_hashes"
+},
+{
+    "from": "slaaps_active_target_probe",
+    "to": "slaaps_manual_worker_transport",
+    "relation": "forces_active_producer_lifecycle_on_NuttX"
+},
+{
+    "from": "slaaps_active_target_probe",
+    "to": "slaaps_manual_bank_transport",
+    "relation": "forces_both_bank_endpoint_lifecycles_on_NuttX"
+},
+{
+    "from": "slaaps_manual_worker_transport",
+    "to": "slaaps_manual_worker",
+    "relation": "advances_real_controller_and_shared_EDF_owner"
+},
+{
+    "from": "slaaps_manual_worker_transport",
+    "to": "slaaps_bound_subscription",
+    "relation": "binds_both_reply_lifetimes"
+},
+{
+    "from": "slaaps_manual_worker_transport",
+    "to": "slaaps_manual_transport",
+    "relation": "encodes_commands_and_decodes_handled_replies"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_manual_worker_transport",
+    "relation": "native_worker_bank_loop_52_added_checks_with_reentry_and_destruction"
+},
+{
+    "from": "slaaps_board_verifier",
+    "to": "slaaps_board_builder",
+    "relation": "independently_checks_sealed_artifacts_version_and_source_bindings"
+},
+{
+    "from": "slaaps_pwm_handling_verifier",
+    "to": "slaaps_pwm_driver",
+    "relation": "extracts_verbatim_updateOutputs_against_committed_baseline"
+},
+{
+    "from": "slaaps_pwm_handling_verifier",
+    "to": "slaaps_pwm_handling_test",
+    "relation": "compiles_debug_release_sanitizer_and_records_source_hashes"
+},
+{
+    "from": "slaaps_manual_bank_transport",
+    "to": "slaaps_bound_subscription",
+    "relation": "binds_command_advertisement_lifetime"
+},
+{
+    "from": "slaaps_manual_bank_transport",
+    "to": "slaaps_manual_output_bank",
+    "relation": "dispatches_frames_and_confirms_exact_handled_tickets"
+},
+{
+    "from": "slaaps_manual_bank_transport",
+    "to": "slaaps_manual_transport",
+    "relation": "validates_command_and_encodes_bank_reply"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_manual_bank_transport",
+    "relation": "nine_native_uorb_scenarios_82_checks"
+},
+{
+    "from": "slaaps_bound_subscription",
+    "to": "stabilized_research_subscription",
+    "relation": "uses_atomic_payload_and_advertisement_revision_copy"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_bound_subscription",
+    "relation": "native_withdrawal_and_hidden_identical_replacement_regression"
+},
+{
+    "from": "slaaps_manual_transport",
+    "to": "slaaps_manual_output",
+    "relation": "maps_shared_control_contract"
+},
+{
+    "from": "slaaps_manual_transport",
+    "to": "slaaps_manual_command_message",
+    "relation": "validates_generated_command_wire_schema"
+},
+{
+    "from": "slaaps_manual_transport",
+    "to": "slaaps_manual_ack_message",
+    "relation": "checks_bank_specific_reply_identity"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_manual_transport",
+    "relation": "shared_codec_fault_tests_and_native_uorb_roundtrips"
+},
+{
+    "from": "bench_msg_build",
+    "to": "slaaps_manual_command_message",
+    "relation": "registers_new_internal_control_topic"
+},
+{
+    "from": "bench_msg_build",
+    "to": "slaaps_manual_ack_message",
+    "relation": "registers_separate_bank_reply_topics"
+},
+{
+    "from": "slaaps_native_anchor_1",
+    "to": "slaaps_configuration_tests",
+    "relation": "links_shared_suite_only_in_explicit_native_test_target"
+},
+{
+    "from": "slaaps_native_test",
+    "to": "slaaps_configuration_tests",
+    "relation": "requires_native_execution_success_before_supervisor_verification"
+},
+                  {
+                      "from": "project_context",
+                      "to": "bench_r09_r10_operator_report",
+                      "relation": "records latest explicit operator PASS for R09 and R10",
+                      "scope": "operator_acceptance_no_invented_numeric_or_profile_data"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_r09_r10_operator_report",
+                      "relation": "records latest explicit operator PASS for R09 and R10",
+                      "scope": "operator_acceptance_no_invented_numeric_or_profile_data"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_r09_r10_operator_report",
+                      "relation": "records latest explicit operator PASS for R09 and R10",
+                      "scope": "operator_acceptance_no_invented_numeric_or_profile_data"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_r09_r10_operator_report",
+                      "relation": "records latest explicit operator PASS for R09 and R10",
+                      "scope": "operator_acceptance_no_invented_numeric_or_profile_data"
+                  },
+                  {
+                      "from": "bench_es3059md_wide_r09",
+                      "to": "bench_r09_r10_operator_report",
+                      "relation": "records latest explicit operator PASS for R09 and R10",
+                      "scope": "operator_acceptance_no_invented_numeric_or_profile_data"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_r09_r10_operator_report",
+                      "relation": "records latest explicit operator PASS for R09 and R10",
+                      "scope": "operator_acceptance_no_invented_numeric_or_profile_data"
+                  },
+                  {
+                      "from": "bench_r09_r10_operator_report",
+                      "to": "bench_rollback_r09_r10_operator_pass",
+                      "relation": "renders exact user statement and preserved source bindings",
+                      "scope": "operator_report_not_independent_raw_capture_review"
+                  },
+                  {
+                      "from": "bench_rollback_r09_r10_operator_pass",
+                      "to": "bench_rollback_signal_test_report",
+                      "relation": "adds R09_R10 acceptance after prior R01_R08 report",
+                      "scope": "previous_report_and_receipts_unchanged"
+                  },
+                  {
+                      "from": "bench_rollback_r09_r10_operator_pass",
+                      "to": "bench_rollback_es3059md_wide_preparation",
+                      "relation": "retains prior prepared profile context without claiming the exact tested file",
+                      "scope": "preparation_binding_not_new_hardware_readback"
+                  },
+                  {
+                      "from": "bench_rollback_r09_r10_operator_pass",
+                      "to": "bench_rollback_es3059md_step_preparation",
+                      "relation": "retains prior prepared profile context without claiming the exact tested file",
+                      "scope": "preparation_binding_not_new_hardware_readback"
+                  },
+{
+    "from": "slaaps_manual_worker",
+    "to": "slaaps_manual_output",
+    "relation": "produces_combined_bound_frames"
+},
+{
+    "from": "slaaps_manual_output_bank",
+    "to": "slaaps_manual_output",
+    "relation": "validates_frames_returns_bank_ack"
+},
+{
+    "from": "slaaps_manual_output_bank",
+    "to": "slaaps_routing_api",
+    "relation": "revalidates_complete_live_inventory_before_dispatch"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_manual_output_bank",
+    "relation": "real_worker_to_both_banks_synthetic_host_fault_tests"
+},
+                  {
+                      "from": "project_context",
+                      "to": "bench_rollback_es3059md_step_preparation",
+                      "relation": "records optional user-requested step-response fixture and source timing reasoning",
+                      "scope": "preparation_not_measured_hardware_response"
+                  },
+                  {
+                      "from": "bench_es3059md_wide_r09",
+                      "to": "bench_rollback_es3059md_step_preparation",
+                      "relation": "records optional user-requested step-response fixture and source timing reasoning",
+                      "scope": "preparation_not_measured_hardware_response"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "bench_rollback_es3059md_step_profile",
+                      "relation": "binds step-response artifact or Ready check",
+                      "scope": "same_amplitude_bounds_high_finite_slew"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "bench_rollback_es3059md_step_console",
+                      "relation": "binds step-response artifact or Ready check",
+                      "scope": "same_amplitude_bounds_high_finite_slew"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "bench_rollback_es3059md_step_native_ready",
+                      "relation": "binds step-response artifact or Ready check",
+                      "scope": "same_amplitude_bounds_high_finite_slew"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "bench_rollback_es3059md_wide_profile",
+                      "relation": "uses unchanged source or preserves previous profile",
+                      "scope": "source_validated_finite_high_rates_not_zero_or_firmware_bypass"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "bench_owner",
+                      "relation": "uses unchanged source or preserves previous profile",
+                      "scope": "source_validated_finite_high_rates_not_zero_or_firmware_bypass"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "bench_owner_api",
+                      "relation": "uses unchanged source or preserves previous profile",
+                      "scope": "source_validated_finite_high_rates_not_zero_or_firmware_bypass"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "bench_output_logic",
+                      "relation": "uses unchanged source or preserves previous profile",
+                      "scope": "source_validated_finite_high_rates_not_zero_or_firmware_bypass"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_step_preparation",
+                      "to": "limiter",
+                      "relation": "uses unchanged source or preserves previous profile",
+                      "scope": "source_validated_finite_high_rates_not_zero_or_firmware_bypass"
+                  },
+{
+    "from": "slaaps_manual_worker",
+    "to": "slaaps_manual_edf_input",
+    "relation": "validates_throttle"
+},
+{
+    "from": "slaaps_manual_worker",
+    "to": "slaaps_edf_api",
+    "relation": "uses_shared_exclusive_owner"
+},
+{
+    "from": "slaaps_manual_worker",
+    "to": "stabilized_manual_api",
+    "relation": "executes_actual_attitude_and_allocation"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_manual_worker",
+    "relation": "synthetic_host_combined_cycle_fault_coverage"
+},
+{
+    "from": "slaaps_manual_edf_input",
+    "to": "manual_control_input_api",
+    "relation": "reuses_selected_throttle_validation"
+},
+{
+    "from": "slaaps_manual_edf_input",
+    "to": "slaaps_edf_api",
+    "relation": "produces_expiring_normalized_requests"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_manual_edf_input",
+    "relation": "exercises_with_common_owner_synthetic_host_only"
+},
+                  {
+                      "from": "project_context",
+                      "to": "bench_es3059md_wide_r09",
+                      "relation": "navigates current user-requested wider unloaded characterization procedure",
+                      "scope": "prepared_candidate_not_measured_operating_profile"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_es3059md_wide_r09",
+                      "relation": "navigates current user-requested wider unloaded characterization procedure",
+                      "scope": "prepared_candidate_not_measured_operating_profile"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_es3059md_wide_r09",
+                      "relation": "navigates current user-requested wider unloaded characterization procedure",
+                      "scope": "prepared_candidate_not_measured_operating_profile"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_es3059md_wide_r09",
+                      "relation": "navigates current user-requested wider unloaded characterization procedure",
+                      "scope": "prepared_candidate_not_measured_operating_profile"
+                  },
+                  {
+                      "from": "bench_es3059md_wide_r09",
+                      "to": "bench_rollback_es3059md_wide_profile",
+                      "relation": "uses staged wider fixture or preparation evidence",
+                      "scope": "unloaded_R09_preparation_not_hardware_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_wide_r09",
+                      "to": "bench_rollback_es3059md_wide_console",
+                      "relation": "uses staged wider fixture or preparation evidence",
+                      "scope": "unloaded_R09_preparation_not_hardware_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_wide_r09",
+                      "to": "bench_rollback_es3059md_wide_native_ready",
+                      "relation": "uses staged wider fixture or preparation evidence",
+                      "scope": "unloaded_R09_preparation_not_hardware_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_wide_r09",
+                      "to": "bench_rollback_es3059md_wide_preparation",
+                      "relation": "uses staged wider fixture or preparation evidence",
+                      "scope": "unloaded_R09_preparation_not_hardware_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_wide_preparation",
+                      "to": "bench_rollback_es3059md_wide_profile",
+                      "relation": "binds new wider profile",
+                      "scope": "immutable_bindings_and_software_only_ready_validation"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_wide_preparation",
+                      "to": "bench_rollback_es3059md_wide_console",
+                      "relation": "binds creation recipe",
+                      "scope": "immutable_bindings_and_software_only_ready_validation"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_wide_preparation",
+                      "to": "bench_rollback_es3059md_wide_native_ready",
+                      "relation": "binds existing-native Ready-only check",
+                      "scope": "immutable_bindings_and_software_only_ready_validation"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_wide_preparation",
+                      "to": "bench_rollback_es3059md_profile",
+                      "relation": "preserves earlier narrow profile",
+                      "scope": "immutable_bindings_and_software_only_ready_validation"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_wide_preparation",
+                      "to": "bench_rollback_es3059md_held_pwm",
+                      "relation": "retains prior positive input-to-pin evidence",
+                      "scope": "immutable_bindings_and_software_only_ready_validation"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_wide_preparation",
+                      "to": "bench_rollback_es3059md_motion_resolution",
+                      "relation": "follows earlier small-motion resolution with explicit expansion request",
+                      "scope": "immutable_bindings_and_software_only_ready_validation"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_rollback_es3059md_motion_resolution",
+                      "relation": "records operator resolution and next per-servo physical measurement stage",
+                      "scope": "reported_small_motion_explanation_not_measured_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_motion_resolution",
+                      "relation": "records operator resolution and next per-servo physical measurement stage",
+                      "scope": "reported_small_motion_explanation_not_measured_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_rollback_es3059md_motion_resolution",
+                      "relation": "records operator resolution and next per-servo physical measurement stage",
+                      "scope": "reported_small_motion_explanation_not_measured_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_rollback_es3059md_motion_resolution",
+                      "relation": "records operator resolution and next per-servo physical measurement stage",
+                      "scope": "reported_small_motion_explanation_not_measured_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_motion_resolution",
+                      "to": "bench_rollback_es3059md_held_pwm",
+                      "relation": "follows confirmed positive input-to-pin observation",
+                      "scope": "retains_existing_firmware_and_bounded_calibration_profile"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_motion_resolution",
+                      "to": "bench_rollback_es3059md_profile",
+                      "relation": "continues with unchanged bounded fixture",
+                      "scope": "retains_existing_firmware_and_bounded_calibration_profile"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_rollback_es3059md_held_pwm",
+                      "relation": "records successful held-positive command through IO and physical MAIN1 width",
+                      "scope": "one_reported_positive_pin_point_not_powered_servo_or_full_G4_acceptance"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_rollback_es3059md_held_pwm",
+                      "relation": "records successful held-positive command through IO and physical MAIN1 width",
+                      "scope": "one_reported_positive_pin_point_not_powered_servo_or_full_G4_acceptance"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_rollback_es3059md_held_pwm",
+                      "relation": "records successful held-positive command through IO and physical MAIN1 width",
+                      "scope": "one_reported_positive_pin_point_not_powered_servo_or_full_G4_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_held_pwm",
+                      "relation": "records successful held-positive command through IO and physical MAIN1 width",
+                      "scope": "one_reported_positive_pin_point_not_powered_servo_or_full_G4_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_held_pwm",
+                      "to": "bench_rollback_es3059md_reset_command",
+                      "relation": "continues the successful centered-reset session",
+                      "scope": "unchanged_bounded_profile_same_enabled_session"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_held_pwm",
+                      "to": "bench_rollback_es3059md_profile",
+                      "relation": "uses the bounded unloaded characterization fixture",
+                      "scope": "unchanged_bounded_profile_same_enabled_session"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_rollback_es3059md_reset_command",
+                      "relation": "records centered reset clearing earlier latch and changing near-neutral command demands",
+                      "scope": "same_session_enabled_command_observation_not_pin_or_servo_measurement"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_rollback_es3059md_reset_command",
+                      "relation": "records centered reset clearing earlier latch and changing near-neutral command demands",
+                      "scope": "same_session_enabled_command_observation_not_pin_or_servo_measurement"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_rollback_es3059md_reset_command",
+                      "relation": "records centered reset clearing earlier latch and changing near-neutral command demands",
+                      "scope": "same_session_enabled_command_observation_not_pin_or_servo_measurement"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_reset_command",
+                      "relation": "records centered reset clearing earlier latch and changing near-neutral command demands",
+                      "scope": "same_session_enabled_command_observation_not_pin_or_servo_measurement"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_reset_command",
+                      "to": "bench_rollback_es3059md_revoked",
+                      "relation": "follows earlier latched state with successful explicit new session",
+                      "scope": "prior_revocation_trigger_remains_unknown"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_rollback_es3059md_active_neutral",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_rollback_es3059md_revoked",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_rollback_es3059md_active_neutral",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_rollback_es3059md_revoked",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_rollback_es3059md_active_neutral",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_rollback_es3059md_revoked",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_active_neutral",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_revoked",
+                      "relation": "records current calibration no-motion diagnosis without inventing revocation cause",
+                      "scope": "observed_input_and_latched_neutral_no_powered_calibration_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_active_neutral",
+                      "to": "bench_rollback_es3059md_profile",
+                      "relation": "matches displayed new profile and Active-neutral pipeline",
+                      "scope": "observed_pipeline_and_reset_not_fault_cause_proof"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_revoked",
+                      "to": "bench_rollback_es3059md_active_neutral",
+                      "relation": "adds later valid held input with latched revoked owner",
+                      "scope": "observed_pipeline_and_reset_not_fault_cause_proof"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_revoked",
+                      "to": "bench_px4_module",
+                      "relation": "uses explicit stop start centered enable reset semantics",
+                      "scope": "observed_pipeline_and_reset_not_fault_cause_proof"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_rollback_signal_test_report",
+                      "relation": "advances current hardware scope from Ready-only to user-confirmed active signal tests",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_es3059md_r09_r10",
+                      "relation": "sets next bounded characterization and measured-profile powered steps",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_es3059md_r09_r10",
+                      "relation": "defines explicit bounded R09 source alternative without relaxing installed G4 G5 review",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_rollback_signal_test_report",
+                      "relation": "retains later user signal outcome and earlier receipt scopes",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_working_base_port_record",
+                      "to": "bench_rollback_es3059md_preparation",
+                      "relation": "records no-tester preparation without firmware change",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_rollback_signal_test_report",
+                      "relation": "accepts user R01 R08 result without requesting repeat",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_es3059md_r09_r10",
+                      "relation": "links model-specific characterization alternative",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_report_form",
+                      "to": "bench_es3059md_r09_r10",
+                      "relation": "records measured points and source method for R09",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_signal_test_report",
+                      "relation": "starts from user-confirmed signal-only tests",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_profile",
+                      "relation": "limits unloaded characterization normal pulses and slew",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_console",
+                      "relation": "provides exact new-file creation commands without auto-enable",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_es3059md_r09_r10",
+                      "to": "bench_rollback_es3059md_preparation",
+                      "relation": "binds operator equipment manufacturer reference and local parser check",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_preparation",
+                      "to": "bench_rollback_es3059md_profile",
+                      "relation": "binds exact 44-token final profile and separately retained rejected attempt",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_preparation",
+                      "to": "bench_rollback_es3059md_console",
+                      "relation": "binds creation recipe and keeps physical installation unperformed",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_signal_test_report",
+                      "to": "bench_rollback_usb_ready_result",
+                      "relation": "supersedes earlier hardware Ready-only scope with later reported measurements",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "bench_rollback_es3059md_preparation",
+                      "to": "bench_rollback_usb_signal_profile",
+                      "relation": "keeps original qualified signal fixture unchanged",
+                      "scope": "user_reported_signal_milestone_R09_preparation_only_no_installed_powered_acceptance"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_joystick_run_sheet",
+                      "relation": "indexes operator start through joystick procedure without advancing hardware gates",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "project_context",
+                      "to": "bench_joystick_report_form",
+                      "relation": "indexes blank report package",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_joystick_run_sheet",
+                      "relation": "links detailed G3 G4 and later measured-profile powered sequence",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_commissioning_procedure",
+                      "to": "bench_joystick_report_form",
+                      "relation": "links R01 R10 evidence form",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_joystick_report_form",
+                      "relation": "defines each required console capture and raw measurement report",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_rollback_candidate_receipt",
+                      "relation": "pins the installed working-baseline bench image and retained upload identity",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_rollback_usb_signal_profile",
+                      "relation": "derives signal-only expected widths and source identity",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_rollback_usb_ready_result",
+                      "relation": "starts from completed content and Ready-only subset",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_px4_module",
+                      "relation": "uses exact explicit enable disable stop start and actual permission predicate",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_output_logic",
+                      "relation": "distinguishes initial absence from neutral after accepted-session revocation",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_output_provider",
+                      "relation": "maps command controls to MAIN1 MAIN4 lease consumer",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+                  {
+                      "from": "bench_joystick_run_sheet",
+                      "to": "bench_acceptance_contract",
+                      "relation": "retains unresolved physical fault and powered-stage review requirements",
+                      "scope": "procedure_preparation_no_hardware_execution_or_output_acceptance"
+                  },
+{
+    "from": "slaaps_pwm_driver",
+    "to": "slaaps_bank_publisher",
+    "relation": "reports_effective_direct_PWM_hardware"
+},
+{
+    "from": "stabilized_px4io_driver",
+    "to": "slaaps_bank_publisher",
+    "relation": "reports_readback_groups_rates_and_serial_output_rejection"
+},
+{
+    "from": "slaaps_bank_publisher",
+    "to": "slaaps_bank_message",
+    "relation": "publishes_serialized_calibration_observation"
+},
+{
+    "from": "slaaps_native_supervisor",
+    "to": "slaaps_reported_routing_core",
+    "relation": "checks_fresh_complete_banks_before_route_diagnosis"
+},
+{
+    "from": "slaaps_reported_routing_core",
+    "to": "slaaps_routing_core",
+    "relation": "supplies_actual_bank_inventory"
+},
+{
+    "from": "slaaps_routing_fixture",
+    "to": "slaaps_bank_message",
+    "relation": "injects_native_test_only_routing_faults"
+},
+{
+    "from": "slaaps_edf_core",
+    "to": "slaaps_edf_api",
+    "relation": "implements_exclusive_request_owner"
+},
+{
+    "from": "slaaps_edf_core",
+    "to": "slaaps_configuration_core",
+    "relation": "uses_validated_vehicle_and_measured_thrust_curve"
+},
+{
+    "from": "slaaps_configuration_tests",
+    "to": "slaaps_edf_core",
+    "relation": "exercises_synthetic_request_and_permission_faults"
+},
+{
+    "from": "slaaps_acceleration_port",
+    "to": "slaaps_edf_api",
+    "relation": "future_newton_output_enters_common_owner"
+},
+{
+    "to": "slaaps_startup",
+    "relation": "selects_dedicated_startup",
+    "from": "slaaps_airframe"
+},
+{
+    "to": "slaaps_native_supervisor",
+    "relation": "starts_native_mode_owner",
+    "from": "slaaps_startup"
+},
+{
+    "to": "slaaps_parameter_capture",
+    "relation": "captures_explicit_configuration_apply",
+    "from": "slaaps_native_supervisor"
+},
+{
+    "to": "slaaps_native_supervisor",
+    "relation": "consumes_fresh_availability_status",
+    "from": "slaaps_native_gate"
+},
+{
+    "to": "slaaps_native_build",
+    "relation": "requires_sealed_wall_clock_binary",
+    "from": "slaaps_native_test"
+},
+{
+    "to": "slaaps_configuration_core",
+    "relation": "validates_configuration_snapshot",
+    "from": "slaaps_native_supervisor"
+},
+{
+    "from": "slaaps_airframe_goal",
+    "to": "slaaps_configuration_record",
+    "relation": "current_implementation_milestone"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_configuration_api",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_configuration_core",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_parameter_schema",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_parameter_metadata",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_parameter_generator",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_routing_api",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_routing_core",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_configuration_build",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_configuration_test_build",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_configuration_tests",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_configuration_verifier",
+    "relation": "implements_or_verifies_configuration_routing_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "bench_output_functions",
+    "relation": "adds_reserved_functions_or_excluded_library_without_changing_existing_owners"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "actuator_command_px4_registration",
+    "relation": "adds_reserved_functions_or_excluded_library_without_changing_existing_owners"
+},
+{
+    "from": "project_context",
+    "to": "slaaps_airframe_goal",
+    "relation": "current_user_goal"
+},
+{
+    "from": "slaaps_airframe_goal",
+    "to": "stabilized_manual_production_ownership",
+    "relation": "supersedes_scope_question_and_requires_production_integration"
+},
+{
+    "from": "stabilized_session_qualification_record",
+    "to": "stabilized_px4_session_producer",
+    "relation": "qualifies_or_operates_integrated_candidate"
+},
+{
+    "from": "stabilized_session_console_verifier",
+    "to": "stabilized_px4_session_producer",
+    "relation": "qualifies_or_operates_integrated_candidate"
+},
+{
+    "from": "stabilized_session_console",
+    "to": "stabilized_px4_session_producer",
+    "relation": "qualifies_or_operates_integrated_candidate"
+},
+{
+    "from": "stabilized_session_qualification_runner",
+    "to": "stabilized_px4_session_producer",
+    "relation": "qualifies_or_operates_integrated_candidate"
+},
+{
+    "from": "stabilized_session_runtime_verifier",
+    "to": "stabilized_session_transport_relay",
+    "relation": "injects_external_transport_faults"
+},
+{
+    "from": "stabilized_session_maneuver_runner",
+    "to": "stabilized_px4_session_producer",
+    "relation": "qualifies_single_axis_cases"
+},
+{
+    "from": "stabilized_session_runtime_verifier",
+    "to": "stabilized_px4_session_producer",
+    "relation": "exercises"
+},
+{
+    "from": "stabilized_px4_session_producer",
+    "to": "stabilized_px4_session_consumer",
+    "relation": "owns separate producer/session schedule and coherent grant exchange"
+},
+{
+    "from": "stabilized_session_checkout_builder",
+    "to": "stabilized_px4_session_consumer_cmake",
+    "relation": "links consumer with current observer lifecycle implementation"
+},
+{
+    "from": "stabilized_session_link_verifier",
+    "to": "stabilized_session_checkout_builder",
+    "relation": "verifies fresh source link and command registration"
+},
+{
+    "from": "stabilized_session_link_record",
+    "to": "stabilized_session_link_verifier",
+    "relation": "records exact link evidence and pending runtime"
+},
+{
+    "from": "stabilized_px4_session_consumer",
+    "to": "stabilized_remote_completion",
+    "relation": "gates asynchronous handled acknowledgments"
+},
+{
+    "from": "stabilized_px4_session_consumer",
+    "to": "stabilized_selected_state_guard",
+    "relation": "checks actual selected input independently"
+},
+{
+    "from": "stabilized_px4_session_consumer",
+    "to": "stabilized_session_output_configuration",
+    "relation": "shares immutable plant output configuration"
+},
+{
+    "from": "stabilized_session_gazebo_transport",
+    "to": "stabilized_session_output_configuration",
+    "relation": "uses same synthetic mapping lease and ack budget"
+},
+{
+    "from": "stabilized_px4_session_consumer_entry",
+    "to": "stabilized_px4_session_consumer",
+    "relation": "starts retained private work queue owner"
+},
+{
+    "from": "stabilized_px4_session_consumer_compile",
+    "to": "stabilized_px4_session_consumer_entry",
+    "relation": "compiles full translation unit against verified PX4 headers"
+},
+{
+    "from": "stabilized_px4_session_consumer_record",
+    "to": "stabilized_px4_session_consumer",
+    "relation": "records compile evidence and unverified runtime boundary"
+},
+{
+    "from": "stabilized_remote_completion",
+    "to": "stabilized_session_transport",
+    "relation": "validates remote command acknowledgment records"
+},
+{
+    "from": "stabilized_remote_completion_test",
+    "to": "stabilized_remote_completion",
+    "relation": "tests pending tickets clocks faults and confirmed disarm"
+},
+{
+    "from": "stabilized_session_plugin_probe",
+    "to": "stabilized_remote_completion",
+    "relation": "gates actual Gazebo acknowledgments"
+},
+{
+    "from": "stabilized_remote_completion_record",
+    "to": "stabilized_remote_completion",
+    "relation": "records exact verification and pending PX4 integration"
+},
+{
+    "from": "stabilized_session_gazebo_transport",
+    "to": "stabilized_plant_endpoint",
+    "relation": "processes queued messages on simulation step"
+},
+{
+    "from": "stabilized_session_plugin_probe",
+    "to": "stabilized_session_gazebo_transport",
+    "relation": "exercises real grant commands expiry and revoke"
+},
+{
+    "from": "stabilized_session_plugin_runner",
+    "to": "stabilized_session_plugin_probe",
+    "relation": "audits acknowledgments against physical truth"
+},
+{
+    "from": "stabilized_session_plugin_transform",
+    "to": "stabilized_session_gazebo_transport",
+    "relation": "installs transport without changing original physical fixture"
+},
+{
+    "from": "stabilized_session_plugin_record",
+    "to": "stabilized_session_plugin_runner",
+    "relation": "records exact evidence and pending PX4 integration"
+},
+{
+    "from": "stabilized_plant_endpoint",
+    "to": "stabilized_session_transport",
+    "relation": "decodes commands and encodes handled acknowledgments"
+},
+{
+    "from": "stabilized_plant_endpoint_test",
+    "to": "stabilized_plant_endpoint",
+    "relation": "tests actual producer and driver transaction boundary"
+},
+{
+    "from": "stabilized_session_transport_build",
+    "to": "stabilized_plant_endpoint_test",
+    "relation": "builds endpoint transaction tests"
+},
+{
+    "from": "stabilized_plant_endpoint_record",
+    "to": "stabilized_plant_endpoint",
+    "relation": "records evidence and remaining Gazebo integration"
+},
+{
+    "from": "stabilized_session_transport_test",
+    "to": "stabilized_session_transport",
+    "relation": "tests protobuf round trips and malformed records"
+},
+{
+    "from": "stabilized_session_transport_build",
+    "to": "stabilized_session_transport_test",
+    "relation": "builds strict native codec test"
+},
+{
+    "from": "stabilized_session_transport_runner",
+    "to": "stabilized_session_transport_build",
+    "relation": "verifies debug release and sanitizer configurations"
+},
+{
+    "from": "stabilized_session_transport_record",
+    "to": "stabilized_session_transport",
+    "relation": "records codec scope and required endpoint integration"
+},
+{
+    "from": "stabilized_validator_requalification",
+    "to": "stabilized_input_validation",
+    "relation": "records exact validator qualification and preserved profile"
+},
+{
+    "from": "stabilized_validator_requalification",
+    "to": "stabilized_validator_requalification_verification",
+    "relation": "records exact validator qualification and preserved profile"
+},
+{
+    "from": "stabilized_validator_requalification",
+    "to": "stabilized_validator_previous_profile",
+    "relation": "records exact validator qualification and preserved profile"
+},
+{
+    "to": "stabilized_selected_state_input",
+    "relation": "checks captured selected state independently",
+    "from": "stabilized_selected_state_guard"
+},
+{
+    "to": "stabilized_input_validation",
+    "relation": "shares nonintegrating validation with controller",
+    "from": "stabilized_selected_state_guard"
+},
+{
+    "to": "stabilized_input_validation",
+    "relation": "delegates state and raw manual validation",
+    "from": "stabilized_manual_core"
+},
+{
+    "to": "stabilized_selected_state_guard",
+    "relation": "owns independent guards at controller and consumer",
+    "from": "stabilized_runtime_test"
+},
+{
+    "to": "stabilized_input_validation_header",
+    "relation": "implements validation interface",
+    "from": "stabilized_input_validation"
+},
+{
+    "to": "stabilized_selected_state_guard",
+    "relation": "records health contract and verification",
+    "from": "stabilized_selected_health_record"
+},
+{
+    "to": "stabilized_selected_health_arm_recipe",
+    "relation": "records health contract and verification",
+    "from": "stabilized_selected_health_record"
+},
+{
+    "to": "stabilized_selected_health_arm_receipt",
+    "relation": "records health contract and verification",
+    "from": "stabilized_selected_health_record"
+},
+{
+    "to": "stabilized_selected_health_verification",
+    "relation": "records health contract and verification",
+    "from": "stabilized_selected_health_record"
+},
+{
+    "from": "stabilized_selected_input_record",
+    "to": "stabilized_selected_state_input",
+    "relation": "records shared input contract and exact verification"
+},
+{
+    "from": "stabilized_selected_input_record",
+    "to": "stabilized_selected_input_arm_recipe",
+    "relation": "records shared input contract and exact verification"
+},
+{
+    "from": "stabilized_selected_input_record",
+    "to": "stabilized_selected_input_arm_receipt",
+    "relation": "records shared input contract and exact verification"
+},
+{
+    "from": "stabilized_selected_input_record",
+    "to": "stabilized_selected_input_verification",
+    "relation": "records shared input contract and exact verification"
+},
+{
+    "from": "stabilized_handshake_firmware_record",
+    "to": "stabilized_handshake_firmware_recipe",
+    "relation": "records exact linked firmware resource and preservation evidence"
+},
+{
+    "from": "stabilized_handshake_firmware_record",
+    "to": "stabilized_handshake_firmware_layout_recipe",
+    "relation": "records exact linked firmware resource and preservation evidence"
+},
+{
+    "from": "stabilized_handshake_firmware_record",
+    "to": "stabilized_handshake_firmware_receipt",
+    "relation": "records exact linked firmware resource and preservation evidence"
+},
+{
+    "from": "stabilized_handshake_firmware_record",
+    "to": "stabilized_handshake_firmware_layout",
+    "relation": "records exact linked firmware resource and preservation evidence"
+},
+{
+    "from": "stabilized_handshake_firmware_record",
+    "to": "stabilized_handshake_firmware_verification",
+    "relation": "records exact linked firmware resource and preservation evidence"
+},
+{
+    "from": "stabilized_handshake_firmware_record",
+    "to": "stabilized_handshake_firmware_package",
+    "relation": "records exact linked firmware resource and preservation evidence"
+},
+{
+    "from": "stabilized_grant_handshake_record",
+    "to": "stabilized_grant_request_message",
+    "relation": "records schema validation and exact verification"
+},
+{
+    "from": "stabilized_grant_handshake_record",
+    "to": "stabilized_grant_response_message",
+    "relation": "records schema validation and exact verification"
+},
+{
+    "from": "stabilized_grant_handshake_record",
+    "to": "stabilized_grant_handshake",
+    "relation": "records schema validation and exact verification"
+},
+{
+    "from": "stabilized_grant_handshake_record",
+    "to": "stabilized_handshake_arm_recipe",
+    "relation": "records schema validation and exact verification"
+},
+{
+    "from": "stabilized_grant_handshake_record",
+    "to": "stabilized_handshake_arm_receipt",
+    "relation": "records schema validation and exact verification"
+},
+{
+    "from": "stabilized_grant_handshake_record",
+    "to": "stabilized_handshake_verification",
+    "relation": "records schema validation and exact verification"
+},
+{
+    "from": "stabilized_grant_deadline_record",
+    "to": "stabilized_grant_arm_recipe",
+    "relation": "records exact grant expiry verification"
+},
+{
+    "from": "stabilized_grant_deadline_record",
+    "to": "stabilized_grant_arm_receipt",
+    "relation": "records exact grant expiry verification"
+},
+{
+    "from": "stabilized_grant_deadline_record",
+    "to": "stabilized_grant_verification",
+    "relation": "records exact grant expiry verification"
+},
+{
+    "from": "stabilized_session_requalification_record",
+    "to": "stabilized_session_dynamic_verification",
+    "relation": "records exact qualification and preserved default"
+},
+{
+    "from": "stabilized_session_requalification_record",
+    "to": "stabilized_session_previous_console_profile",
+    "relation": "records exact qualification and preserved default"
+},
+{
+    "from": "stabilized_manual_session_record",
+    "to": "stabilized_manual_session_header",
+    "relation": "records implementation and verification"
+},
+{
+    "from": "stabilized_manual_session_record",
+    "to": "stabilized_manual_session",
+    "relation": "records implementation and verification"
+},
+{
+    "from": "stabilized_manual_session_record",
+    "to": "stabilized_manual_session_tests",
+    "relation": "records implementation and verification"
+},
+{
+    "from": "stabilized_manual_session_record",
+    "to": "stabilized_manual_session_arm_recipe",
+    "relation": "records implementation and verification"
+},
+{
+    "from": "stabilized_manual_session_record",
+    "to": "stabilized_manual_session_arm_receipt",
+    "relation": "records implementation and verification"
+},
+{
+    "from": "stabilized_manual_session_record",
+    "to": "stabilized_manual_session_verification",
+    "relation": "records implementation and verification"
+},
+{
+    "from": "stabilized_runtime_test",
+    "to": "stabilized_research_subscription",
+    "relation": "copies command payload with atomic lifetime metadata",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "stabilized_observer_binding",
+    "to": "stabilized_research_subscription",
+    "relation": "aliases shared bound-copy subscription",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "stabilized_research_subscription",
+    "to": "stabilized_manual_uorb_queue_copy",
+    "relation": "uses lifecycle revision and payload critical section",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "stabilized_mixer_adapter_core",
+    "to": "stabilized_mixer_adapter_api",
+    "relation": "enforces explicitly requested source lifetime and disarm handoff",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "stabilized_source_ownership_record",
+    "to": "stabilized_output_source_verification",
+    "relation": "records accepted native and ARM evidence",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "stabilized_output_source_verification",
+    "to": "stabilized_output_source_arm_receipt",
+    "relation": "binds rehashed source and ARM results",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "stabilized_output_source_arm_receipt",
+    "to": "stabilized_output_source_arm_recipe",
+    "relation": "records complete compilation recipe and consistent overlay",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "project_context",
+    "to": "stabilized_source_ownership_record",
+    "relation": "current software milestone",
+    "scope": "production_request_ack_health_and_driver_integration_pending"
+},
+{
+    "from": "stabilized_dedicated_provider",
+    "to": "stabilized_mixer_transaction_api",
+    "relation": "reads only prepared normalized controls",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_dedicated_provider",
+    "to": "mixer_provider_context",
+    "relation": "receives attached transaction from mixer context",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "bench_mixer",
+    "to": "stabilized_dedicated_provider",
+    "relation": "allocates only for ordered MAIN canard channels with attached guard",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_mixer_adapter_core",
+    "to": "bench_output_functions",
+    "relation": "requires dedicated research routing at grant and final validation",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_runtime_test",
+    "to": "stabilized_dedicated_provider",
+    "relation": "tests competing generic servo traffic and incorrect research remapping",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_dedicated_routing_record",
+    "to": "stabilized_output_routing_verification",
+    "relation": "records accepted native and ARM evidence",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_output_routing_verification",
+    "to": "stabilized_output_routing_arm_receipt",
+    "relation": "binds independently rehashed ARM evidence",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_output_routing_arm_receipt",
+    "to": "stabilized_output_routing_arm_recipe",
+    "relation": "records complete compilation and index compatibility recipe",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "project_context",
+    "to": "stabilized_dedicated_routing_record",
+    "relation": "current software milestone",
+    "scope": "production_supervisor_source_binding_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_mixer_adapter_api",
+    "to": "stabilized_mixer_transaction_api",
+    "relation": "implements serialized mixer hook",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_mixer_adapter_core",
+    "to": "stabilized_driver_api",
+    "relation": "owns prepared ticket and driver acknowledgment state",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "bench_mixer_build",
+    "to": "stabilized_mixer_adapter_core",
+    "relation": "compiles only with explicit research hook enabled",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_runtime_test",
+    "to": "stabilized_mixer_adapter_core",
+    "relation": "tests actual reusable adapter with eight-channel memory driver",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_runtime_runner",
+    "to": "stabilized_mixer_adapter_core",
+    "relation": "snapshots compiles and seals actual source",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_mixer_adapter_record",
+    "to": "stabilized_mixer_adapter_verification",
+    "relation": "records native and ARM evidence",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_mixer_adapter_verification",
+    "to": "stabilized_mixer_adapter_arm_receipt",
+    "relation": "binds compiler and snapshot results",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "stabilized_mixer_adapter_arm_receipt",
+    "to": "stabilized_mixer_adapter_arm_recipe",
+    "relation": "records actual compilation recipe",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "project_context",
+    "to": "stabilized_mixer_adapter_record",
+    "relation": "current software milestone",
+    "scope": "production_supervisor_transport_and_physical_attachment_pending"
+},
+{
+    "from": "bench_mixer",
+    "to": "stabilized_mixer_transaction_api",
+    "relation": "validates final bank and reports actual driver completion",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "bench_mixer_api",
+    "to": "stabilized_mixer_transaction_api",
+    "relation": "allows one MAIN-only attachment before first update",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "stabilized_observer_kconfig",
+    "to": "stabilized_mixer_transaction_api",
+    "relation": "defaults hook off without installing guard",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "stabilized_runtime_test",
+    "to": "stabilized_mixer_transaction_api",
+    "relation": "exercises mapping routing override and completion faults in memory",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "stabilized_mixer_transaction_record",
+    "to": "stabilized_mixer_hook_verification",
+    "relation": "records accepted native and ARM evidence",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "stabilized_mixer_hook_verification",
+    "to": "stabilized_mixer_hook_arm_receipt",
+    "relation": "binds independent evidence rehash",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "stabilized_mixer_hook_arm_receipt",
+    "to": "stabilized_mixer_hook_arm_recipe",
+    "relation": "records complete translation unit comparison recipe",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "project_context",
+    "to": "stabilized_mixer_transaction_record",
+    "relation": "current software milestone",
+    "scope": "production_adapter_and_supervisor_pending_no_hardware"
+},
+{
+    "from": "stabilized_output_phases_record",
+    "to": "stabilized_output_phases_verification",
+    "relation": "records current native host ARM and PX4IO evidence",
+    "scope": "production_mixer_hook_and_supervisor_still_pending"
+},
+{
+    "from": "stabilized_output_phases_verification",
+    "to": "stabilized_output_phases_arm_receipt",
+    "relation": "binds changed driver ARM compilation",
+    "scope": "production_mixer_hook_and_supervisor_still_pending"
+},
+{
+    "from": "stabilized_output_phases_arm_receipt",
+    "to": "stabilized_output_phases_arm_recipe",
+    "relation": "retains working-baseline compile recipe",
+    "scope": "production_mixer_hook_and_supervisor_still_pending"
+},
+{
+    "from": "stabilized_output_phases_verification",
+    "to": "stabilized_output_phases_negative_receipt",
+    "relation": "binds reproduced old false revoke acknowledgment and correction",
+    "scope": "production_mixer_hook_and_supervisor_still_pending"
+},
+{
+    "from": "stabilized_output_phases_negative_receipt",
+    "to": "stabilized_output_phases_negative_recipe",
+    "relation": "compiles actual preserved old/current driver methods",
+    "scope": "production_mixer_hook_and_supervisor_still_pending"
+},
+{
+    "from": "stabilized_output_phases_negative_recipe",
+    "to": "stabilized_output_phases_negative_fixture",
+    "relation": "reproduces revoke during command handling",
+    "scope": "production_mixer_hook_and_supervisor_still_pending"
+},
+{
+    "from": "stabilized_runtime_test",
+    "to": "stabilized_driver_api",
+    "relation": "uses matching prepare and complete around actual mixer handling",
+    "scope": "production_mixer_hook_and_supervisor_still_pending"
+},
+{
+    "from": "stabilized_lifecycle_firmware_record",
+    "to": "stabilized_lifecycle_firmware_verification",
+    "relation": "records independent source package layout and preservation checks",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_lifecycle_firmware_verification",
+    "to": "stabilized_lifecycle_firmware_receipt",
+    "relation": "binds full ARM link and staged artifacts",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_lifecycle_firmware_verification",
+    "to": "stabilized_lifecycle_layout_receipt",
+    "relation": "binds prior/current compiler type sizes",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_lifecycle_firmware_receipt",
+    "to": "stabilized_lifecycle_firmware_recipe",
+    "relation": "retains clean build and offline dependency workflow",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_lifecycle_layout_receipt",
+    "to": "stabilized_lifecycle_layout_recipe",
+    "relation": "measures actual ARM sizeof without executing target code",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_lifecycle_firmware_receipt",
+    "to": "stabilized_lifecycle_firmware_inputs",
+    "relation": "binds 92 working-baseline overlay source files",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_observer_binding",
+    "to": "stabilized_lifecycle_firmware_receipt",
+    "relation": "now included in full working-baseline ARM image",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_px4io_driver",
+    "to": "stabilized_lifecycle_firmware_receipt",
+    "relation": "verified handled-result correction ported into linked image",
+    "scope": "unflashed_output_disabled_observer_image"
+},
+{
+    "from": "stabilized_observer_module",
+    "to": "stabilized_observer_binding",
+    "relation": "binds seven input lifetimes before admitting control state",
+    "scope": "seven_topic_lifecycle_not_publisher_authentication"
+},
+{
+    "from": "stabilized_observer_binding",
+    "to": "stabilized_manual_uorb_queue_copy",
+    "relation": "copies data and lifecycle under one critical section",
+    "scope": "seven_topic_lifecycle_not_publisher_authentication"
+},
+{
+    "from": "stabilized_observer_native_test",
+    "to": "stabilized_observer_module",
+    "relation": "tests hidden restarts on same work queue",
+    "scope": "seven_topic_lifecycle_not_publisher_authentication"
+},
+{
+    "from": "stabilized_observer_lifecycle_record",
+    "to": "stabilized_observer_lifecycle_verification",
+    "relation": "records independently rehashed evidence",
+    "scope": "seven_topic_lifecycle_not_publisher_authentication"
+},
+{
+    "from": "stabilized_observer_lifecycle_verification",
+    "to": "stabilized_observer_lifecycle_arm_receipt",
+    "relation": "binds two complete unlinked ARM objects",
+    "scope": "seven_topic_lifecycle_not_publisher_authentication"
+},
+{
+    "from": "stabilized_observer_lifecycle_arm_receipt",
+    "to": "stabilized_observer_lifecycle_arm_recipe",
+    "relation": "retains compilation commands and dependencies",
+    "scope": "seven_topic_lifecycle_not_publisher_authentication"
+},
+{
+    "from": "stabilized_px4io_runner",
+    "to": "stabilized_px4io_test",
+    "relation": "extracts actual methods and checks old-code regression",
+    "scope": "PX4IO_method_fixture_and_unlinked_ARM_only"
+},
+{
+    "from": "stabilized_px4io_test",
+    "to": "stabilized_px4io_driver",
+    "relation": "checks failed and successful register writes",
+    "scope": "PX4IO_method_fixture_and_unlinked_ARM_only"
+},
+{
+    "from": "stabilized_px4io_record",
+    "to": "stabilized_px4io_verification",
+    "relation": "records host and ARM evidence",
+    "scope": "PX4IO_method_fixture_and_unlinked_ARM_only"
+},
+{
+    "from": "stabilized_px4io_verification",
+    "to": "stabilized_px4io_arm_receipt",
+    "relation": "binds full translation unit compile",
+    "scope": "PX4IO_method_fixture_and_unlinked_ARM_only"
+},
+{
+    "from": "stabilized_px4io_arm_receipt",
+    "to": "stabilized_px4io_arm_recipe",
+    "relation": "retains reproducible toolchain recipe",
+    "scope": "PX4IO_method_fixture_and_unlinked_ARM_only"
+},
                   {
                       "from":  "project_context",
                       "to":  "bench_rollback_usb_ready_result",
@@ -7612,6 +10747,126 @@
                       "to":  "stabilized_output_arm_container",
                       "relation":  "runs with prior firmware source and build volume read-only",
                       "scope":  "portable_output_contract_no_runtime_driver_binding"
+                  },
+                  {
+                      "from":  "project_context",
+                      "to":  "stabilized_runtime_record",
+                      "relation":  "records latest uncommitted runtime prototype milestone",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_output_record",
+                      "to":  "stabilized_runtime_record",
+                      "relation":  "links subsequent scheduled native integration",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "bench_commissioning_procedure",
+                      "to":  "stabilized_runtime_record",
+                      "relation":  "records partial G9 software evidence without hardware acceptance",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_driver_core",
+                      "to":  "stabilized_driver_api",
+                      "relation":  "implements sink-completion and revoke barriers",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_driver_api",
+                      "to":  "stabilized_output_api",
+                      "relation":  "owns existing consumer contract",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_output_test",
+                      "to":  "stabilized_driver_core",
+                      "relation":  "tests driver rejection late completion confirmed revoke and recovery",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_manual_build",
+                      "to":  "stabilized_driver_core",
+                      "relation":  "builds reusable driver boundary",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_test",
+                      "to":  "stabilized_driver_core",
+                      "relation":  "dispatches independent scheduled consumer into capture sink",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_test",
+                      "to":  "bench_mixer",
+                      "relation":  "exercises actual normalized-to-PWM mixer and updateOutputs callback",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_test",
+                      "to":  "stabilized_manual_core",
+                      "relation":  "runs real rate and hold control before and after handoff",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_test",
+                      "to":  "stabilized_runtime_command",
+                      "relation":  "transports one outstanding canard frame",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_test",
+                      "to":  "stabilized_runtime_ack",
+                      "relation":  "transports driver-handled acknowledgments",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_build",
+                      "to":  "stabilized_runtime_params",
+                      "relation":  "supplies explicit private PWM calibration parameters",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_build",
+                      "to":  "stabilized_runtime_test",
+                      "relation":  "compiles POSIX-only fixture",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_kconfig",
+                      "to":  "stabilized_runtime_build",
+                      "relation":  "default-off isolated module selection",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_runner",
+                      "to":  "stabilized_observer_verifier",
+                      "relation":  "reuses working-baseline preparation host native and observer regression",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_runner",
+                      "to":  "stabilized_runtime_test",
+                      "relation":  "runs ten scenarios twice and seals exact binary evidence",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_record",
+                      "to":  "stabilized_runtime_verification",
+                      "relation":  "binds independently rehashed result totals",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_runtime_verification",
+                      "to":  "stabilized_driver_arm_receipt",
+                      "relation":  "records separate unlinked ARM portability",
+                      "scope":  "native_memory_sink_only_no_production_IO"
+                  },
+                  {
+                      "from":  "stabilized_driver_arm_receipt",
+                      "to":  "stabilized_driver_arm_recipe",
+                      "relation":  "binds actual compiler command and dependencies",
+                      "scope":  "native_memory_sink_only_no_production_IO"
                   }
               ],
     "gaps":  [
@@ -7671,6 +10926,7 @@
                  }
              ],
     "notes":  [
+                  "2026-10-19 uncommitted G9 scheduled-output increment after 472a7d6786: reusable driver-handled ack completion check and confirmed-disarm revoke barrier; private POSIX producer/consumer work queues, uORB, actual mixer and memory sink. Eight scenarios twice PASS,626 assertions329 acks; every case verifies blocked rejected-disarm handoff and successor rate/hold. Host Debug Release ASan/UBSan126064 each, output2788; existing observer9007 on same binary. Native evidence research-stabilized-output-native-20261019 manifest68ad5e5afe5d76837579b676b55e10afaa249c975ebcd0c23140227e49db1984;275 files112 ARM dependencies independently rehashed0 mismatch. New unlinked ARM wrapper570text0data0bss; no new firmware link, production IO, electrical feedback or hardware operation. Consumer-own stall expires only on resumption; physical hold-time bound remains open. Next production supervisor/sink, selected health/identity, exclusive ownership and linked/runtime resource checks.",
                   "2026-10-19 source commit checkpoint prepared on slaaps-sitl: October 19 bench diagnostics and rollback tooling, observer, portable output contract, tests and handoff. px4_head identifies the parent checkpoint bde4aea321; use git HEAD for the new commit identity. All 11 changed C/C++ files pass repository make format without changes; 16 bootloader protocol fixtures pass. Local build/WSL evidence and the unrelated empty timestamp file are excluded. No push, flash or hardware action.",
                   "2026-10-19 G9 portable stabilized output boundary: explicit non-message session grants, calibrated asymmetric/reversed four-servo mapping, one outstanding command with matching software acceptance ack, independent consumer expiry, stale/replay/future/clock faults and latched permission inhibition. Debug Release ASan/UBSan each pass 126013 checks (2737 new output); host lx60q8nq manifest f2cdfaa6aaec3f2646791e19e3889bbc43038d61d72305dcad9913b635a19155. ARM GCC13.2.1/NuttX11 unlinked object 2068 text, zero static data/BSS, max individual compiler stack frame88 not runtime high-water. Rehashed234 host files111 ARM dependencies3 prior observer artifacts zero mismatch. No new firmware link, PX4 driver/transport integration, physical operation or commissioning acceptance. Next runtime supervisor, exclusive ownership, driver application/revoke acknowledgments, production health and scheduled fault verification.",
                   "2026-10-19 authorized stabilized hardware development: output-disabled observer built on working e8ea98b404/NuttX11, default off, explicit 86-token profile and diagnostic publication only. Zero simulated thrust permitted; C math portability fixed without changing allocation algorithm. Debug/Release/ASan-UBSan each pass123083+193 checks; final native module9015 checks no actuator publications, receipt c7eaf8171b937254c1047df9a6719d3ed6177b27e7c98b1bea35754d8cc51a66,156 artifacts independently rehashed. ARM .px4 4b3e706ab4130461e1085134d1dca4813ec168c5948c9209caec9f5d36362226,1961704 image bytes,4376 headroom, bench/test modules excluded;3 ARM artifacts rehashed. No flash or physical operation. Bench and original31-case SITL evidence preserved; G9 active output/health/ownership transitions and G8/G10 measurements remain open. Root library guard preserves earlier external SITL registration.",

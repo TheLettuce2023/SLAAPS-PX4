@@ -64,6 +64,13 @@ set_property(GLOBAL APPEND PROPERTY PX4_MODULE_CONFIG_FILES ${CMAKE_CURRENT_SOUR
 set_property(GLOBAL APPEND PROPERTY PX4_MODULE_CONFIG_FILES ${CMAKE_CURRENT_SOURCE_DIR}/params.yaml)
 
 add_dependencies(mixer_module output_functions_header)
+if(CONFIG_MODULES_SLAAPS)
+	target_sources(mixer_module PRIVATE SlaapsOutputInventory.cpp)
+endif()
+if(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	target_sources(mixer_module PRIVATE ResearchStabilizedOutput.cpp)
+	target_link_libraries(mixer_module PRIVATE research_stabilized_manual)
+endif()
 if(CONFIG_MODULES_RESEARCH_BENCH_CONTROL)
 	target_link_libraries(mixer_module PRIVATE research_actuator_command)
 endif()

@@ -82,6 +82,9 @@ public:
 	Status configure(const Configuration &configuration);
 	Status enable(TimeUs now, const ManualSample &manual, const StateSample &sample);
 	Status cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report);
+	// Validate live input while output acknowledgment is pending, without
+	// integrating PID, changing hold reference or advancing allocation history.
+	Status monitor(TimeUs now, const ManualSample &manual, const StateSample &sample);
 	void disable();
 	State state() const { return _state; }
 	Status fault() const { return _fault; }
@@ -89,6 +92,7 @@ public:
 	static constexpr bool outputsEnabled() { return false; }
 
 private:
+	Status inspect(TimeUs now, const ManualSample &manual, const StateSample &sample, Quaternion &attitude);
 	Status validateState(TimeUs now, const StateSample &sample, Quaternion &attitude) const;
 	Status reject(Status reason);
 	Configuration _configuration{};
@@ -99,6 +103,7 @@ private:
 	Vector3f _rate_setpoint{};
 	CanardVector _last_command{};
 	TimeUs _last_cycle_us{};
+	TimeUs _last_observed_us{};
 	State _state{State::Disabled};
 	Status _fault{Status::Ok};
 };

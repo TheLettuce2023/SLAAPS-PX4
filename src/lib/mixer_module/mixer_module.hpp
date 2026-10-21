@@ -34,6 +34,11 @@
 #pragma once
 
 #include "actuator_test.hpp"
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+#include "ResearchOutputTransaction.hpp"
+#include "functions/FunctionResearchStabilized.hpp"
+#include <cstring>
+#endif
 
 #include "functions/FunctionActuatorSet.hpp"
 #include "functions/FunctionConstantMax.hpp"
@@ -63,6 +68,9 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/parameter_update.h>
+#if defined(CONFIG_MODULES_SLAAPS)
+#include <uORB/topics/slaaps_output_bank.h>
+#endif
 
 using namespace time_literals;
 
@@ -174,6 +182,22 @@ public:
 
 	const actuator_armed_s &armed() const { return _armed; }
 	bool isActuatorTestRunning() const { return _actuator_test.inTestMode(); }
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	// One permanent guard per driver lifetime; producer replacement must use
+	// its acknowledged session protocol, never replace or detach this guard.
+	bool attachResearchTransaction(ResearchOutputTransaction &transaction)
+	{
+		static constexpr unsigned kCanardChannels{4}, kMainChannels{8};
+
+		if (_research_transaction || _research_dispatch_started || strcmp(_param_prefix, "PWM_MAIN") != 0
+		    || _max_num_outputs < kCanardChannels || _max_num_outputs > kMainChannels) { return false; }
+
+		_research_transaction = &transaction;
+		return true;
+	}
+	uint16_t reversedOutputs() const { return _reverse_output_mask; }
+	unsigned maxNumOutputs() const { return _max_num_outputs; }
+#endif
 
 	void setAllFailsafeValues(uint16_t value);
 	void setAllDisarmedValues(uint16_t value);
@@ -206,6 +230,13 @@ public:
 	void setMaxNumOutputs(uint8_t max_num_outputs) { if (max_num_outputs < _max_num_outputs) { _max_num_outputs = max_num_outputs; } }
 
 	const char *paramPrefix() const { return _param_prefix; }
+
+#if defined(CONFIG_MODULES_SLAAPS)
+	// Driver supplies effective hardware channels/rates on its own serialized
+	// work queue; this report grants no output permission.
+	bool slaapsInventoryDue() const;
+	void reportSlaapsInventory(unsigned channel_count, uint32_t hardware_mask, const uint16_t rates[16], bool ready);
+#endif
 
 	void setLowrateSchedulingInterval(hrt_abstime interval) { _lowrate_schedule_interval = interval; }
 
@@ -297,12 +328,21 @@ private:
 	bool _need_function_update{true};
 	bool _has_backup_schedule{false};
 	const char *const _param_prefix;
+#if defined(CONFIG_MODULES_SLAAPS)
+	uORB::PublicationMulti<slaaps_output_bank_s> _slaaps_bank_pub {ORB_ID(slaaps_output_bank)};
+	hrt_abstime _slaaps_last_report{};
+	hrt_abstime _slaaps_driver_instance{};
+#endif
 	ParamHandles _param_handles[MAX_ACTUATORS];
 	param_t _param_handle_rev_range{PARAM_INVALID};
 	hrt_abstime _lowrate_schedule_interval{300_ms};
 	ActuatorTest _actuator_test{_function_assignment};
 	uint32_t _reversible_mask{0}; ///< per-output bits. If set, the output is configured to be reversible (motors only)
 	bool _was_all_disabled{false};
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+	ResearchOutputTransaction *_research_transaction {};
+	bool _research_dispatch_started{};
+#endif
 
 	uORB::SubscriptionCallbackWorkItem *_subscription_callback{nullptr}; ///< current scheduling callback
 

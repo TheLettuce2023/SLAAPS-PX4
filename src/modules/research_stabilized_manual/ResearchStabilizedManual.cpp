@@ -1,19 +1,11 @@
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 #include <lib/research_stabilized_manual/ObserverProfile.hpp>
-#include <lib/research_actuator_command/Px4ManualControlInput.hpp>
-#include <parameters/param.h>
 #include <drivers/drv_hrt.h>
 #include <uORB/Publication.hpp>
-#include <uORB/Subscription.hpp>
 #include <uORB/topics/stabilized_observer_status.h>
-#include <uORB/topics/actuator_armed.h>
-#include <uORB/topics/vehicle_attitude.h>
-#include <uORB/topics/vehicle_angular_velocity.h>
-#include <uORB/topics/sensor_selection.h>
-#include <uORB/topics/estimator_status.h>
-#include <uORB/topics/estimator_status_flags.h>
 #include <cstring>
+#include "SelectedStateInput.hpp"
 
 using namespace research_stabilized_manual;
 
@@ -22,10 +14,6 @@ namespace
 // Isolate diagnostic allocation work from flight-controller queues. This stack
 // reservation is a build provision, not a measured hardware high-water mark.
 constexpr px4::wq_config_t kObserverQueue{"wq:stabilized_observer", 6000, -5};
-bool fresh(TimeUs now, TimeUs timestamp, TimeUs maximum)
-{
-	return timestamp != 0 && timestamp <= now && now - timestamp <= maximum;
-}
 }
 
 // Observation only: this translation unit has exactly one diagnostic publisher.
@@ -46,7 +34,6 @@ public:
 	}
 private:
 	void Run() override;
-	static bool singleEstimator();
 	void revoke(Status reason)
 	{
 		_owner.disable();
@@ -56,13 +43,8 @@ private:
 	}
 	ObserverProfile _profile;
 	StabilizedManualControl _owner{};
-	uORB::Subscription _manual{ORB_ID(manual_control_setpoint)};
-	uORB::Subscription _attitude{ORB_ID(vehicle_attitude)};
-	uORB::Subscription _rates{ORB_ID(vehicle_angular_velocity)};
-	uORB::Subscription _selection{ORB_ID(sensor_selection)};
-	uORB::Subscription _estimator{ORB_ID(estimator_status)};
-	uORB::Subscription _flags{ORB_ID(estimator_status_flags)};
-	uORB::Subscription _armed{ORB_ID(actuator_armed)};
+	SelectedStateInput _inputs{};
+	uint32_t _enabled_epoch{};
 	uORB::Publication<stabilized_observer_status_s> _diagnostics{ORB_ID(stabilized_observer_status)};
 	px4::atomic<int> _request{0}; // Observe=1; disable=2 takes precedence.
 	px4::atomic<int> _state{static_cast<int>(State::Ready)};
@@ -75,23 +57,6 @@ private:
 };
 
 ModuleBase::Descriptor ResearchStabilizedManual::desc{task_spawn, custom_command, print_usage};
-
-bool ResearchStabilizedManual::singleEstimator()
-{
-	// Current adapter binds estimator instance zero. It does not qualify
-	// multi-EKF selection, unobserved publisher replacement or flight health.
-	const char *names[] = {"EKF2_MULTI_IMU", "EKF2_MULTI_MAG", "SENS_IMU_MODE", "SENS_MAG_MODE"};
-	const int32_t expected[] = {0, 0, 1, 1};
-
-	for (unsigned i = 0; i < 4; ++i) {
-		int32_t value{};
-		const param_t handle = param_find(names[i]);
-
-		if (handle == PARAM_INVALID || param_get(handle, &value) != 0 || value != expected[i]) { return false; }
-	}
-
-	return true;
-}
 
 void ResearchStabilizedManual::Run()
 {
@@ -112,44 +77,19 @@ void ResearchStabilizedManual::Run()
 
 	if (request == 2) { revoke(Status::InvalidState); }
 
-	manual_control_setpoint_s manual_message{};
-	vehicle_attitude_s attitude{};
-	vehicle_angular_velocity_s rates{};
-	sensor_selection_s selection{};
-	estimator_status_s estimator{};
-	estimator_status_flags_s flags{};
-	actuator_armed_s armed{};
-	// H10 ordering: copy inputs before reading the evaluation clock.
-	const bool have = _manual.copy(&manual_message) && _attitude.copy(&attitude) && _rates.copy(&rates)
-			  && _selection.copy(&selection) && _estimator.copy(&estimator) && _flags.copy(&flags) && _armed.copy(&armed);
-	const bool supported = singleEstimator();
-	const TimeUs now = hrt_absolute_time();
-	const auto manual = research_actuator_command::manualControlSampleFromMessage(manual_message);
-	StateSample sample{};
-	sample.attitude_timestamp_us = attitude.timestamp;
-	sample.attitude_sample_us = attitude.timestamp_sample;
-	sample.rate_timestamp_us = rates.timestamp;
-	sample.rate_sample_us = rates.timestamp_sample;
-	sample.attitude = Quaternion(attitude.q);
-	sample.rate_rad_s = Vector3f(rates.xyz);
-	sample.angular_accel_rad_s2 = Vector3f(rates.xyz_derivative);
-	sample.attitude_reset_counter = attitude.quat_reset_counter;
-	sample.source_epoch = 1; // Diagnostic session only; not general publisher identity.
-	sample.valid = have && supported && flags.cs_tilt_align && flags.cs_yaw_align
-		       && !flags.fs_bad_hdg && !flags.fs_bad_acc_vertical
-		       && selection.gyro_device_id != 0 && selection.accel_device_id != 0
-		       && selection.gyro_device_id == estimator.gyro_device_id && selection.accel_device_id == estimator.accel_device_id
-		       && fresh(now, estimator.timestamp, _profile.maximum_status_age_us)
-		       && fresh(now, flags.timestamp, _profile.maximum_status_age_us)
-		       && fresh(now, armed.timestamp, _profile.maximum_permission_age_us)
-		       && !armed.armed && !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode;
+	const auto inputs = _inputs.capture(_profile);
+	const TimeUs now = inputs.now;
+	const auto &manual = inputs.manual;
+	const auto &sample = inputs.state;
+	const auto &revisions = inputs.revisions;
+	const auto source_epoch = sample.source_epoch;
 
-	if (!_revoked && _session && (!sample.valid || selection.gyro_device_id != _gyro
-				      || selection.accel_device_id != _accel || estimator.timestamp < _estimator_time)) {
+	if (!_revoked && _session && (!sample.valid || source_epoch != _enabled_epoch || inputs.gyro != _gyro
+				      || inputs.accel != _accel || inputs.estimator_time < _estimator_time)) {
 		revoke(Status::StateChanged);
 	}
 
-	_estimator_time = estimator.timestamp;
+	_estimator_time = inputs.estimator_time;
 	Report report{};
 	bool candidate_valid = false;
 
@@ -160,8 +100,9 @@ void ResearchStabilizedManual::Run()
 
 		else {
 			_session = _last_cycle = now;
-			_gyro = selection.gyro_device_id;
-			_accel = selection.accel_device_id;
+			_enabled_epoch = source_epoch;
+			_gyro = inputs.gyro;
+			_accel = inputs.accel;
 			_state.store(static_cast<int>(_owner.state()));
 		}
 
@@ -183,8 +124,12 @@ void ResearchStabilizedManual::Run()
 	diagnostic.timestamp = now;
 	diagnostic.timestamp_sample = sample.rate_sample_us;
 	diagnostic.session = _session;
-	diagnostic.gyro_device_id = selection.gyro_device_id;
-	diagnostic.accel_device_id = selection.accel_device_id;
+	diagnostic.source_epoch = source_epoch;
+
+	for (unsigned i = 0; i < PublisherBinding::kTopics; ++i) { diagnostic.publisher_revision[i] = revisions[i]; }
+
+	diagnostic.gyro_device_id = inputs.gyro;
+	diagnostic.accel_device_id = inputs.accel;
 	diagnostic.attitude_reset_counter = sample.attitude_reset_counter;
 	diagnostic.state = _state.load();
 	diagnostic.fault = _fault.load();

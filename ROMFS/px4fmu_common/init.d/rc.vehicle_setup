@@ -8,6 +8,11 @@
 #
 # Fixed wing setup.
 #
+if [ $VEHICLE_TYPE = slaaps ]
+then
+	. ${R}etc/init.d/rc.slaaps_apps
+fi
+
 if [ $VEHICLE_TYPE = fw ]
 then
 	# Start standard fixedwing apps.

@@ -368,6 +368,94 @@ subset; no enable command or pin measurement was performed in the transcript.
 The normalized displayed-text hash is not an independent hash of the board file.
 Host/card readback hash or verified transfer evidence is still needed before
 active acceptance. Keep the module stopped and all actuator connections/energy
-disconnected. Next prepare G4 captures on MAIN1..4 plus AUX4, including the pin
-baseline before first enable. No measurement equipment is available yet; enable,
-the full lifecycle and physical timing/fault tests remain pending the scope.
+disconnected. At that checkpoint, G4 captures and enable still awaited a scope.
+The later result below supersedes that equipment/testing status.
+
+## Joystick signal tests confirmed and R09 is next
+
+The [later user report](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-joystick-signal-report-20261020.json)
+confirms R01..R08: readbacks/profile/input/prearm, Active centered1500 us/50 Hz
+measured on an oscilloscope, signed/intermediate axis commands and normal
+disable/stop/loss/recovery/closeout. Raw captures and numerical timing values were
+not supplied in that reply; retain this as the user's reported result, without
+claiming independent review of the whole G4 fault matrix. Earlier receipts remain
+unchanged and the referenced run-sheet version is preserved with the report.
+
+The servo model is EMAX ES3059MD; the user reports 4.8..6.0 V, maximum supply
+capacity12 A, no independent PWM tester and an available physical power switch.
+The [R09/R10 procedure](MANUAL_BENCH_ES3059MD_R09_R10.md) prepares a separate
+1450..1550 us, 5 us/s normal-slew fixture for one unloaded servo, with scope and
+angle/current/voltage measurements. This is a bounded alternative characterization
+source, not installed calibration or independent controller validation. Its
+existing-native Ready-only parse check passes; the original signal profile and
+ARM image are unchanged. R09 measurements and the measured R10 profile remain
+pending; no powered test has been performed by Codex.
+
+The [new calibration-profile console](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-active-neutral-report-20261020.json)
+now confirms file-content match, Ready then Active, actual disarmed/prearmed,
+USB2/255:190 centered input and enabled neutral controls with IO1500 us. The user
+reports no servo motion. No held-deflection sample or new-profile physical ramp
+capture is supplied. Next trace a power-off roll+1 held for12 seconds through
+input, owner, IO and physical pin before changing wiring or configuration.
+IO senses about6 V; actual servo-connector voltage/polarity remains to be measured.
+R09/R10 remain open; latest supplied owner state is Active, not a final stopped
+state. Firmware, parameters and prior receipts are unchanged.
+
+The [held-roll follow-up](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-revoked-report-20261020.json)
+confirms valid roll+1 but state2/revoked and IO1500us. Neutral is the intended
+latched response, not evidence that the joystick failed. Exact revocation cause
+is not known; pitch+/-0.082 while deflected is not itself an Active-range fault.
+Next reset while centered with servo energy off, confirm state1 before movement,
+observe30 seconds centered and12 seconds held roll, retaining status/command.
+No parameter, source or firmware change is made.
+
+The [centered-reset result](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-reset-command-report-20261020.json)
+now confirms state1 and fresh changing enabled frames in one session, latest
+47.36 seconds after its start. The requested pulse range calculated from those
+frames is1498.61..1507.70 us. No held full-axis/current pin result accompanies
+them, so the next check is a steady12-second full-roll input-to-pin capture with
+servo energy off. The old revoked condition is cleared in this observed session;
+its original trigger and actual powered servo response remain unestablished.
+
+The [subsequent held-positive capture](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-held-pwm-report-20261020.json)
+verifies roll+1/pitch+0.13 from255:190, same-session enabled controls+0.05,
+Active state1, IO1550 us on MAIN1..4 and user-measured1550 us on MAIN1. Positive
+input-to-pin delivery works for this point. Next center to measured1500 us,
+disable/stop and check one unloaded servo's actual connector signal, ground,
+polarity and measured supply before the documented powered characterization.
+No powered motion, angle/current data or R09/R10 acceptance is inferred; firmware
+and parameters remain unchanged.
+
+The [operator subsequently resolves the no-motion concern](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-es3059md-motion-resolution-report-20261020.json):
+travel was too small to notice by eye. R09 now proceeds to physical measurement
+with the same1450..1550 us fixture, a light pointer/fixed angle reference and one
+labeled servo at a time. Collect actual PWM/angle, both approaches, repeatability,
+voltage/current and slow response; no numerical calibration data accompanies the
+resolution report. A proposed5-second settled dwell/three-cycle collection
+sequence is added to the procedure. R09/R10 remain open; no wider profile,
+firmware or parameter change is made.
+
+The operator explicitly requests a wider profile because the narrow fixture's
+travel is insufficient for practical observation. The separate
+[wider R09 procedure](MANUAL_BENCH_ES3059MD_WIDE_R09.md) stages
+es3059md-unloaded-wide-r09.txt at1250/1500/1750 us with50 us/s normal slew.
+It retains USB2/255:190, all1 common R/P/Y mix and1500 us neutral; no flash or
+parameter change is needed. Existing-native Ready-only parse/start/stop passes
+without enable/Commander/drivers/build. The preparation receipt binds that log,
+profile/recipe, old profile and prior operator evidence. This user-requested
+preparation supersedes the provisional narrow-measurement prerequisite.
+Next scope-verify the wider profile with servo energy off, then one servo with
+linkage detached, beginning at+/-0.24 roll and increasing excursion in stages.
+No new physical waveform, angle/current data, install or R09/R10 pass is claimed.
+
+Latest operator closeout: **R09 PASS; R10 PASS**. The operator reports all servos
+closely matched manufacturer documentation and explicitly requests both results
+marked passed. The [operator report](MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md)
+and structured hardware-r09-r10-operator-pass-20261020.json retain that statement,
+prior context and pre-update procedure snapshots. R01..R10 now have operator-
+reported passes for the stated manual servo bench scope. No numerical angle/
+PWM/power/timing readings, exact tested profile/hash or load/linkage state were
+provided with this closeout. No data, calibration profile or separate G4/wind/
+stabilized hardware result is fabricated. Firmware, parameters, profiles and
+prior diagnostic/software receipts remain unchanged; the blank form remains a
+future-run template.

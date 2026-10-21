@@ -5,3 +5,12 @@ menuconfig MODULES_RESEARCH_STABILIZED_MANUAL
 		Explicit-profile stabilized manual observer. Diagnostic output only;
 		no actuator publication, automatic startup or enable. Requires a
 		separate image from the research servo bench owner.
+
+config RESEARCH_STABILIZED_OUTPUT_HOOK
+	bool "Research MAIN PWM transaction hook (experimental)"
+	default n
+	depends on MODULES_RESEARCH_STABILIZED_MANUAL
+	help
+		Provide a permanently attached, serialized validation/completion guard
+		around the MAIN PWM driver call. Does not install a guard, grant output
+		authority, or enable stabilized control. Hardware acceptance is separate.

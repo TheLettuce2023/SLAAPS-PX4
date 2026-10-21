@@ -1,0 +1,7 @@
+# Separate development variant; inherits default.px4board.
+# Stock autotune does not identify/tune the SLAAPS custom controller.
+CONFIG_MODULES_FW_AUTOTUNE_ATTITUDE_CONTROL=n
+CONFIG_MODULES_MC_AUTOTUNE_ATTITUDE_CONTROL=n
+# Diagnostic observer only. No automatic startup or actuator authority.
+CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL=y
+CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK=n

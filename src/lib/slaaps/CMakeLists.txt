@@ -1,0 +1,2 @@
+px4_add_library(slaaps_configuration VehicleConfiguration.cpp ActuatorRouting.cpp EdfOwner.cpp ReportedRouting.cpp)
+target_link_libraries(slaaps_configuration PRIVATE research_stabilized_manual research_actuator_command)

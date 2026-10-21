@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-	px4_add_library(research_stabilized_manual CanardAllocator.cpp StabilizedManualControl.cpp ObserverProfile.cpp StabilizedOutput.cpp)
+	px4_add_library(research_stabilized_manual CanardAllocator.cpp StabilizedManualControl.cpp StabilizedInputValidation.cpp ObserverProfile.cpp StabilizedOutput.cpp StabilizedOutputDriver.cpp StabilizedManualSession.cpp)
 	target_link_libraries(research_stabilized_manual PRIVATE research_actuator_command RateControl)
 	return()
 endif()
@@ -24,7 +24,7 @@ if(NOT UORB_GENERATION_RESULT EQUAL 0)
 endif()
 
 add_library(research_stabilized_manual STATIC
-	CanardAllocator.cpp StabilizedManualControl.cpp ObserverProfile.cpp StabilizedOutput.cpp
+	CanardAllocator.cpp StabilizedManualControl.cpp StabilizedInputValidation.cpp ObserverProfile.cpp StabilizedOutput.cpp StabilizedOutputDriver.cpp StabilizedManualSession.cpp
 	"${PX4_ROOT}/src/lib/rate_control/rate_control.cpp"
 	"${PX4_ROOT}/src/lib/research_actuator_command/ManualControlInput.cpp"
 )
@@ -42,6 +42,10 @@ target_compile_options(research_stabilized_manual PRIVATE
     -Wall -Wextra -Werror -Wpedantic -Wdouble-promotion -Wfloat-equal)
 
 if(BUILD_TESTING)
+	add_executable(stabilized_manual_session_test StabilizedManualSessionTest.cpp)
+	target_link_libraries(stabilized_manual_session_test PRIVATE research_stabilized_manual)
+	target_compile_options(stabilized_manual_session_test PRIVATE -Wall -Wextra -Werror -Wpedantic)
+	add_test(NAME stabilized_manual_session_test COMMAND stabilized_manual_session_test)
 	add_executable(stabilized_manual_test StabilizedManualTest.cpp)
 	target_link_libraries(stabilized_manual_test PRIVATE research_stabilized_manual)
 	target_compile_options(stabilized_manual_test PRIVATE -Wall -Wextra -Werror -Wpedantic)

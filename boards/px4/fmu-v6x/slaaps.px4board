@@ -1,0 +1,13 @@
+# SLAAPS airframe integration target, separate from retained stock/bench images.
+CONFIG_MODULES_SLAAPS=y
+CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL=n
+CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK=n
+CONFIG_MODULES_RESEARCH_BENCH_CONTROL=n
+CONFIG_MODULES_FW_AUTOTUNE_ATTITUDE_CONTROL=n
+CONFIG_MODULES_MC_AUTOTUNE_ATTITUDE_CONTROL=n
+# QGC-based SLAAPS target does not use MSP video overlay; retain flash for its control/output owners.
+CONFIG_DRIVERS_OSD_MSP_OSD=n
+# Camera gimbal control is outside this airframe's requested control path.
+CONFIG_MODULES_GIMBAL=n
+# SLAAPS uses its own fixed-EDF controller; stock winged-VTOL transitions are not a supported mode.
+CONFIG_MODULES_VTOL_ATT_CONTROL=n

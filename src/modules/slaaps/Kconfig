@@ -1,0 +1,16 @@
+menuconfig MODULES_SLAAPS
+	bool "slaaps"
+	default n
+	depends on MODULES_COMMANDER
+	help
+		SLAAPS vehicle configuration and named-mode supervisor. Hardware output
+		admission remains separate from mode registration and configuration.
+
+config SLAAPS_ROUTING_TEST
+	bool "SLAAPS synthetic routing and control native tests"
+	default n
+	depends on MODULES_SLAAPS && BOARD_NOLOCKSTEP && PLATFORM_POSIX
+	help
+		Publishes synthetic PWM-bank inventory and exposes the portable control
+		test suite as a native PX4 command. Uses synthetic inputs and no outputs.
+		Never enable this option in a vehicle firmware target.

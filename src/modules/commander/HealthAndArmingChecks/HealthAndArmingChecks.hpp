@@ -80,6 +80,9 @@
 #include "checks/trafficAvoidanceCheck.hpp"
 #include "checks/externalChecks.hpp"
 #include "checks/gnssRedundancyCheck.hpp"
+#if defined(CONFIG_MODULES_SLAAPS)
+#include "checks/slaapsCheck.hpp"
+#endif
 
 class HealthAndArmingChecks : public ModuleParams
 {
@@ -178,7 +181,11 @@ private:
 	ExternalChecks _external_checks;
 #endif
 
-	HealthAndArmingCheckBase *_checks[42] = {
+#if defined(CONFIG_MODULES_SLAAPS)
+	SlaapsChecks _slaaps_checks;
+#endif
+
+	HealthAndArmingCheckBase *_checks[43] = {
 #ifndef CONSTRAINED_FLASH
 		&_external_checks,
 #endif
@@ -221,5 +228,8 @@ private:
 		&_vtol_checks,
 		&_traffic_avoidance_checks,
 		&_gnss_redundancy_checks,
+#if defined(CONFIG_MODULES_SLAAPS)
+		&_slaaps_checks,
+#endif
 	};
 };

@@ -1,6 +1,6 @@
 # SLAAPS manual servo bench commissioning and stabilized control procedure
 
-2026-10-13, updated 2026-10-19 | Codex | Pixhawk 6X, `px4_fmu-v6x_default`
+2026-10-13, updated 2026-10-20 | Codex | Pixhawk 6X, `px4_fmu-v6x_default`
 
 Current hardware disposition: the original H10 candidate remains withdrawn after
 failed startup. Its [startup diagnosis](MANUAL_BENCH_H10_BOOT_DIAGNOSIS.md) and
@@ -13,9 +13,13 @@ matching runtime identity and three user-confirmed successful cold starts. Its
 [reference-build and cold-boot record](MANUAL_BENCH_STOCK_ROLLBACK_REFERENCE.md)
 records the deliberate reset to stock settings, accepted without a preflash
 parameter backup. The [step 3 bench port](MANUAL_BENCH_WORKING_BASE_PORT.md) now
-passes fresh qualification on that complete baseline. Continue with disconnected
-G3 input verification, retaining the remaining G2 console/configuration evidence
-alongside it. Calibration/profile and actual output verification remain open.
+passes fresh qualification on that complete baseline. The user now confirms
+R01..R08, including oscilloscope-verified 1500 us/50 Hz, signed/intermediate
+joystick signals and stop/loss/recovery. The latest
+[R09/R10 operator report](MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md) records **R09 PASS** and **R10 PASS**:
+all servos closely matched manufacturer documentation, according to the operator.
+Numerical readings, raw captures, exact tested profile and load configuration
+were not supplied with that acceptance. The remaining G4 fault matrix is separate.
 
 Commission the existing servo-only manual controller through firmware identification,
 USB flashing, disconnected-output measurements, restrained servo tests and staged
@@ -36,19 +40,25 @@ to its dependent gate. A failed or unmeasured requirement remains open. The exis
 separate authorization for flashing, powered tests and wind tests. Writing this
 procedure and preparing a candidate do not perform those operations.
 
-| Gate | Result needed to proceed | Status on 2026-10-19 |
+| Gate | Result needed to proceed | Status on 2026-10-20 |
 | --- | --- | --- |
 | G0 | Named operators, installation record and numerical test limits | Open |
 | G1 | Exact bench firmware and retained software evidence | Working-baseline port freshly qualified and staged; original H10 remains withdrawn |
 | G2 | USB flash verified on the identified controller, all loads disconnected | Bench cold boots/stopped module user-confirmed; fresh runtime identity and PX4IO captured; boot/configuration evidence remains open |
-| G3 | Actual selected QGC input, output routing and prearm behavior verified | FMU setup/current IO zeros match; hardware profile-content/Ready/start/stop subset passes; disarmed/prearmed and owner stopped; full lifecycle open |
-| G4 | Signal-only normal and failure captures reviewed | No instrument currently available; active captures/enable pending measurement equipment and physical timing/fault review |
-| G5 | Independent servo calibration and reviewed installed profile | Measurements required |
-| G6 | Restrained, powered no-wind manual bench operation accepted | Depends on G4-G5 |
+| G3 | Actual selected QGC input, output routing and prearm behavior verified | R01..R08 user-confirmed for the signal fixture, including Active and normal stop/loss/recovery; measured installed profile still pending |
+| G4 | Signal-only normal and failure captures reviewed | Center 1500 us/50 Hz, signed/intermediate axes and R06/R07 user-confirmed; remaining fault matrix and numerical timing review stay open |
+| G5 | Measured servo calibration and reviewed installed profile | R09 **PASS**, operator-reported: all servos closely matched manufacturer documentation; numerical calibration and exact tested profile not supplied |
+| G6 | Restrained, powered no-wind manual bench operation accepted | R10 **PASS**, operator-reported; exact load/envelope and raw captures not supplied |
 | G7 | Manual bench accepted within a finite measured wind/load envelope | Depends on G6 |
 | G8 | Vehicle plant and stabilized allocation/tuning supported by measurements | Missing vehicle inputs |
 | G9 | Dedicated stabilized hardware firmware and output ownership verified | Output-disabled observer builds/tests pass; active output integration and hardware qualification remain open |
 | G10 | Restrained stabilized rate/hold operation accepted in its measured envelope | Depends on G8-G9 |
+
+The current user-requested [wider unloaded R09 fixture](MANUAL_BENCH_ES3059MD_WIDE_R09.md)
+uses1250..1750 us and50 us/s, with an optional high-rate step file. Its retained
+preparation evidence is native Ready-only. The later R09/R10 operator passes do
+not identify which prepared file was used; preserve that distinction. No firmware
+or parameter change is made by recording the acceptance.
 
 G2-G4 can use a clearly labelled electrical test profile while servos and EDF are
 disconnected. G5 can use an independent calibrated PWM source to establish the
@@ -610,6 +620,13 @@ check merely to perform the Ready-only step below.
 
 ### Current USB profile: create, inspect and check Ready only
 
+For the complete sequence from module start through joystick signal captures,
+loss/stop/recovery, required reports and later measured-profile servo movement,
+use the [joystick operator run sheet](MANUAL_BENCH_JOYSTICK_RUN_SHEET.md) and its
+[report form](templates/MANUAL_BENCH_JOYSTICK_TEST_REPORT.md). It keeps the current
+synthetic signal fixture separate from the measured powered-servo profile and
+does not close the remaining G4 fault cases.
+
 Keep all servo/EDF connections and energy disconnected. No instrument is
 currently available, so the current scope ends at profile inspection and
 Ready/start/stop. Use the staged USB fixture only; its synthetic values do not
@@ -777,9 +794,18 @@ hazardous failure requirement prevents advancement to the powered stage it affec
 ## G5 Measure servo calibration without wind
 
 Use a separately authorized restrained calibration setup, with EDF isolated and
-the independent stop proven. Calibrate with an independent, measured PWM source
-before connecting servos to the PX4 bench output. Disconnect the PX4 signal while
-that source is attached; never drive a signal wire from both devices.
+the independent stop proven. Prefer an independent, measured PWM source before
+connecting servos to the PX4 bench output. Disconnect the PX4 signal while that
+source is attached; never drive a signal wire from both devices.
+
+For the current ES3059MD setup without an independent tester, the
+[R09 alternative](MANUAL_BENCH_ES3059MD_R09_R10.md) uses the previously verified
+PX4 signal as a separately bounded source: 1450..1550 us and 5 us/s normal slew,
+one unloaded servo with linkage detached, independent scope/angle/power
+measurements and a physical power cut. Treat this as characterization of that
+servo/fixture, not independent controller verification or assembled powered
+acceptance. Complete installed linkage/load/mix measurements before installed
+R10, and retain the applicable G4 fault review.
 
 1. Verify the individual servo model, allowable supply and signal rate. Remove
    load or disconnect the linkage where the approved calibration setup requires.
@@ -911,6 +937,12 @@ explicit sessions, software acknowledgments and independent lease expiry; runtim
 supervision, actual driver application/revoke acknowledgments and integrated
 firmware verification remain open. It does not change the staged observer image.
 
+The later [scheduled native prototype](STABILIZED_MANUAL_SCHEDULED_OUTPUT.md)
+passes 16 fresh-process loss/driver/transition cases through actual PX4 work
+queues, uORB and mixer into memory capture. It adds confirmed disarm before
+handoff and driver-handled acknowledgments, without production I/O integration
+or electrical feedback. G9 and physical timing/acceptance remain incomplete.
+
 The current active stabilized owner/consumer live in a private POSIX SITL integration;
 the bench ARM candidate has no deployable SLAAPS stabilized mode. The existing
 library supplies reusable rate PID, quaternion reference handling and allocation,
@@ -1013,16 +1045,10 @@ sequence, and verify the fixture is safe before approaching it. For an unexpecte
 motion or limit exceedance, use the independent stop and reviewed tunnel shutdown;
 do not wait for a CLI or radio response. Record the failure before any restart.
 
-The bench cold boots and available/stopped module are user-confirmed, and the
-runtime console confirms USB input identity 2 / 255:190, disarmed state and clear
-buttons. The corrected physical labels establish the expected roll sign; finite
-USB parser checks and applied FMU setup are recorded. Following the requested
-cold check, actual IO first-four failsafe entries now match zero. The user then
-created the exact USB signal fixture: complete displayed content matches and
-hardware Ready/start/stop passes, with no enable and the module now stopped.
-Next obtain profile byte-integrity evidence and prepare calibrated MAIN1..4 and
-AUX4 captures, retaining pin baselines before the first enabled session. Full
-lifecycle, powered operation and G4 timing/fault acceptance remain pending
-measurement equipment and their measured checks.
-Installed calibration, powered/wind acceptance and the separate stabilized firmware
-remain subsequent milestones.
+The bench startup/USB/input/routing checks remain retained. The later
+[R01..R08 user report](../build/bench_commissioning/bench-e8ea98b404-step3/hardware-joystick-signal-report-20261020.json)
+confirms profile/readbacks, Active centered1500 us/50 Hz on the scope, all signed
+axes/intermediate positions and normal stop/loss/recovery/closeout. Next perform
+the bounded ES3059MD R09 characterization and derive the measured operating
+profile before R10. Remaining G4 fault review, installed loaded calibration,
+powered/wind acceptance and separate stabilized firmware retain their own gates.

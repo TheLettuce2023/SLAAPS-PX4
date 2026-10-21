@@ -1,5 +1,9 @@
 # Stabilized manual hardware integration: output-disabled observer
 
+Current-source follow-on: [seven-input publisher lifecycle binding](STABILIZED_MANUAL_OBSERVER_LIFECYCLE.md).
+The image and evidence described below retain their original source and scope;
+the lifecycle changes have separate native and ARM-object evidence.
+
 2026-10-19, Codex. First G9 software increment following the user's instruction
 to proceed. The observer builds for Pixhawk 6X on the verified working
 PX4 `e8ea98b404baf50623a519ac67ec1c03aa240859` / NuttX 11 baseline.
@@ -38,10 +42,12 @@ package remain separate and unchanged.
 - Root library registration is guarded so the earlier private SITL external
   module can continue registering the same library before `src/lib` is processed.
 
-The adapter's alignment/status checks are diagnostic conditions, not a reviewed
+The staged image's alignment/status checks are diagnostic conditions, not a reviewed
 production health predicate. A constant diagnostic source epoch does not detect
 all same-instance publisher replacements between polls. The earlier POSIX
-publisher-revision work has not been ported to NuttX by this increment.
+publisher-revision work was not ported to NuttX by that original increment.
+The linked follow-on replaces the constant epoch in current source, with flat
+NuttX compile verification; it has not replaced the staged image.
 
 ## Explicit observer profile
 

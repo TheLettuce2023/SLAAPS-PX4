@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -65,6 +66,9 @@ def prepare(out):
     # New implementation is overlaid on the qualified older baseline; the
     # previously flashed image, parent source and evidence are never changed.
     overlays = []
+    subscription = "platforms/common/uORB/ResearchSubscription.hpp"
+    shutil.copy2(ROOT / subscription, source / subscription)
+    overlays.append(subscription)
     for folder in ("src/lib/research_stabilized_manual", "src/modules/research_stabilized_manual"):
         for item in (ROOT / folder).iterdir():
             if item.is_file():
@@ -75,6 +79,33 @@ def prepare(out):
     message = "msg/StabilizedObserverStatus.msg"
     shutil.copy2(ROOT / message, source / message)
     overlays.append(message)
+    # Port only the observer-gated additions to the older uORB source. Preserve
+    # the working baseline's other API and locking implementation.
+    lifecycle_sources = {}
+    for name, anchors in {
+        "platforms/common/uORB/uORBDeviceNode.hpp": (
+            "\tvoid mark_as_advertised() { _advertised.store(true); }",
+            "\tpx4::atomic<unsigned>  _generation{0};  /**< object generation count */"),
+        "platforms/common/uORB/uORBDeviceNode.cpp": (
+            "\t// callbacks\n", "\tdevnode->_advertised.store(false);"),
+    }.items():
+        donor = (ROOT / name).read_text()
+        blocks = re.findall(r"#if defined\(CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL\).*?#endif", donor, re.S)
+        assert len(blocks) == 2, name
+        target = source / name
+        text = target.read_text()
+        for index, anchor in enumerate(anchors):
+            assert text.count(anchor) == 1, (name, anchor)
+            if name.endswith(".hpp") and index == 1:
+                replacement = anchor + "\n" + blocks[index]
+            elif name.endswith(".cpp") and index == 0:
+                replacement = blocks[index] + "\n\n" + anchor
+            else:
+                replacement = blocks[index]
+            text = text.replace(anchor, replacement, 1)
+        target.write_text(text)
+        lifecycle_sources[name] = {"donor_sha256": digest(ROOT / name), "ported_sha256": digest(target)}
+    record(out / "lifecycle-port.json", lifecycle_sources)
     library = source / "src/lib/CMakeLists.txt"
     library.write_text(library.read_text() + "\nadd_subdirectory(research_stabilized_manual EXCLUDE_FROM_ALL)\n")
     messages = source / "msg/CMakeLists.txt"
@@ -87,7 +118,8 @@ def prepare(out):
     # An ARM overlay includes the full inherited bench backport but disables
     # its module; the observer's CMake also rejects any combined configuration.
     inherited = json.loads((PARENT / "port-source-manifest.json").read_text())
-    names = sorted(set(inherited["files"]) | set(overlays) | {"src/lib/CMakeLists.txt", "msg/CMakeLists.txt"})
+    names = sorted(set(inherited["files"]) | set(overlays) | set(lifecycle_sources)
+                   | {"src/lib/CMakeLists.txt", "msg/CMakeLists.txt"})
     record(out / "arm-overlay-inputs.json", {name: digest(source / name) for name in names})
     with tarfile.open(out / "observer-overlay.tar", "w") as archive:
         for name in names:
@@ -162,8 +194,12 @@ def test(out):
     import re
     result = re.search(r"OBSERVER_RESULT checks=(\d+) failures=(\d+)", log.read_text())
     assert result and int(result[1]) > 100 and int(result[2]) == 0, log
+    lifecycle = re.findall(r"OBSERVER_LIFECYCLE topic=(\d+) before=(\d+) after=(\d+) elapsed=(\d+)", log.read_text())
+    assert len(lifecycle) == 7 and {int(row[0]) for row in lifecycle} == set(range(7))
+    assert all(int(after) > int(before) and int(elapsed) < 20000 for _, before, after, elapsed in lifecycle)
     record(work / "result.json", {"checks": int(result[1]), "failures": int(result[2]), "px4_sha256": digest(out / "native/bin/px4"),
-           "profile_sha256": digest(profile), "console_sha256": digest(log), "hardware": False, "physics": False})
+           "profile_sha256": digest(profile), "console_sha256": digest(log), "hardware": False, "physics": False,
+           "hidden_lifecycle_topics": 7})
     print("native observation PASS " + str(work), flush=True)
 
 
@@ -172,6 +208,9 @@ def seal(out):
         raise RuntimeError("Refusing to overwrite sealed evidence")
     preparation = json.loads((out / "preparation.json").read_text())
     source = out / "px4-source"
+    for name, identity in json.loads((out / "lifecycle-port.json").read_text()).items():
+        assert digest(ROOT / name) == identity["donor_sha256"]
+        assert digest(source / name) == identity["ported_sha256"]
     for name, expected in preparation["donor_files"].items():
         assert digest(ROOT / name) == digest(source / name) == expected, name
     overlay = json.loads((out / "arm-overlay-inputs.json").read_text())
@@ -221,11 +260,13 @@ def seal(out):
     for folder in out.glob("observation-*"):
         files += [p for p in folder.iterdir() if p.is_file()]
     for label in host_results:
-        files += [out / label / "stabilized_manual_test", out / label / "stabilized_observer_profile_test"]
+        files += [out / label / name for name in
+                  ("stabilized_manual_test", "stabilized_observer_profile_test", "stabilized_output_test")]
     manifest = {"schema_version": 1, "scope": "working-baseline output-disabled observer software verification",
                 "base": BASE, "host_results": host_results, "accepted_native_results": accepted,
                 "native_px4_sha256": native_hash, "hardware_tested": False, "physical_plant_validated": False,
                 "actuator_publication": False, "bench_module_excluded": True,
+                "publisher_lifecycle_binding": "seven queue-one inputs, POSIX native tested, flat NuttX compile only",
                 "files": {str(p.relative_to(out)): digest(p) for p in sorted(set(files))}}
     record(out / "observer-verification-manifest.json", manifest)
     print("Sealed " + digest(out / "observer-verification-manifest.json"), flush=True)

@@ -6,8 +6,8 @@
   "fixture_airflow_m_s": 20.0,
   "fixed_simulated_edf_thrust_n": 10.0,
   "physical_authority_granted": false,
-  "qualification_evidence": "/var/tmp/research-stabilized-sitl-0crhkf9n",
-  "manifest_sha256": "899a1ddd82e3226f715e74be1b4a90fa30c714b8759f276978a8cb904f3bfc3a",
-  "px4_sha256": "67a6bab516dcdf0b9d7df76d548b3931f6c03fcb93b7814242e966690a6a0193",
-  "plugin_sha256": "a5addecdf9ed5378ffba95a1dd0dde62df44d08240c4a26541393edb577fb789"
+  "qualification_evidence": "/var/tmp/research-stabilized-sitl-2u88ldfk",
+  "manifest_sha256": "a725a1ff7c1f05f196c5b07b147a2b1fb9a749142f580abba8045ea13a94c970",
+  "px4_sha256": "40d5334904a467d32a9797f457845747e8ac47a35318d0698601e5dbb0a7611d",
+  "plugin_sha256": "a12dbf5eb8aefbd79df3d7187a0f731433be013171a7bb00fdfd517a2e540f32"
 }

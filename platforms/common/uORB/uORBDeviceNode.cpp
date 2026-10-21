@@ -196,6 +196,10 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 
 	memcpy(_data + (_meta->o_size * (generation % _meta->o_queue)), buffer, _meta->o_size);
 
+#if defined(CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL) || defined(CONFIG_MODULES_SLAAPS)
+	_research_data_revision = _research_revision;
+#endif
+
 	// callbacks
 	for (auto item : _callbacks) {
 		item->call(generation + 1);
@@ -314,7 +318,11 @@ int uORB::DeviceNode::unadvertise(orb_advert_t handle)
 	 * of subscribers and publishers. But we also do not have a leak since future
 	 * publishers reuse the same DeviceNode object.
 	 */
+#if defined(CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL) || defined(CONFIG_MODULES_SLAAPS)
+	devnode->mark_research_unadvertised();
+#else
 	devnode->_advertised.store(false);
+#endif
 
 	return PX4_OK;
 }

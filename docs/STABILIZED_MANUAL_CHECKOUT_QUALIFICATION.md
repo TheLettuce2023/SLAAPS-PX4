@@ -6,6 +6,8 @@ and pass over **68,813 control cycles**. The actual stdin-driven console also
 passes. The earlier revision-aware package and its default profile are preserved.
 Vehicle-supported SM5 allocation and tuning still await measured inputs.
 
+The default was subsequently refreshed by the [October 20 core requalification](STABILIZED_MANUAL_SESSION_REQUALIFICATION.md). This record retains the October 6 evidence.
+
 ## Build, qualify and run
 
 The [checkout build recipe](STABILIZED_MANUAL_CHECKOUT_BUILD.md) produces a

@@ -41,6 +41,9 @@
 #include <uORB/SubscriptionCallback.hpp>
 
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+#include "../ResearchOutputTransaction.hpp"
+#endif
 
 class FunctionProviderBase
 {
@@ -48,6 +51,9 @@ public:
 	struct Context {
 		px4::WorkItem &work_item;
 		const float &thrust_factor;
+#if defined(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
+		ResearchOutputTransaction *research_transaction {};
+#endif
 	};
 
 	FunctionProviderBase() = default;

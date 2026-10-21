@@ -1,6 +1,6 @@
 # SLAAPS isolated stabilized manual mode
 
-2026-10-06, Codex. The default console now runs the fresh checkout-built,
+Updated 2026-10-20, Codex. The default console now runs the fresh checkout-built,
 fully qualified revision-aware
 synthetic manual mode. Its complete declared 31-case SITL matrix passes, and an
 additional live operator-console test passes. Vehicle-supported control still
@@ -42,9 +42,9 @@ qualification receipt, ELF and plugin. Startup verifies their artifact hashes
 and the current fixture inputs before launching. The console uses existing
 qualified POSIX artifacts, so workspace and WSL evidence must be preserved.
 A [fresh build from checkout](STABILIZED_MANUAL_CHECKOUT_BUILD.md) now compiles
-both artifacts. Its [full fresh qualification and console check](STABILIZED_MANUAL_CHECKOUT_QUALIFICATION.md)
-pass all 31 cases over 68,813 cycles and are the current default. The earlier
-package below remains preserved at its original scope.
+both artifacts. The [latest core requalification and console check](STABILIZED_MANUAL_VALIDATOR_REQUALIFICATION.md)
+pass all 31 cases over 68,761 cycles and are the current default. The October 6
+checkout qualification and earlier package below retain their original scopes.
 
 ## Preserved previous revision campaign
 

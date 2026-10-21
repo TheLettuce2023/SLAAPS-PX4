@@ -1,0 +1,2081 @@
+{
+  "module_name": "SLAAPS",
+  "parameters": [
+    {
+      "group": "SLAAPS Vehicle",
+      "definitions": {
+        "SLA_DATA_REV": {
+          "description": {
+            "short": "Operator data revision; does not certify flight readiness",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 2147483647,
+          "default": 0
+        },
+        "SLA_MASS": {
+          "description": {
+            "short": "Measured all-up mass; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "kg",
+          "decimal": 6
+        },
+        "SLA_CG_X": {
+          "description": {
+            "short": "CG X from declared body FRD reference",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "m",
+          "decimal": 6
+        },
+        "SLA_CG_Y": {
+          "description": {
+            "short": "CG Y from declared body FRD reference",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "m",
+          "decimal": 6
+        },
+        "SLA_CG_Z": {
+          "description": {
+            "short": "CG Z from declared body FRD reference",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "m",
+          "decimal": 6
+        },
+        "SLA_I_XX": {
+          "description": {
+            "short": "Inertia tensor XX at CG in body FRD",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -100.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "kg m^2",
+          "decimal": 6
+        },
+        "SLA_I_YY": {
+          "description": {
+            "short": "Inertia tensor YY at CG in body FRD",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -100.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "kg m^2",
+          "decimal": 6
+        },
+        "SLA_I_ZZ": {
+          "description": {
+            "short": "Inertia tensor ZZ at CG in body FRD",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -100.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "kg m^2",
+          "decimal": 6
+        },
+        "SLA_I_XY": {
+          "description": {
+            "short": "Inertia tensor XY at CG in body FRD",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -100.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "kg m^2",
+          "decimal": 6
+        },
+        "SLA_I_XZ": {
+          "description": {
+            "short": "Inertia tensor XZ at CG in body FRD",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -100.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "kg m^2",
+          "decimal": 6
+        },
+        "SLA_I_YZ": {
+          "description": {
+            "short": "Inertia tensor YZ at CG in body FRD",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -100.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "kg m^2",
+          "decimal": 6
+        },
+        "SLA_AIRSPD": {
+          "description": {
+            "short": "Measured airflow speed for moment derivatives",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 300.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        },
+        "SLA_AOA": {
+          "description": {
+            "short": "Angle of attack at measured condition",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -3.141593,
+          "max": 3.141593,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_BETA": {
+          "description": {
+            "short": "Sideslip at measured condition",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -3.141593,
+          "max": 3.141593,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_TEST_THR": {
+          "description": {
+            "short": "Measured EDF thrust at derivative test condition",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "N",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Canard 1",
+      "definitions": {
+        "SLA_C1_DMR": {
+          "description": {
+            "short": "Measured R moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C1_DUR": {
+          "description": {
+            "short": "Absolute uncertainty in R derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C1_BMR": {
+          "description": {
+            "short": "Bench selected-input R mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_DMP": {
+          "description": {
+            "short": "Measured P moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C1_DUP": {
+          "description": {
+            "short": "Absolute uncertainty in P derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C1_BMP": {
+          "description": {
+            "short": "Bench selected-input P mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_DMY": {
+          "description": {
+            "short": "Measured Y moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C1_DUY": {
+          "description": {
+            "short": "Absolute uncertainty in Y derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C1_BMY": {
+          "description": {
+            "short": "Bench selected-input Y mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_SLOPE": {
+          "description": {
+            "short": "Signed deflection per normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.570797,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C1_SL_UNC": {
+          "description": {
+            "short": "Absolute deflection slope uncertainty",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C1_TRIM": {
+          "description": {
+            "short": "Normalized zero-moment trim",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_MIN": {
+          "description": {
+            "short": "Minimum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_MAX": {
+          "description": {
+            "short": "Maximum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_RISE": {
+          "description": {
+            "short": "Positive normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_FALL": {
+          "description": {
+            "short": "Negative normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C1_PWM_NEG": {
+          "description": {
+            "short": "Pulse at normalized -1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C1_PWM_CTR": {
+          "description": {
+            "short": "Pulse at zero deflection; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C1_PWM_POS": {
+          "description": {
+            "short": "Pulse at normalized +1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C1_DEF_MAX": {
+          "description": {
+            "short": "Calibrated deflection magnitude at unit command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 90.0,
+          "default": 0.0,
+          "unit": "deg",
+          "decimal": 6
+        },
+        "SLA_C1_LAG": {
+          "description": {
+            "short": "Measured loaded servo lag time constant",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C1_DELAY": {
+          "description": {
+            "short": "Measured loaded command latency",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C1_WASH": {
+          "description": {
+            "short": "Measured local airflow at this canard",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 300.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Canard 2",
+      "definitions": {
+        "SLA_C2_DMR": {
+          "description": {
+            "short": "Measured R moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C2_DUR": {
+          "description": {
+            "short": "Absolute uncertainty in R derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C2_BMR": {
+          "description": {
+            "short": "Bench selected-input R mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_DMP": {
+          "description": {
+            "short": "Measured P moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C2_DUP": {
+          "description": {
+            "short": "Absolute uncertainty in P derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C2_BMP": {
+          "description": {
+            "short": "Bench selected-input P mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_DMY": {
+          "description": {
+            "short": "Measured Y moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C2_DUY": {
+          "description": {
+            "short": "Absolute uncertainty in Y derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C2_BMY": {
+          "description": {
+            "short": "Bench selected-input Y mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_SLOPE": {
+          "description": {
+            "short": "Signed deflection per normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.570797,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C2_SL_UNC": {
+          "description": {
+            "short": "Absolute deflection slope uncertainty",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C2_TRIM": {
+          "description": {
+            "short": "Normalized zero-moment trim",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_MIN": {
+          "description": {
+            "short": "Minimum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_MAX": {
+          "description": {
+            "short": "Maximum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_RISE": {
+          "description": {
+            "short": "Positive normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_FALL": {
+          "description": {
+            "short": "Negative normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C2_PWM_NEG": {
+          "description": {
+            "short": "Pulse at normalized -1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C2_PWM_CTR": {
+          "description": {
+            "short": "Pulse at zero deflection; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C2_PWM_POS": {
+          "description": {
+            "short": "Pulse at normalized +1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C2_DEF_MAX": {
+          "description": {
+            "short": "Calibrated deflection magnitude at unit command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 90.0,
+          "default": 0.0,
+          "unit": "deg",
+          "decimal": 6
+        },
+        "SLA_C2_LAG": {
+          "description": {
+            "short": "Measured loaded servo lag time constant",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C2_DELAY": {
+          "description": {
+            "short": "Measured loaded command latency",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C2_WASH": {
+          "description": {
+            "short": "Measured local airflow at this canard",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 300.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Canard 3",
+      "definitions": {
+        "SLA_C3_DMR": {
+          "description": {
+            "short": "Measured R moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C3_DUR": {
+          "description": {
+            "short": "Absolute uncertainty in R derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C3_BMR": {
+          "description": {
+            "short": "Bench selected-input R mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_DMP": {
+          "description": {
+            "short": "Measured P moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C3_DUP": {
+          "description": {
+            "short": "Absolute uncertainty in P derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C3_BMP": {
+          "description": {
+            "short": "Bench selected-input P mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_DMY": {
+          "description": {
+            "short": "Measured Y moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C3_DUY": {
+          "description": {
+            "short": "Absolute uncertainty in Y derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C3_BMY": {
+          "description": {
+            "short": "Bench selected-input Y mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_SLOPE": {
+          "description": {
+            "short": "Signed deflection per normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.570797,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C3_SL_UNC": {
+          "description": {
+            "short": "Absolute deflection slope uncertainty",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C3_TRIM": {
+          "description": {
+            "short": "Normalized zero-moment trim",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_MIN": {
+          "description": {
+            "short": "Minimum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_MAX": {
+          "description": {
+            "short": "Maximum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_RISE": {
+          "description": {
+            "short": "Positive normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_FALL": {
+          "description": {
+            "short": "Negative normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C3_PWM_NEG": {
+          "description": {
+            "short": "Pulse at normalized -1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C3_PWM_CTR": {
+          "description": {
+            "short": "Pulse at zero deflection; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C3_PWM_POS": {
+          "description": {
+            "short": "Pulse at normalized +1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C3_DEF_MAX": {
+          "description": {
+            "short": "Calibrated deflection magnitude at unit command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 90.0,
+          "default": 0.0,
+          "unit": "deg",
+          "decimal": 6
+        },
+        "SLA_C3_LAG": {
+          "description": {
+            "short": "Measured loaded servo lag time constant",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C3_DELAY": {
+          "description": {
+            "short": "Measured loaded command latency",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C3_WASH": {
+          "description": {
+            "short": "Measured local airflow at this canard",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 300.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Canard 4",
+      "definitions": {
+        "SLA_C4_DMR": {
+          "description": {
+            "short": "Measured R moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C4_DUR": {
+          "description": {
+            "short": "Absolute uncertainty in R derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C4_BMR": {
+          "description": {
+            "short": "Bench selected-input R mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_DMP": {
+          "description": {
+            "short": "Measured P moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C4_DUP": {
+          "description": {
+            "short": "Absolute uncertainty in P derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C4_BMP": {
+          "description": {
+            "short": "Bench selected-input P mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_DMY": {
+          "description": {
+            "short": "Measured Y moment derivative about CG",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C4_DUY": {
+          "description": {
+            "short": "Absolute uncertainty in Y derivative",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_C4_BMY": {
+          "description": {
+            "short": "Bench selected-input Y mix coefficient",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_SLOPE": {
+          "description": {
+            "short": "Signed deflection per normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.570797,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C4_SL_UNC": {
+          "description": {
+            "short": "Absolute deflection slope uncertainty",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.570797,
+          "default": 0.0,
+          "unit": "rad",
+          "decimal": 6
+        },
+        "SLA_C4_TRIM": {
+          "description": {
+            "short": "Normalized zero-moment trim",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_MIN": {
+          "description": {
+            "short": "Minimum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_MAX": {
+          "description": {
+            "short": "Maximum normalized deflection command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_RISE": {
+          "description": {
+            "short": "Positive normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_FALL": {
+          "description": {
+            "short": "Negative normalized command slew per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_C4_PWM_NEG": {
+          "description": {
+            "short": "Pulse at normalized -1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C4_PWM_CTR": {
+          "description": {
+            "short": "Pulse at zero deflection; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C4_PWM_POS": {
+          "description": {
+            "short": "Pulse at normalized +1; zero is unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 2500.0,
+          "default": 0.0,
+          "unit": "us",
+          "decimal": 6
+        },
+        "SLA_C4_DEF_MAX": {
+          "description": {
+            "short": "Calibrated deflection magnitude at unit command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 90.0,
+          "default": 0.0,
+          "unit": "deg",
+          "decimal": 6
+        },
+        "SLA_C4_LAG": {
+          "description": {
+            "short": "Measured loaded servo lag time constant",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C4_DELAY": {
+          "description": {
+            "short": "Measured loaded command latency",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_C4_WASH": {
+          "description": {
+            "short": "Measured local airflow at this canard",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 300.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Roll",
+      "definitions": {
+        "SLA_R_M_SCALE": {
+          "description": {
+            "short": "Physical moment per normalized controller moment",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm",
+          "decimal": 6
+        },
+        "SLA_R_SIGN": {
+          "description": {
+            "short": "Stick sign; must be +1 or -1",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_R_RATE": {
+          "description": {
+            "short": "Maximum commanded body rate",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "rad/s",
+          "decimal": 6
+        },
+        "SLA_R_SP_ACC": {
+          "description": {
+            "short": "Maximum rate setpoint acceleration",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "rad/s^2",
+          "decimal": 6
+        },
+        "SLA_R_MEAS_R": {
+          "description": {
+            "short": "Maximum accepted measured body rate",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "rad/s",
+          "decimal": 6
+        },
+        "SLA_R_MEAS_A": {
+          "description": {
+            "short": "Maximum accepted angular acceleration",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "rad/s^2",
+          "decimal": 6
+        },
+        "SLA_R_ATT_P": {
+          "description": {
+            "short": "Quaternion hold proportional gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_R_RATE_P": {
+          "description": {
+            "short": "Body-rate proportional gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_R_RATE_I": {
+          "description": {
+            "short": "Body-rate integral gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_R_RATE_D": {
+          "description": {
+            "short": "Body-rate derivative gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_R_I_LIM": {
+          "description": {
+            "short": "Normalized moment integrator limit",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_R_M_LIM": {
+          "description": {
+            "short": "Maximum normalized controller moment",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_R_WEIGHT": {
+          "description": {
+            "short": "Allocator moment-axis weight",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Pitch",
+      "definitions": {
+        "SLA_P_M_SCALE": {
+          "description": {
+            "short": "Physical moment per normalized controller moment",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm",
+          "decimal": 6
+        },
+        "SLA_P_SIGN": {
+          "description": {
+            "short": "Stick sign; must be +1 or -1",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_P_RATE": {
+          "description": {
+            "short": "Maximum commanded body rate",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "rad/s",
+          "decimal": 6
+        },
+        "SLA_P_SP_ACC": {
+          "description": {
+            "short": "Maximum rate setpoint acceleration",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "rad/s^2",
+          "decimal": 6
+        },
+        "SLA_P_MEAS_R": {
+          "description": {
+            "short": "Maximum accepted measured body rate",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "rad/s",
+          "decimal": 6
+        },
+        "SLA_P_MEAS_A": {
+          "description": {
+            "short": "Maximum accepted angular acceleration",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "rad/s^2",
+          "decimal": 6
+        },
+        "SLA_P_ATT_P": {
+          "description": {
+            "short": "Quaternion hold proportional gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_P_RATE_P": {
+          "description": {
+            "short": "Body-rate proportional gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_P_RATE_I": {
+          "description": {
+            "short": "Body-rate integral gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_P_RATE_D": {
+          "description": {
+            "short": "Body-rate derivative gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_P_I_LIM": {
+          "description": {
+            "short": "Normalized moment integrator limit",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_P_M_LIM": {
+          "description": {
+            "short": "Maximum normalized controller moment",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_P_WEIGHT": {
+          "description": {
+            "short": "Allocator moment-axis weight",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Yaw",
+      "definitions": {
+        "SLA_Y_M_SCALE": {
+          "description": {
+            "short": "Physical moment per normalized controller moment",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm",
+          "decimal": 6
+        },
+        "SLA_Y_SIGN": {
+          "description": {
+            "short": "Stick sign; must be +1 or -1",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_Y_RATE": {
+          "description": {
+            "short": "Maximum commanded body rate",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "rad/s",
+          "decimal": 6
+        },
+        "SLA_Y_SP_ACC": {
+          "description": {
+            "short": "Maximum rate setpoint acceleration",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "rad/s^2",
+          "decimal": 6
+        },
+        "SLA_Y_MEAS_R": {
+          "description": {
+            "short": "Maximum accepted measured body rate",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "rad/s",
+          "decimal": 6
+        },
+        "SLA_Y_MEAS_A": {
+          "description": {
+            "short": "Maximum accepted angular acceleration",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "rad/s^2",
+          "decimal": 6
+        },
+        "SLA_Y_ATT_P": {
+          "description": {
+            "short": "Quaternion hold proportional gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_Y_RATE_P": {
+          "description": {
+            "short": "Body-rate proportional gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_Y_RATE_I": {
+          "description": {
+            "short": "Body-rate integral gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_Y_RATE_D": {
+          "description": {
+            "short": "Body-rate derivative gain",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_Y_I_LIM": {
+          "description": {
+            "short": "Normalized moment integrator limit",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_Y_M_LIM": {
+          "description": {
+            "short": "Maximum normalized controller moment",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_Y_WEIGHT": {
+          "description": {
+            "short": "Allocator moment-axis weight",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Input Timing",
+      "definitions": {
+        "SLA_IN_INST": {
+          "description": {
+            "short": "Selected MAVLink input instance; -1 unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": -1,
+          "max": 5,
+          "default": -1
+        },
+        "SLA_IN_SYS": {
+          "description": {
+            "short": "Selected input sender system ID",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 255,
+          "default": 0
+        },
+        "SLA_IN_COMP": {
+          "description": {
+            "short": "Selected input sender component ID",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 255,
+          "default": 0
+        },
+        "SLA_IN_AGE": {
+          "description": {
+            "short": "Maximum manual sample age",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500,
+          "default": 0,
+          "unit": "ms"
+        },
+        "SLA_STATE_AGE": {
+          "description": {
+            "short": "Maximum selected-state sample age",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500,
+          "default": 0,
+          "unit": "ms"
+        },
+        "SLA_STATE_SKEW": {
+          "description": {
+            "short": "Maximum attitude-rate sample skew",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500,
+          "default": 0,
+          "unit": "ms"
+        },
+        "SLA_CYCLE_MIN": {
+          "description": {
+            "short": "Minimum controller cycle interval",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_CYCLE_MAX": {
+          "description": {
+            "short": "Maximum controller cycle interval",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_BENCH_GAP": {
+          "description": {
+            "short": "Maximum bench cycle gap",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500,
+          "default": 0,
+          "unit": "ms"
+        },
+        "SLA_OUT_LEASE": {
+          "description": {
+            "short": "Independent consumer output lease",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500,
+          "default": 0,
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Control",
+      "definitions": {
+        "SLA_STK_ENTER": {
+          "description": {
+            "short": "Centered-stick entry threshold",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 0.99,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_STK_EXIT": {
+          "description": {
+            "short": "Stick threshold to leave attitude hold",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 0.99,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_BENCH_DZ": {
+          "description": {
+            "short": "Bench stick deadzone",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 0.99,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_QUAT_TOL": {
+          "description": {
+            "short": "Quaternion norm tolerance",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 0.99,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_ALLOC_REG": {
+          "description": {
+            "short": "Allocator regularization",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_ALLOC_ROW": {
+          "description": {
+            "short": "Minimum effectiveness row norm",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_ALLOC_IND": {
+          "description": {
+            "short": "Minimum effectiveness independence",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_ALLOC_TOL": {
+          "description": {
+            "short": "Allocator saturation tolerance",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS EDF",
+      "definitions": {
+        "SLA_EDF_T0": {
+          "description": {
+            "short": "Measured thrust at 0% normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "N",
+          "decimal": 6
+        },
+        "SLA_EDF_T1": {
+          "description": {
+            "short": "Measured thrust at 25% normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "N",
+          "decimal": 6
+        },
+        "SLA_EDF_T2": {
+          "description": {
+            "short": "Measured thrust at 50% normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "N",
+          "decimal": 6
+        },
+        "SLA_EDF_T3": {
+          "description": {
+            "short": "Measured thrust at 75% normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "N",
+          "decimal": 6
+        },
+        "SLA_EDF_T4": {
+          "description": {
+            "short": "Measured thrust at 100% normalized command",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "N",
+          "decimal": 6
+        },
+        "SLA_EDF_VOLT": {
+          "description": {
+            "short": "Measured voltage of the EDF thrust curve",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "V",
+          "decimal": 6
+        },
+        "SLA_EDF_RISE": {
+          "description": {
+            "short": "Maximum normalized EDF command rise per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_EDF_FALL": {
+          "description": {
+            "short": "Maximum normalized EDF command fall per second",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_EDF_ENTRY": {
+          "description": {
+            "short": "Maximum normalized throttle admitted on entry",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 0.1,
+          "default": 0.0,
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Configuration",
+      "definitions": {
+        "SLA_CFG_APPLY": {
+          "description": {
+            "short": "Apply completed configuration edits",
+            "long": "Increase this counter after all vehicle parameters have been edited. Requires disarmed status. Each increase validates one complete snapshot. Restarting the supervisor requires a new increase; a saved value never automatically activates a configuration."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 2147483647,
+          "default": 0
+        },
+        "SLA_CFG_KIND": {
+          "description": {
+            "short": "Configuration validation scope",
+            "long": "Choose the validation scope before increasing SLA_CFG_APPLY. Validation is not flight acceptance or permission to enable outputs."
+          },
+          "type": "enum",
+          "values": {
+            "0": "Servo bench",
+            "1": "Stabilized manual"
+          },
+          "default": 0
+        }
+      }
+    }
+  ]
+}

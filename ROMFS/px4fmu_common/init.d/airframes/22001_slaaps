@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# @name SLAAPS X-canard EDF
+#
+# @type SLAAPS
+# @class Plane
+#
+# Four independent X-canards and one fixed rear EDF. Vehicle parameters and
+# output functions are configured in QGC; no synthetic profile is installed.
+#
+
+set VEHICLE_TYPE slaaps
+param set-default MAV_TYPE 1
+
+# No fixed-wing coordinated-turn/airspeed assumptions for this wingless vehicle.
+# Sensor presence and estimator settings remain explicit vehicle configuration.
+param set-default SYS_HAS_NUM_ASPD 0
+
+# Preserve user assignments and calibration. Merely selecting this airframe
+# neither applies a vehicle profile nor grants actuator ownership.

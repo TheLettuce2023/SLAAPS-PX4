@@ -54,6 +54,10 @@ if(CONFIG_MODULES_AIRSHIP_ATT_CONTROL)
 	)
 endif()
 
+if(CONFIG_MODULES_SLAAPS)
+	px4_add_romfs_files(rc.slaaps_apps)
+endif()
+
 if(CONFIG_MODULES_FW_RATE_CONTROL)
 	px4_add_romfs_files(
 		rc.fw_apps
