@@ -1,7 +1,7 @@
 #include "RequestGuard.hpp"
 
 #include <cmath>
-#include <limits>
+#include <stdint.h>
 
 namespace research_acceleration
 {
@@ -15,7 +15,7 @@ bool finite(const Vec3f &value)
 
 bool add(TimeUs left, TimeUs right, TimeUs &result)
 {
-	if (left > std::numeric_limits<TimeUs>::max() - right) {
+	if (left > UINT64_MAX - right) {
 		return false;
 	}
 
@@ -103,7 +103,7 @@ Decision RequestGuard::decision(DecisionCode code, bool syntactically_valid, boo
 Decision RequestGuard::reject(DecisionCode code, bool syntactically_valid, bool conservative_age_valid,
 			      TimeUs conservative_age_us)
 {
-	if (rejection_count_ != std::numeric_limits<uint64_t>::max()) {
+	if (rejection_count_ != UINT64_MAX) {
 		++rejection_count_;
 	}
 

@@ -1,6 +1,8 @@
 #include "WireAdapter.hpp"
 #include "WireAdapterChecks.hpp"
 
+#include <stdint.h>
+
 namespace research_acceleration
 {
 using namespace wire_adapter_detail;
@@ -509,7 +511,7 @@ AdapterResult WireAdapter::process(const TrustedStateSample &sample, OperationKi
 						      sample.request_guard_context.validator_receive_time_us, true);
 			}
 
-		} else if (snapshot_.state_generation == std::numeric_limits<uint64_t>::max()
+		} else if (snapshot_.state_generation == UINT64_MAX
 			   || sample.generation != snapshot_.state_generation + kFirstUsableCounterValue) {
 			return terminalResult(AdapterCode::TrustedStateFault,
 					      sample.request_guard_context.validator_receive_time_us, true);
@@ -523,7 +525,7 @@ AdapterResult WireAdapter::process(const TrustedStateSample &sample, OperationKi
 	const uint8_t required_reports = requires_barrier ? kTransitionReportCount : kOperationReportCount;
 
 	if ((requires_barrier && !first_observation
-	     && snapshot_.transition_epoch == std::numeric_limits<uint64_t>::max())
+	     && snapshot_.transition_epoch == UINT64_MAX)
 	    || !hasNormalReportCapacity(required_reports)) {
 		return terminalResult(AdapterCode::CounterExhausted,
 				      sample.request_guard_context.validator_receive_time_us, false);
@@ -752,7 +754,7 @@ AdminResult WireAdapter::processAdmin(const TrustedStateSample &sample, const De
 							   sample.request_guard_context.validator_receive_time_us, correlation, true);
 			}
 
-		} else if (snapshot_.state_generation == std::numeric_limits<uint64_t>::max()
+		} else if (snapshot_.state_generation == UINT64_MAX
 			   || sample.generation != snapshot_.state_generation + kFirstUsableCounterValue) {
 			return adminTerminalResult(AdminCode::TrustedStateFault,
 						   sample.request_guard_context.validator_receive_time_us, correlation, true);
@@ -1311,7 +1313,7 @@ IngressResult WireAdapter::processIngress(const TrustedStateSample &sample, Ingr
 							     sample.request_guard_context.validator_receive_time_us, correlation, true);
 			}
 
-		} else if (snapshot_.state_generation == std::numeric_limits<uint64_t>::max()
+		} else if (snapshot_.state_generation == UINT64_MAX
 			   || sample.generation != snapshot_.state_generation + kFirstUsableCounterValue) {
 			return ingressTerminalResult(IngressCode::TrustedStateFault,
 						     sample.request_guard_context.validator_receive_time_us, correlation, true);
@@ -1325,7 +1327,7 @@ IngressResult WireAdapter::processIngress(const TrustedStateSample &sample, Ingr
 	const uint8_t required_reports = requires_barrier ? kTransitionReportCount : kOperationReportCount;
 
 	if ((requires_barrier && !first_observation
-	     && snapshot_.transition_epoch == std::numeric_limits<uint64_t>::max())
+	     && snapshot_.transition_epoch == UINT64_MAX)
 	    || !hasNormalReportCapacity(required_reports)) {
 		return ingressTerminalResult(IngressCode::CounterExhausted,
 					     sample.request_guard_context.validator_receive_time_us, correlation, false);

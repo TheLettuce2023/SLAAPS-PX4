@@ -1,8 +1,8 @@
 #include "WireStatus.hpp"
 
 #include <cstring>
-#include <initializer_list>
-#include <limits>
+#include <stddef.h>
+#include <stdint.h>
 
 namespace research_acceleration
 {
@@ -169,7 +169,8 @@ struct Input {
 	bool shape_valid;
 };
 
-bool localCode(const Input &input, uint16_t &code, std::initializer_list<uint16_t> allowed)
+template<size_t N>
+bool localCode(const Input &input, uint16_t &code, const uint16_t (&allowed)[N])
 {
 	if (input.evidence.decision_origin != StatusDecisionOrigin::Local) { return false; }
 
@@ -246,7 +247,7 @@ StatusBuildCode build(const Input &input, const StatusRecipient &recipient, Wire
 	const ReportEvidence &e = input.evidence;
 
 	if (!input.shape_valid || input.sequence == 0
-	    || (input.sequence == std::numeric_limits<uint64_t>::max() && !input.terminal)) {
+	    || (input.sequence == UINT64_MAX && !input.terminal)) {
 		return StatusBuildCode::InvalidReport;
 	}
 
@@ -264,7 +265,7 @@ StatusBuildCode build(const Input &input, const StatusRecipient &recipient, Wire
 	uint16_t code{};
 
 	if (!resolve(code) || !assignedDecision(code)
-	    || (input.sequence == std::numeric_limits<uint64_t>::max() && code != 78)) {
+	    || (input.sequence == UINT64_MAX && code != 78)) {
 		return StatusBuildCode::UnrepresentableDecision;
 	}
 

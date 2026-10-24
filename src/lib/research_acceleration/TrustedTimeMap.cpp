@@ -1,7 +1,7 @@
 #include "TrustedTimeMap.hpp"
 
 #include <cmath>
-#include <limits>
+#include <stdint.h>
 
 namespace research_acceleration
 {
@@ -10,7 +10,7 @@ namespace
 
 bool checkedAdd(TimeUs left, TimeUs right, TimeUs &result)
 {
-	if (left > std::numeric_limits<TimeUs>::max() - right) {
+	if (left > UINT64_MAX - right) {
 		return false;
 	}
 

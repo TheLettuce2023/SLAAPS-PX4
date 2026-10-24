@@ -1,7 +1,7 @@
 #include "FrameMath.hpp"
 
 #include <cmath>
-#include <limits>
+#include <float.h>
 
 namespace research_acceleration
 {
@@ -59,9 +59,9 @@ MathStatus normalisedQuaternion(const QuaternionNedFromFrd &input, float toleran
 MathStatus checkedVector(double x, double y, double z, Vec3f &output)
 {
 	if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)
-	    || x > static_cast<double>(std::numeric_limits<float>::max()) || x < -static_cast<double>(std::numeric_limits<float>::max())
-	    || y > static_cast<double>(std::numeric_limits<float>::max()) || y < -static_cast<double>(std::numeric_limits<float>::max())
-	    || z > static_cast<double>(std::numeric_limits<float>::max()) || z < -static_cast<double>(std::numeric_limits<float>::max())) {
+	    || x > static_cast<double>(FLT_MAX) || x < -static_cast<double>(FLT_MAX)
+	    || y > static_cast<double>(FLT_MAX) || y < -static_cast<double>(FLT_MAX)
+	    || z > static_cast<double>(FLT_MAX) || z < -static_cast<double>(FLT_MAX)) {
 		return MathStatus::Overflow;
 	}
 

@@ -2,14 +2,14 @@
 
 #include "WireAdapter.hpp"
 
-#include <limits>
+#include <stdint.h>
 
 namespace research_acceleration
 {
 namespace wire_adapter_detail
 {
 
-constexpr uint64_t kTerminalReportSequence = std::numeric_limits<uint64_t>::max();
+constexpr uint64_t kTerminalReportSequence = UINT64_MAX;
 constexpr uint64_t kFirstUsableCounterValue = 1U;
 constexpr uint64_t kMaximumNormalReportSequence = kTerminalReportSequence - kFirstUsableCounterValue;
 constexpr uint8_t kOperationReportCount = static_cast<uint8_t>(kFirstUsableCounterValue);
@@ -110,7 +110,7 @@ inline bool validRequestPacket(const DecodedRequestV1 &packet)
 
 inline bool checkedAdd(TimeUs left, TimeUs right, TimeUs &result)
 {
-	if (left > std::numeric_limits<TimeUs>::max() - right) {
+	if (left > UINT64_MAX - right) {
 		return false;
 	}
 
