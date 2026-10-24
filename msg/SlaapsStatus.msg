@@ -62,11 +62,15 @@ uint32 snapshot_duration_us
 int32 apply_counter
 int8[3] mode_id # Manual, acceleration, servo bench; -1 until registered
 uint8 configuration_fault
+char[17] cfg_param # Exact last rejected apply parameter; empty for unknown/cross-field faults
 uint8 configuration_use # 0 servo bench, 1 stabilized manual, 2 EDF commissioning
 bool configuration_valid
 bool routing_snapshot_valid # Observation only, not output permission or an atomic cross-bank transaction
 uint8 inventory_fault
 uint8 routing_fault
+int16 io_index # Current rejected inventory index; -1 if no actual channel is identified
+uint8 io_bank # 0 MAIN, 1 AUX, 255 unknown; never inferred for a missing/stale report
+uint8 io_channel # One-based physical bank channel; zero when unknown
 bool direct_actuator_modes_configured
 
 uint8 UNAVAILABLE_CONFIGURATION = 0

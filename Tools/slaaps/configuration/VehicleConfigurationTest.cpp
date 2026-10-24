@@ -296,12 +296,14 @@ static void profileTests()
 	      "initial throttle request must survive until the first integration tick");
 	bad = c;
 	bad.inertia[3] = .1F;
-	check(validate(bad, ConfigurationUse::StabilizedManual).fault == ConfigurationFault::InvalidInertia,
-	      "indefinite full inertia rejected");
+	const auto indefinite = validate(bad, ConfigurationUse::StabilizedManual);
+	check(indefinite.fault == ConfigurationFault::InvalidInertia && indefinite.parameter == nullptr,
+	      "indefinite full inertia rejects without incorrectly attributing the tensor error to mass");
 	bad = c;
 	bad.inertia[0] = 1.F;
-	check(validate(bad, ConfigurationUse::StabilizedManual).fault == ConfigurationFault::InvalidInertia,
-	      "positive definite but impossible rigid-body inertia rejected");
+	const auto impossible = validate(bad, ConfigurationUse::StabilizedManual);
+	check(impossible.fault == ConfigurationFault::InvalidInertia && impossible.parameter == nullptr,
+	      "impossible rigid-body inertia rejects without naming an unrelated scalar parameter");
 	bad = c;
 	bad.canard[0].pwm_neutral = 1000.F;
 	check(!validate(bad, ConfigurationUse::Bench).valid(), "unordered calibration rejected");
@@ -333,7 +335,9 @@ static void profileTests()
 	bad = c;
 	bad.mass = 0.F;
 	check(validate(bad, ConfigurationUse::Bench).valid(), "servo bench does not require a flight plant");
-	check(!validate(bad, ConfigurationUse::StabilizedManual).valid(), "manual flight requires plant data");
+	const auto missing_mass = validate(bad, ConfigurationUse::StabilizedManual);
+	check(missing_mass.fault == ConfigurationFault::InvalidInertia && missing_mass.parameter
+	      && std::strcmp(missing_mass.parameter, "SLA_MASS") == 0, "missing manual mass names the actual rejected scalar");
 }
 
 static void benchTravelBoundsTests()
@@ -3164,6 +3168,7 @@ static int runConfigurationTests()
 #include <lib/slaaps/BoundSubscription.hpp>
 #include <uORB/topics/slaaps_status.h>
 #include <uORB/topics/slaaps_manual_permission.h>
+#include <uORB/topics/mavlink_log.h>
 #include <lib/slaaps/ManualBankTransport.hpp>
 #include <lib/slaaps/ManualPreparationEndpoint.hpp>
 #include <lib/slaaps/ManualPreparationCoordinator.hpp>
@@ -6513,6 +6518,108 @@ static int nativeSupervisorOrchestrationTests()
 	wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE; }, 1000000,
 	"isolated supervisor leaves its final non-actuating preparation before stop");
 
+	// Actual apply results must reach operator status, including replacement of
+	// an earlier rejection and clearing after a corrected coherent profile.
+	const param_t voltage_parameter = param_find("SLA_PWR_VMAX"), battery_id_parameter = param_find("SLA_PWR_ID");
+	const float rejected_voltage = 19.F;
+	const int32_t rejected_id = 0, accepted_id = 1;
+	uORB::Subscription diagnostic_logs{ORB_ID(mavlink_log)};
+	uint64_t diagnostic_log_start = hrt_absolute_time();
+	uint64_t aux8_log_time{}, aux6_log_time{};
+	unsigned voltage_log_count{}, identity_log_count{}, aux8_log_count{}, aux6_log_count{};
+	auto collect_diagnostics = [&]() {
+		mavlink_log_s log{};
+
+		for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+			if (log.timestamp < diagnostic_log_start) { continue; }
+
+			if (std::strcmp(log.text, "SLAAPS: check SLA_PWR_VMAX") == 0) { ++voltage_log_count; }
+
+			if (std::strcmp(log.text, "SLAAPS: check SLA_PWR_ID") == 0) { ++identity_log_count; }
+
+			if (std::strcmp(log.text, "SLAAPS: check AUX channel 8 (routing 8)") == 0) { ++aux8_log_count; aux8_log_time = log.timestamp; }
+
+			if (std::strcmp(log.text, "SLAAPS: check AUX channel 6 (routing 8)") == 0) { ++aux6_log_count; aux6_log_time = log.timestamp; }
+		}
+	};
+	int32_t diagnostic_apply = 304;
+	check(param_set(voltage_parameter, &rejected_voltage) == 0
+	      && param_set(param_find("SLA_CFG_APPLY"), &diagnostic_apply) == 0,
+	      "deliberately apply an invalid power voltage band through actual parameters");
+	wait([&]() {
+		collect_diagnostics();
+		return !status.configuration_valid && status.apply_counter == diagnostic_apply
+		       && status.configuration_fault == static_cast<uint8_t>(ConfigurationFault::ParameterRange)
+		       && std::strcmp(status.cfg_param, "SLA_PWR_VMAX") == 0 && voltage_log_count == 1;
+	}, 1000000, "actual supervisor reports and emits the precise parameter that rejected the current apply");
+	check(!status.can_run_mask && !status.can_arm_mask && !status.manual_worker_active
+	      && !status.manual_preparation_session, "a detailed apply rejection cannot admit any stale candidate or output session");
+	const auto rejected_status_time = status.timestamp;
+	param_notify_changes();
+	wait([&]() {
+		collect_diagnostics();
+		return status.timestamp > rejected_status_time
+		       && status.apply_counter == diagnostic_apply && !status.configuration_valid
+		       && status.configuration_fault == static_cast<uint8_t>(ConfigurationFault::ParameterRange)
+		       && std::strcmp(status.cfg_param, "SLA_PWR_VMAX") == 0 && voltage_log_count == 1;
+	}, 1000000, "unchanged parameter notification and later supervisor cycle retain the exact rejected-apply detail");
+	check(param_set(voltage_parameter, &c.power.voltage_max) == 0, "mutate the rejected profile without approving a new apply");
+	wait([&]() {
+		collect_diagnostics();
+		return !status.configuration_valid && status.apply_counter == diagnostic_apply
+		       && status.configuration_fault == static_cast<uint8_t>(ConfigurationFault::NoCandidate)
+		       && status.cfg_param[0] == '\0';
+	}, 1000000, "unattempted profile mutation clears the obsolete parameter label without admitting the repaired profile");
+	check(voltage_log_count == 1 && !identity_log_count, "notification and unattempted repair cannot repeat the prior apply's status text");
+	diagnostic_apply = 305;
+	diagnostic_log_start = hrt_absolute_time();
+	check(param_set(battery_id_parameter, &rejected_id) == 0
+	      && param_set(param_find("SLA_CFG_APPLY"), &diagnostic_apply) == 0,
+	      "submit a different invalid apply without retaining the prior voltage error");
+	wait([&]() {
+		collect_diagnostics();
+		return !status.configuration_valid && status.apply_counter == diagnostic_apply
+		       && status.configuration_fault == static_cast<uint8_t>(ConfigurationFault::ParameterRange)
+		       && std::strcmp(status.cfg_param, "SLA_PWR_ID") == 0 && identity_log_count == 1;
+	}, 1000000, "same-fault new rejected apply supersedes the parameter detail and emits the new exact parameter");
+	diagnostic_apply = 306;
+	check(param_set(battery_id_parameter, &accepted_id) == 0
+	      && param_set(param_find("SLA_CFG_APPLY"), &diagnostic_apply) == 0, "explicitly apply the corrected coherent power profile");
+	wait([&]() {
+		return status.configuration_valid && status.apply_counter == diagnostic_apply
+		       && status.configuration_fault == static_cast<uint8_t>(ConfigurationFault::None)
+		       && status.cfg_param[0] == '\0' && status.routing_snapshot_valid;
+	}, 1000000, "successful actual apply clears parameter detail and restores valid routing without entering a mode");
+	const param_t center_parameter = param_find("PWM_AUX_CENT8");
+	const param_t second_center_parameter = param_find("PWM_AUX_CENT6");
+	const int32_t wrong_center = 1501, correct_center = 1500;
+	diagnostic_log_start = hrt_absolute_time();
+	check(param_set(center_parameter, &wrong_center) == 0, "change actual AUX8 calibration while the supervisor is inactive");
+	wait([&]() {
+		collect_diagnostics();
+		return !status.routing_snapshot_valid && status.inventory_fault == static_cast<uint8_t>(InventoryFault::None)
+		       && status.routing_fault == static_cast<uint8_t>(RoutingFault::InvalidCalibration)
+		       && status.io_index == 15 && status.io_bank == 1 && status.io_channel == 8
+		       && aux8_log_count == 1;
+	}, 1500000, "actual mixer reports expose and emit the rejected inventory index and physical AUX8 channel");
+	check(param_set(center_parameter, &correct_center) == 0 && param_set(second_center_parameter, &wrong_center) == 0,
+	      "replace the known AUX8 error with an AUX6 error of the same routing fault class");
+	wait([&]() {
+		collect_diagnostics();
+		return !status.routing_snapshot_valid && status.inventory_fault == static_cast<uint8_t>(InventoryFault::None)
+		       && status.routing_fault == static_cast<uint8_t>(RoutingFault::InvalidCalibration)
+		       && status.io_index == 13 && status.io_bank == 1 && status.io_channel == 6
+		       && aux6_log_count == 1;
+	}, 1500000, "latest same-fault physical channel emits after the existing bounded routing-report interval");
+	check(aux8_log_count == 1 && aux6_log_time >= aux8_log_time + 1000000,
+	      "routing message channel updates neither repeat the old pin nor bypass the one-second reporting bound");
+	check(param_set(second_center_parameter, &correct_center) == 0, "restore actual AUX6 calibration without a new ownership session");
+	wait([&]() {
+		return status.routing_snapshot_valid && status.routing_fault == static_cast<uint8_t>(RoutingFault::None)
+		       && status.io_index == -1 && status.io_bank == UINT8_MAX && status.io_channel == 0;
+	}, 1000000, "fresh successful routing validation clears stale index and physical channel detail");
+	PX4_INFO("SLAAPS_OPERATOR_DIAGNOSTIC_TEST_PASS actual_source=1 emitted_mavlink_log=1 actual_mixer_routing=1 qgc_display=0");
+
 	// A separate disarmed numerical-readiness scenario uses real topic copies,
 	// but never supplies synthetic flight admission or an armed state. Opposite
 	// full-rank IAS corners intentionally cancel at the table's midpoint.
@@ -6556,7 +6663,7 @@ static int nativeSupervisorOrchestrationTests()
 	      "explicit synthetic scheduled prearm fixture has four individually valid corners");
 	SlaapsNativeTest::admitted.store(false);
 	installNativeMixerConfiguration(scheduled);
-	const int32_t scheduled_apply = 304;
+	const int32_t scheduled_apply = 307;
 	check(param_set(param_find("SLA_CFG_APPLY"), &scheduled_apply) == 0,
 	      "deliberately apply scheduled readiness profile while genuinely disarmed");
 	publish_conditions = true;

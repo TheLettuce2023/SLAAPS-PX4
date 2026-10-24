@@ -1,5 +1,58 @@
 # SLAAPS configuration and routing implementation
 
+## October 23: actionable configuration and routing rejection
+
+The supervisor retains the exact rejected-apply parameter while that same
+configuration fingerprint, scope and apply counter remain current. Edits clear
+old attribution until another apply; successful apply clears the fault. Invalid
+inertia no longer incorrectly attributes a tensor failure to SLA_MASS.
+Current routing errors expose the actual inventory index and one-based MAIN/AUX
+channel only when a fresh inventory identifies it. Missing/stale observations
+clear the pin attribution, and missing assignments do not invent a physical pin.
+
+Commander supplies native scalar-argument events with parameter-group guidance.
+The supervisor also publishes exact parameter STATUSTEXT once per rejected apply
+and changed routing text at most once per second; suppressed newer routing detail
+remains eligible to report. These direct notifications handle stock Report's
+suppression of argument-only changes. Pending disarm retains priority. This adds
+no output authority and does not establish QGC GUI acceptance.
+
+Independent review, formatting, whitespace and event extraction pass (13 new
+scalar-only events). Host `/var/tmp/slaaps-configuration-31m8u6ae` passes Debug,
+Release and ASan/UBSan (3,082 each) and actual metadata for 308 parameters.
+The first native compile exposed the ULog format-description limit. Compact new
+field names `cfg_param`, `io_index`, `io_bank`, `io_channel` reduce the generated
+maximum to 1,440 bytes: 1,440 + 150 reserved bytes < the existing 1,600-byte buffer.
+No existing fields or global logger buffers changed. Native `3eg3u4yv` links;
+binary SHA256 `687e4156a6785ec9d6ba24844e59e851a622dee658a6a4067cfb3fe7e03d0446`.
+Runtime `uq8klqnm` completed 1,930 isolated actual-source checks, then its Python
+marker assertion failed because PX4 truncated the long informational marker.
+The retained failure is not a passing runtime receipt. The harness-only correction
+uses the complete logged evidence prefix. Full runtime `gjoks2mh` passes on the
+same binary with harness SHA256
+`dfb63bf04562b9b1319bb54a2feb032e47ebecf5c0caa1e6e91093eda63a9d17`.
+The corrected Python harness is an uncompiled delta from the sealed firmware.
+Native control/mixer/supervisor checks are 4,742/2,126/1,930. Actual mavlink_log
+messages, unchanged-attempt persistence/no-repeat, changed-parameter supersession,
+AUX8-to-AUX6 rate-bounded routing messages and stale-detail clearing pass. Existing
+manual/bench/power/companion paths and seven lifecycle/export-restore checks pass.
+The portable host test prefix is byte-identical after native-only field renaming.
+Capture-only and explicit synthetic-authority/forced-test-arm limits remain;
+QGC GUI rendering and physical outputs were not tested.
+
+Board checkpoint `build/slaaps_firmware/diagnostics-20261023` passes source/ELF/
+package/resource checks: image 1,907,220 B (+3,752), flash headroom 58,860 B;
+AXI RAM 111,100 B and SRAM4 2,048 B are unchanged. Nine probe units were compiled
+fresh (six affected prior units and three reporting callees); 26 unchanged units
+were reused only after exact dependency-content/include/flag comparison.
+Identified MAIN/AUX stacks are 2,868/2,812 of 4,096 B; supervisor 3,984 of 6,500 B;
+the new Commander diagnostic chain is 1,212 of 3,250 B. These are static identified
+chains, not runtime high-water or whole-program timing qualification. Supervisor
+object size is 12,480 B (+48), endpoints 8,592 B each (+16 each).
+Resource receipt SHA256 `383e4da9da0463cb2f325680a1342cfef2db857723cd801ca786291322ee93c1`.
+Source closure SHA256 `0e649f42200c22d4321378eced130eb0ccdb00a96e3895289cf59f8d2d98417f`.
+All jobs are terminal. No hardware operation, boot or flight qualification is claimed.
+
 ## October 23: selected propulsion power integration
 
 Manual and EDF commissioning now require an explicitly configured `battery_status`

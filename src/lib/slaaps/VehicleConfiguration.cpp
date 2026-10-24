@@ -483,7 +483,10 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 		return benchActivationTiming(c);
 	}
 
-	if (!positive(c.mass) || !validInertia(c)) { return {ConfigurationFault::InvalidInertia, "SLA_MASS"}; }
+	if (!positive(c.mass)) { return {ConfigurationFault::InvalidInertia, "SLA_MASS"}; }
+
+	// Tensor consistency involves multiple entries; do not blame a valid mass.
+	if (!validInertia(c)) { return {ConfigurationFault::InvalidInertia, nullptr}; }
 
 	const bool scheduled = c.schedule.enabled == 1;
 

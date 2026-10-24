@@ -1,23 +1,17 @@
 # SLAAPS implementation: start here
 
 Updated 2026-10-23 by Codex. Software progress is not flight acceptance.
-Current power-health checkpoint: shared selected-battery health gates Manual/EDF
-readiness and permission, with original report expiry and session identity binding.
-Host/metadata, full native integration and FMUv6X board/resource validation pass.
-User confirmed the unexpected older-file restore was unintentional. Supervisor,
-native verifier and status schema were recovered from verified native snapshot
-`/var/tmp/slaaps-native-lgi2s_y4`; replacements remain preserved under
-`build/slaaps_recovery/companion-20261023/observed-now`. Companion work resumed.
+Current uncommitted increment: actionable configuration and routing rejection
+through supervisor status, Commander events and native QGC STATUSTEXT. Host/native
+checks and current FMUv6X source/package/static-resource verification pass.
 Repository: https://github.com/TheLettuce2023/SLAAPS-PX4 (`origin` verified).
 Branch `slaaps-sitl`; verification source base `36a17722eff48e4317bdc0888fc541b935e51b7a`.
-The reviewed checkpoint is committed after portability commit `8130a4d074`;
-use `git log -2` for the current commit identities. Evidence retains its original source base.
-Recovery comparison: `build/slaaps_recovery/companion-20261023/current-production-comparison.json`.
-User authorized committing the reviewed implementation checkpoint. Preserve
-the separate user AGENTS.md edits and unrelated untracked `timestamp`.
-Latest completed increment: authenticated companion receipt through the real
-MAVLink parser/supervisor, corrected initial-readiness ordering, and acceleration
-library ARM portability. Current host/native/board checks pass; manual flight
+Power-health checkpoint `58f4be89fa` is committed; diagnostic changes remain uncommitted.
+Evidence retains its original source base and explicit overlays. Preserve the separate
+user AGENTS.md edits and unrelated untracked `timestamp`.
+Latest completed increment: retained exact apply errors and current physical routing
+diagnostics through native QGC messages. Power-health and companion-receipt paths
+remain integrated; companion receipt is not acceleration command admission. Current host/native/board checks pass; manual flight
 admission, companion command admission/control and physical qualification remain open.
 
 ## Navigation
@@ -29,7 +23,7 @@ Historical startup context: [October 22 archive](PROJECT_CONTEXT_ARCHIVE_2026102
 
 | Task | Entry / graph nodes |
 | --- | --- |
-| Current integration/evidence | [Power checkpoint](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-selected-propulsion-power-integration), [scheduling milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-scheduled-manual-control), [goal](SLAAPS_AIRFRAME_GOAL.md) |
+| Current integration/evidence | [Diagnostic checkpoint](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-actionable-configuration-and-routing-rejection), [scheduling milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-scheduled-manual-control), [goal](SLAAPS_AIRFRAME_GOAL.md) |
 | Manual activation/output | `slaaps_preparation_coordinator`, `slaaps_preparation_endpoint`, `slaaps_manual_worker_transport`, `slaaps_manual_bank_transport`, `slaaps_production_mixer_preparation` |
 | Shared configuration/QGC | `slaaps_configuration_api`, `slaaps_parameter_capture`, `slaaps_parameter_schema`, `slaaps_parameter_metadata`, `slaaps_routing_core` |
 | Scheduling | `slaaps_control_schedule`, `slaaps_operating_condition`, `slaaps_operating_condition_observation`, `slaaps_schedule_portable_evidence` |
@@ -110,13 +104,13 @@ bounded time mapping, session grant and wire status return remain missing.
 ## Latest evidence
 
 Detailed results, failures, hashes and earlier scheduling evidence are in the
-linked integration record. Current native build `fk9aazlr` and runtime `ghh0mrhs`
-pass selected-power readiness/fault/re-entry, manual/bench lifecycles, shared
+linked integration record. Current native build `3eg3u4yv` and runtime `gjoks2mh`
+pass operator rejection diagnostics, power recovery, manual/bench lifecycles, shared
 schedule/mixer checks and companion signed receipt. Isolated manual uses synthetic authority;
 Commander EDF commissioning uses recorded internal forced arming in no-plant
 tests. Normal vehicle health, physical outputs and QGC GUI remain unqualified.
-Latest closed board stage `companion-20261023/readiness-final` has image1,899,452
-and headroom66,628; the power change is being checked separately. Snapshots retain baseline
+Current board stage `diagnostics-20261023` links at image1,907,220 B
+with headroom58,860 B; nine fresh probe units and 26 dependency-verified reused units. Snapshots retain baseline
 Git metadata472a7d6786 with explicit committed+dirty overlays; the commit alone
 does not identify tested content. Runtime stack/timing and target boot remain open.
 
@@ -142,11 +136,11 @@ Earlier failures, recovery copies and companion/preparation evidence are retaine
 in the linked integration record. The deterministic initial-readiness race is fixed;
 the old intermittent `6buyl3gj` failure cannot be conclusively attributed to it.
 Unlinked acceleration-library host/ARM portability passes; it is not a controller.
-Power host matrix `/var/tmp/slaaps-configuration-lka3nypt` passes Debug/Release/
-ASan-UBSan (3,082 each) and308 parameters. Native build
-`/var/tmp/slaaps-native-fk9aazlr` links; full runtime `slaaps-native-runtime-ghh0mrhs`
-passes power readiness/fault/disarm/deliberate-reentry and existing regressions.
-Earlier `3qbzsnvv` exposed a Python EN1 re-entry sequencing error; corrected harness
-is hashed separately, unchanged native binary reused. Board `power-20261023` passes:
-image 1,903,468 B, flash headroom 62,612 B; all 32 stack probe units compiled fresh.
-All verification jobs are terminal; clearing history or starting a fresh chat is safe.
+Diagnostic host matrix `/var/tmp/slaaps-configuration-31m8u6ae` passes Debug/Release/
+ASan-UBSan (3,082 each) and 308 parameters. Portable test prefix is unchanged by
+native-only compact field renaming. Native build `3eg3u4yv` and full runtime
+`gjoks2mh` pass emitted parameter/channel text, clearing and existing regressions.
+Initial compile exceeded ULog's format-description limit; compact new field names
+resolve it without enlarging logger buffers. Failed runtime `uq8klqnm` exposed a
+truncated test marker; the corrected Python harness is hashed separately.
+All jobs are terminal and evidence is linked; clearing history or a fresh chat is safe.

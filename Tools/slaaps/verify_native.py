@@ -191,7 +191,9 @@ def main():
                 time.sleep(.1)
             supervisor_match = re.search(r"SLAAPS_SUPERVISOR_TEST_PASS checks=(\d+)", supervisor_output)
             assert supervisor_match, "Actual-source supervisor activation regression missing"
-            supervisor_result.update(passed=True, checks=int(supervisor_match.group(1)))
+            assert "SLAAPS_OPERATOR_DIAGNOSTIC_TEST_PASS actual_source=1 emitted_mavlink_log=1 actual_mixer_routing=1" in supervisor_output
+            supervisor_result.update(passed=True, checks=int(supervisor_match.group(1)),
+                                     operator_rejection_diagnostics=True, actual_mavlink_log=True, qgc_display=False)
         finally:
             if supervisor_process.poll() is None:
                 supervisor_process.terminate()
@@ -256,6 +258,8 @@ def main():
         result["native_supervisor_checks"] = supervisor_result["checks"]
         result["native_supervisor_isolated_process"] = True
         result["native_supervisor_scope"] = "actual_source_synthetic_authority_capture_only_no_hardware"
+        result["native_operator_rejection_diagnostics"] = dict(actual_source=True,
+            actual_mavlink_log=True, actual_mixer_routing=True, qgc_display=False)
         result["native_mixer_output_scope"] = "actual_worker_and_mixer_synthetic_authority_capture_only_no_hardware"
         result["native_control_scope"] = "native_selected_worker_and_bank_transport_synthetic_no_physical_driver"
         initial = wait_status(r"configured=1")
@@ -298,21 +302,44 @@ def main():
         client("param", "set", "SLA_CFG_KIND", "1")
         client("param", "set", "SLA_CFG_APPLY", "3")
         wait_status(r"configuration valid=0 use=1 apply=3")
+        rejected_profile = wait_status(r"configuration rejected parameter=SLA_PWR_INST\b")
+        assert re.search(r"configuration valid=0 use=1 apply=3 fault=1\b", rejected_profile), rejected_profile
         client("param", "set", "SLA_CFG_KIND", "0")
         client("param", "set", "SLA_CFG_APPLY", "4")
-        wait_status(r"configuration valid=1 use=0 apply=4")
+        accepted_profile = wait_status(r"configuration valid=1 use=0 apply=4")
+        assert "configuration rejected parameter=" not in accepted_profile, accepted_profile
         accepted_parameters = out / "accepted-configuration.bson"
         client("param", "save", str(accepted_parameters))
         assert accepted_parameters.is_file() and accepted_parameters.stat().st_size > 0
         client("slaaps_routing_test", "valid")
-        wait_status(r"routing snapshot=1 inventory_fault=0 routing_fault=0")
-        for scenario in ("duplicate", "unavailable", "calibration", "stale"):
+        wait_status(r"routing snapshot=1 inventory_fault=0 routing_fault=0 index=-1 bank=255 channel=0\b")
+        routing_details = []
+        # Exact indexes follow the fixture's MAIN1..8 then AUX1..8 inventory;
+        # physical channels are one based. Missing/stale reports identify none.
+        for scenario, inventory_fault, routing_fault, index, bank, channel in (
+                ("duplicate", 0, 5, 15, 1, 8),
+                ("unavailable", 0, 4, 10, 1, 3),
+                ("calibration", 0, 8, 10, 1, 3),
+                ("stale", 3, 1, -1, 255, 0)):
             client("slaaps_routing_test", scenario)
-            wait_status(r"routing snapshot=0")
-            client("slaaps_routing_test", "valid")
-            wait_status(r"routing snapshot=1 inventory_fault=0 routing_fault=0")
+            wait_status(rf"routing snapshot=0 inventory_fault={inventory_fault} routing_fault={routing_fault} "
+                        rf"index={index} bank={bank} channel={channel}\b")
+            routing_wire = client("listener", "slaaps_status", "1")
+            for field, value in (("io_index", index), ("io_bank", bank), ("io_channel", channel)):
+                assert re.search(rf"\b{field}:\s+{value}\b", routing_wire), routing_wire
+            routing_details.append(dict(scenario=scenario, inventory_fault=inventory_fault,
+                                        routing_fault=routing_fault, index=index, bank=bank, channel=channel))
+            # Let the next stale capture supersede a known AUX3 calibration
+            # error directly; its physical detail must clear, not linger.
+            if scenario != "calibration":
+                client("slaaps_routing_test", "valid")
+                wait_status(r"routing snapshot=1 inventory_fault=0 routing_fault=0 index=-1 bank=255 channel=0\b")
         time.sleep(1.1)
-        wait_status(r"routing snapshot=0 inventory_fault=3")
+        wait_status(r"routing snapshot=0 inventory_fault=3 routing_fault=1 index=-1 bank=255 channel=0\b")
+        result["operator_rejection_details"] = dict(passed=True, actual_supervisor=True,
+            invalid_apply_parameter="SLA_PWR_INST", corrected_apply_clears_parameter=True,
+            routing=routing_details, successful_routing_clears_detail=True,
+            inventory_failure_supersedes_channel_detail=True, qgc_gui_verified=False)
         for _ in range(3):
             client("slaaps", "stop")
             client("slaaps", "start")

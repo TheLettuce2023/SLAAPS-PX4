@@ -1,5 +1,157 @@
 #include "slaapsCheck.hpp"
 #include <lib/slaaps/Airframe.hpp>
+#include <lib/slaaps/ActuatorRouting.hpp>
+
+namespace
+{
+void reportConfigurationFailure(const slaaps_status_s &status, NavModes modes, Report &reporter)
+{
+	if (status.cfg_param[0]) {
+		/* EVENT
+		 * @description
+		 * The last applied profile failed validation. The accompanying status text identifies the exact parameter returned by the validator. Correct it in the QGC parameter editor while disarmed, then increase SLA_CFG_APPLY. The parameter is also recorded in slaaps_status.cfg_param; fault {1} is the ConfigurationFault code. A later edit clears this attribution until another apply is attempted. Saving parameters is not vehicle qualification.
+		 */
+		reporter.armingCheckFailure<uint8_t>(modes, health_component_t::system,
+						     events::ID("check_slaaps_profile_parameter"), events::Log::Error,
+						     "SLAAPS profile rejected: check reported parameter (fault {1})", status.configuration_fault);
+
+		// Report enables this legacy path only during its existing rate-bounded
+		// reporting pass. libevents arguments cannot carry runtime strings.
+		if (reporter.mavlink_log_pub()) {
+			mavlink_log_critical(reporter.mavlink_log_pub(), "SLAAPS: check %.16s", status.cfg_param);
+		}
+
+		return;
+	}
+
+	switch (static_cast<slaaps::ConfigurationFault>(status.configuration_fault)) {
+	case slaaps::ConfigurationFault::InvalidInertia:
+		/* EVENT
+		 * @description
+		 * Check measured mass and all six inertia entries about the CG in body FRD. The complete tensor must be positive definite and obey rigid-body principal-moment constraints. This cross-field rejection does not identify one erroneous tensor entry.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_profile_inertia"), events::Log::Error,
+					    "Check SLAAPS mass and complete inertia tensor");
+		return;
+
+	case slaaps::ConfigurationFault::InvalidServo:
+		/* EVENT
+		 * @description
+		 * Check all canard PWM negative/neutral/positive calibration values, calibrated deflection and positive rise/fall limits. Pulses must be ordered integral microseconds. No single canard or parameter is inferred from this group rejection.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_profile_servo"), events::Log::Error,
+					    "Check SLAAPS canard calibration and travel/rate limits");
+		return;
+
+	case slaaps::ConfigurationFault::InvalidTiming:
+		/* EVENT
+		 * @description
+		 * Check explicitly configured input/status/arming ages, cycle or bench gap, output lease, activation ACK timeout and first-command budget. Apply the complete consistent timing group while disarmed; numerical acceptance is not timing qualification.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_profile_timing"), events::Log::Error,
+					    "Check SLAAPS ages, cycle and activation timing");
+		return;
+
+	case slaaps::ConfigurationFault::InvalidEffectiveness:
+		/* EVENT
+		 * @description
+		 * Check signed canard moment derivatives, deflection slopes/uncertainties, fixed moment normalization and allocator rank. For an enabled schedule check every measured corner. The validator cannot identify one coefficient as the cause of a cross-field authority failure.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_profile_effectiveness"), events::Log::Error,
+					    "Check SLAAPS canard effectiveness and allocator rank");
+		return;
+
+	case slaaps::ConfigurationFault::InvalidController:
+		/* EVENT
+		 * @description
+		 * Check input-axis permutation/signs, controller gains and rate/integrator/moment limits, calibrated travel and bench mix. For an enabled schedule validate every corner. No particular field is inferred from this cross-field rejection.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_profile_controller"), events::Log::Error,
+					    "Check SLAAPS input mapping and controller/bench limits");
+		return;
+
+	case slaaps::ConfigurationFault::InvalidThrustCurve:
+		/* EVENT
+		 * @description
+		 * Check the measured EDF thrust curve, its voltage/condition and positive command slew limits. The thrust entries must rise strictly from zero. Do not infer a curve or qualification from saved values.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_profile_edf"), events::Log::Error,
+					    "Check SLAAPS measured EDF curve and slew limits");
+		return;
+
+	default:
+		/* EVENT
+		 * @description
+		 * A complete coherent profile must be explicitly applied while disarmed. Check configuration scope and record identity, repair incomplete or edited fields, then increase SLA_CFG_APPLY. No single parameter is available for this rejection. Application and persistence do not establish calibration or flight permission.
+		 */
+		reporter.armingCheckFailure<uint8_t>(modes, health_component_t::system,
+						     events::ID("check_slaaps_profile_invalid"), events::Log::Error,
+						     "Apply complete SLAAPS profile while disarmed (fault {1})", status.configuration_fault);
+		return;
+	}
+}
+
+void reportRoutingFailure(const slaaps_status_s &status, NavModes modes, Report &reporter)
+{
+	if (status.io_index >= 0 && status.io_channel > 0 && status.io_bank == 0) {
+		/* EVENT
+		 * @description
+		 * The current routing validator rejected physical MAIN channel {1}, routing fault {2}. Check that channel's PWM_MAIN_FUNC, MIN, CENT, MAX, DIS, FAIL and reversal/rate settings against the accepted logical canard/EDF calibration. Only SLAAPS functions on supported MAIN/AUX PWM are accepted; raw servo, motor, passthrough and actuator-test paths are not substitutes. The channel is reported only from a fresh actual inventory.
+		 */
+		reporter.armingCheckFailure<uint8_t, uint8_t>(modes, health_component_t::system,
+				events::ID("check_slaaps_routing_main"), events::Log::Error,
+				"Check SLAAPS MAIN channel {1} output configuration (fault {2})", status.io_channel, status.routing_fault);
+		return;
+	}
+
+	if (status.io_index >= 0 && status.io_channel > 0 && status.io_bank == 1) {
+		/* EVENT
+		 * @description
+		 * The current routing validator rejected physical AUX channel {1}, routing fault {2}. Check that channel's PWM_AUX_FUNC, MIN, CENT, MAX, DIS, FAIL and reversal/rate settings against the accepted logical canard/EDF calibration. Only SLAAPS functions on supported MAIN/AUX PWM are accepted; raw servo, motor, passthrough and actuator-test paths are not substitutes. The channel is reported only from a fresh actual inventory.
+		 */
+		reporter.armingCheckFailure<uint8_t, uint8_t>(modes, health_component_t::system,
+				events::ID("check_slaaps_routing_aux"), events::Log::Error,
+				"Check SLAAPS AUX channel {1} output configuration (fault {2})", status.io_channel, status.routing_fault);
+		return;
+	}
+
+	if (status.routing_fault == static_cast<uint8_t>(slaaps::RoutingFault::MissingCanard)) {
+		/* EVENT
+		 * @description
+		 * Assign all four logical SLAAPS canard functions exactly once across supported MAIN/AUX PWM channels, using the shared calibration. A missing assignment does not identify a physical channel to blame.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_routing_canard"), events::Log::Error,
+					    "Assign every SLAAPS canard once in MAIN/AUX outputs");
+		return;
+	}
+
+	if (status.routing_fault == static_cast<uint8_t>(slaaps::RoutingFault::MissingEdf)) {
+		/* EVENT
+		 * @description
+		 * Assign the SLAAPS EDF function exactly once to a supported MAIN/AUX PWM channel for Manual or EDF commissioning. Servo-only commissioning may omit EDF. The EDF must use forward-only calibration and compatible stopped/failsafe values. A missing assignment does not identify a physical channel to blame.
+		 */
+		reporter.armingCheckFailure(modes, health_component_t::system,
+					    events::ID("check_slaaps_routing_edf"), events::Log::Error,
+					    "Assign SLAAPS EDF to a supported MAIN/AUX PWM output");
+		return;
+	}
+
+	/* EVENT
+	 * @description
+	 * The current inventory is invalid but identifies no supported physical MAIN/AUX channel. Check bank/channel validity, exclusive SLAAPS functions, PWM protocol/rate and calibration. No pin or missing actuator is inferred. Routing fault {1} is the RoutingFault code.
+	 */
+	reporter.armingCheckFailure<uint8_t>(modes, health_component_t::system,
+					     events::ID("check_slaaps_routing_invalid"), events::Log::Error,
+					     "Check SLAAPS MAIN/AUX output inventory (fault {1})", status.routing_fault);
+}
+} // namespace
 
 void SlaapsChecks::checkAndReport(const Context &context, Report &reporter)
 {
@@ -101,6 +253,23 @@ void SlaapsChecks::checkAndReport(const Context &context, Report &reporter)
 					    && status.mode_id[bench_index] >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
 					    && status.mode_id[bench_index] <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8
 					    && context.status().nav_state_user_intention == status.mode_id[bench_index];
+		const bool manual_selected = fresh && status.direct_actuator_modes_configured
+					     && status.mode_id[0] >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
+					     && status.mode_id[0] <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8
+					     && context.status().nav_state_user_intention == status.mode_id[0];
+
+		if ((bench_selected || manual_selected) && !status.bench_disarm_pending) {
+			if (status.configuration_fault != static_cast<uint8_t>(slaaps::ConfigurationFault::None)) {
+				reportConfigurationFailure(status, unavailable_modes, reporter);
+				return;
+			}
+
+			if (status.configuration_valid && !status.routing_snapshot_valid && !status.inventory_fault
+			    && status.routing_fault != static_cast<uint8_t>(slaaps::RoutingFault::None)) {
+				reportRoutingFailure(status, unavailable_modes, reporter);
+				return;
+			}
+		}
 
 		if (bench_selected) {
 			if (status.configuration_use == 2 && status.power_required && !status.bench_disarm_pending
@@ -213,11 +382,6 @@ void SlaapsChecks::checkAndReport(const Context &context, Report &reporter)
 				return;
 			}
 		}
-
-		const bool manual_selected = fresh && status.direct_actuator_modes_configured
-					     && status.mode_id[0] >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
-					     && status.mode_id[0] <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8
-					     && context.status().nav_state_user_intention == status.mode_id[0];
 
 		if (manual_selected) {
 			if (status.power_required && (!status.power_ready || now >= status.power_deadline)) {

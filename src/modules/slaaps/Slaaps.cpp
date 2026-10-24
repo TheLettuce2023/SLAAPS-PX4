@@ -8,6 +8,7 @@
 #include <lib/slaaps/PowerObservation.hpp>
 #include <lib/research_stabilized_manual/StabilizedInputValidation.hpp>
 #include <lib/parameters/atomic_transaction.h>
+#include <systemlib/mavlink_log.h>
 
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
@@ -41,6 +42,7 @@ constexpr unsigned kBenchMode = 2;
 constexpr hrt_abstime kIntervalUs = slaaps::kSupervisorIdleIntervalUs;
 constexpr hrt_abstime kRetryUs = 500000;
 constexpr hrt_abstime kMaximumStatusAgeUs = 1000000;
+constexpr hrt_abstime kRoutingDiagnosticIntervalUs = 1000000; // Telemetry rate bound, not output timing.
 constexpr px4::wq_config_t kSupervisorQueue{"wq:slaaps", 6500, -5};
 constexpr const char *kModeNames[kModeCount] = {"SLAAPS Manual", "SLAAPS Acceleration", "SLAAPS Bench"};
 constexpr int32_t kMaximumBenchSeconds = 60; // Software command bound, not hardware qualification.
@@ -55,6 +57,7 @@ class Slaaps final : public ModuleBase, public px4::ScheduledWorkItem
 public:
 	static Descriptor desc;
 	Slaaps() : ScheduledWorkItem(MODULE_NAME, kSupervisorQueue) {}
+	~Slaaps() override { if (_diagnostic_log_pub) { orb_unadvertise(_diagnostic_log_pub); } }
 	static int task_spawn(int argc, char *argv[]);
 	static int custom_command(int argc, char *argv[]) { return print_usage("unknown command"); }
 	static int print_usage(const char *reason = nullptr);
@@ -204,11 +207,24 @@ private:
 	int32_t _selected_use{};
 	bool _restore_pending{true};
 	slaaps::ConfigurationFault _configuration_fault{slaaps::ConfigurationFault::NoCandidate};
+	const char *_configuration_parameter{}; // Trusted validator literal, never a parameter handle.
+	uint64_t _configuration_rejection_identity{};
+	int32_t _configuration_rejection_use{};
+	int32_t _configuration_rejection_apply{};
+	orb_advert_t _diagnostic_log_pub{};
 	unsigned _stop_index{};
 	bool _registration_fault{};
 	bool _routing_valid{};
 	slaaps::InventoryFault _inventory_fault{slaaps::InventoryFault::MissingBank};
 	slaaps::RoutingFault _routing_fault{slaaps::RoutingFault::InvalidInventory};
+	int16_t _routing_fault_index{-1};
+	uint8_t _routing_fault_bank{UINT8_MAX};
+	uint8_t _routing_fault_channel{};
+	slaaps::RoutingFault _routing_reported_fault{slaaps::RoutingFault::None};
+	int16_t _routing_reported_index{-1};
+	uint8_t _routing_reported_bank{UINT8_MAX};
+	uint8_t _routing_reported_channel{};
+	hrt_abstime _last_routing_diagnostic{};
 	slaaps::OutputRoutingObservation _output_observation{};
 	slaaps::ReportedRoutingSnapshot _routing_snapshot{};
 	uORB::Subscription _parameter_update{ORB_ID(parameter_update)};
@@ -339,6 +355,8 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 
 		_configuration.invalidate();
 		_configuration_fault = slaaps::ConfigurationFault::Active;
+		_configuration_parameter = nullptr;
+		_configuration_rejection_apply = 0;
 		return;
 	}
 
@@ -347,11 +365,23 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 	if (!_parameters.capture(snapshot, _snapshot_duration)) {
 		_configuration.invalidate();
 		_configuration_fault = slaaps::ConfigurationFault::ParameterRange;
+		_configuration_parameter = nullptr;
+		_configuration_rejection_apply = 0;
 		return;
 	}
 
 	const bool restoring = _restore_pending && slaaps::Px4ConfigurationSource::remembered(snapshot);
 	_restore_pending = false;
+
+	// A rejection describes one actual attempted profile, not later unattempted
+	// edits. Retain it across repeated observation of that same attempt only.
+	if (_configuration_rejection_apply && (snapshot.apply_counter != _configuration_rejection_apply
+					       || snapshot.use != _configuration_rejection_use
+					       || slaaps::fingerprint(snapshot.configuration) != _configuration_rejection_identity)) {
+		_configuration_rejection_apply = 0;
+		_configuration_parameter = nullptr;
+		_configuration_fault = slaaps::ConfigurationFault::NoCandidate;
+	}
 
 	if (_bench_restore_after_disarm && (snapshot.use != _selected_use || snapshot.apply_counter != _last_apply
 					    || !slaaps::Px4ConfigurationSource::remembered(snapshot) || !slaaps::equal(snapshot.configuration, _configuration.configuration()))) {
@@ -362,7 +392,11 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 
 	if (snapshot.use != _selected_use) { _configuration.invalidate(); }
 
-	if (!_configuration.hasCandidate()) { _configuration_fault = slaaps::ConfigurationFault::NoCandidate; }
+	if (!_configuration.hasCandidate() && !_configuration_rejection_apply) {
+		_configuration_fault = slaaps::ConfigurationFault::NoCandidate;
+		_configuration_parameter = nullptr;
+		_configuration_rejection_apply = 0;
+	}
 
 	if (!restoring && snapshot.apply_counter <= _last_apply) { return; }
 
@@ -379,27 +413,45 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 
 	if (snapshot.use < 0 || snapshot.use > static_cast<int32_t>(slaaps::ConfigurationUse::EdfCommissioning)) {
 		_configuration_fault = slaaps::ConfigurationFault::ParameterRange;
+		_configuration_parameter = "SLA_CFG_KIND";
+		_configuration_rejection_identity = slaaps::fingerprint(snapshot.configuration);
+		_configuration_rejection_use = snapshot.use;
+		_configuration_rejection_apply = snapshot.apply_counter;
 		PX4_WARN("invalid SLA_CFG_KIND");
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: check SLA_CFG_KIND");
 		return;
 	}
 
 	_selected_use = snapshot.use;
 	const auto result = _configuration.commit(snapshot.configuration, static_cast<slaaps::ConfigurationUse>(_selected_use));
 	_configuration_fault = result.fault;
+	_configuration_parameter = result.parameter;
+	_configuration_rejection_apply = result.valid() ? 0 : snapshot.apply_counter;
+
+	if (!result.valid()) {
+		_configuration_rejection_identity = slaaps::fingerprint(snapshot.configuration);
+		_configuration_rejection_use = snapshot.use;
+	}
 
 	if (!result.valid()) {
 		PX4_WARN("configuration rejected: fault=%u parameter=%s", static_cast<unsigned>(result.fault),
 			 result.parameter ? result.parameter : "cross-field constraint");
 
+		// One publication per actual apply attempt. Commander events ignore
+		// argument-only changes; a second rejected parameter must still reach QGC.
+		if (result.parameter) { mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: check %.16s", result.parameter); }
+
 	} else {
 		if (!restoring && !_parameters.remember(snapshot)) {
 			_configuration.invalidate();
 			_configuration_fault = slaaps::ConfigurationFault::NoCandidate;
+			_configuration_parameter = nullptr;
+			_configuration_rejection_apply = 0;
 			PX4_WARN("configuration acceptance could not be saved; apply again");
 			return;
 		}
 
-		PX4_INFO("configuration %s; output integration unavailable", restoring ? "restored" : "applied");
+		PX4_INFO("configuration %s; mode readiness checked separately", restoring ? "restored" : "applied");
 	}
 }
 
@@ -433,16 +485,67 @@ void Slaaps::updateRouting(hrt_abstime now)
 {
 	_routing_valid = false;
 	_routing_fault = slaaps::RoutingFault::InvalidInventory;
+	_routing_fault_index = -1;
+	_routing_fault_bank = UINT8_MAX;
+	_routing_fault_channel = 0;
 	// Both physical banks must report, including a bank without assignments.
 	// Only a successful stable capture can replace the retained snapshot.
 	_inventory_fault = _output_observation.captureLive(now, _routing_snapshot);
 
-	if (_inventory_fault != slaaps::InventoryFault::None || !_configuration.hasCandidate()) { return; }
+	if (_inventory_fault != slaaps::InventoryFault::None || !_configuration.hasCandidate()) {
+		_routing_reported_fault = slaaps::RoutingFault::None;
+		return;
+	}
 
 	slaaps::RoutingPlan plan{};
 	const auto result = slaaps::makeRoutingPlan(_configuration.configuration(), _routing_snapshot.inventory, _selected_use != 0, plan);
 	_routing_fault = result.fault;
 	_routing_valid = result.valid();
+
+	if (!result.valid() && result.channel >= 0 && static_cast<unsigned>(result.channel) < _routing_snapshot.inventory.count) {
+		_routing_fault_index = static_cast<int16_t>(result.channel);
+		const auto &channel = _routing_snapshot.inventory.channels[result.channel];
+
+		if ((channel.bank == slaaps::OutputBank::Main || channel.bank == slaaps::OutputBank::Aux)
+		    && channel.channel < slaaps::kMaximumChannelsPerBank) {
+			_routing_fault_bank = static_cast<uint8_t>(channel.bank);
+			_routing_fault_channel = channel.channel + 1;
+		}
+	}
+
+	if (result.valid()) {
+		_routing_reported_fault = slaaps::RoutingFault::None;
+		return;
+	}
+
+	const bool same_report = _routing_reported_fault == _routing_fault && _routing_reported_index == _routing_fault_index
+				 && _routing_reported_bank == _routing_fault_bank && _routing_reported_channel == _routing_fault_channel;
+
+	if (_bench_disarm_pending || same_report || (_last_routing_diagnostic && (now < _last_routing_diagnostic
+			|| now - _last_routing_diagnostic < kRoutingDiagnosticIntervalUs))) { return; }
+
+	// Compare against the last emitted tuple. A changed tuple suppressed by
+	// this throttle remains eligible for a later report even if input is held.
+	_routing_reported_fault = _routing_fault;
+	_routing_reported_index = _routing_fault_index;
+	_routing_reported_bank = _routing_fault_bank;
+	_routing_reported_channel = _routing_fault_channel;
+	_last_routing_diagnostic = now;
+
+	if (_routing_fault_bank <= static_cast<uint8_t>(slaaps::OutputBank::Aux) && _routing_fault_channel) {
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: check %s channel %u (routing %u)",
+				     _routing_fault_bank == static_cast<uint8_t>(slaaps::OutputBank::Main) ? "MAIN" : "AUX",
+				     _routing_fault_channel, static_cast<unsigned>(_routing_fault));
+
+	} else if (_routing_fault == slaaps::RoutingFault::MissingCanard) {
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: assign all four canard output functions");
+
+	} else if (_routing_fault == slaaps::RoutingFault::MissingEdf) {
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: assign EDF output function");
+
+	} else {
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: check MAIN/AUX output inventory");
+	}
 }
 
 void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm)
@@ -518,7 +621,10 @@ bool Slaaps::restoreStoppedProfile(hrt_abstime now, const vehicle_status_s &vehi
 	    && _stop_profile.use == static_cast<int32_t>(_configuration.use())
 	    && _stop_profile.apply_counter == _last_apply && slaaps::Px4ConfigurationSource::remembered(_stop_profile)
 	    && slaaps::equal(_stop_profile.configuration, retained)) {
-		_configuration_fault = _configuration.commit(retained, _configuration.use()).fault;
+		const auto result = _configuration.commit(retained, _configuration.use());
+		_configuration_fault = result.fault;
+		_configuration_parameter = result.parameter;
+		_configuration_rejection_apply = 0;
 	}
 
 	return false;
@@ -1959,12 +2065,20 @@ void Slaaps::publishStatus(hrt_abstime now)
 	status.configuration_valid = _configuration.hasCandidate();
 	status.configuration_identity = status.configuration_valid ? _configuration.identity() : 0;
 	status.configuration_fault = static_cast<uint8_t>(_configuration_fault);
+
+	if (_configuration_parameter) {
+		strncpy(status.cfg_param, _configuration_parameter, sizeof(status.cfg_param) - 1);
+	}
+
 	status.configuration_use = _selected_use;
 	status.apply_counter = _last_apply;
 	status.snapshot_duration_us = _snapshot_duration;
 	status.routing_snapshot_valid = _routing_valid && status.configuration_valid;
 	status.inventory_fault = static_cast<uint8_t>(_inventory_fault);
 	status.routing_fault = static_cast<uint8_t>(_routing_fault);
+	status.io_index = _routing_fault_index;
+	status.io_bank = _routing_fault_bank;
+	status.io_channel = _routing_fault_channel;
 	status.direct_actuator_modes_configured = !_registration_fault;
 
 	for (unsigned i = 0; i < kModeCount; ++i) {
@@ -2181,6 +2295,9 @@ int Slaaps::print_status()
 	PX4_INFO("configuration valid=%d use=%u apply=%ld fault=%u snapshot=%lu us",
 		 status.configuration_valid, status.configuration_use, static_cast<long>(status.apply_counter),
 		 status.configuration_fault, static_cast<unsigned long>(status.snapshot_duration_us));
+
+	if (status.cfg_param[0]) { PX4_INFO("configuration rejected parameter=%s", status.cfg_param); }
+
 	PX4_INFO("flight unavailable=%u", status.unavailable_reason);
 	PX4_INFO("companion transport=%u receiver=%lu event=%llu deadline=%llu (no command admission)",
 		 status.companion_transport_status, static_cast<unsigned long>(status.companion_receiver_revision),
@@ -2198,8 +2315,9 @@ int Slaaps::print_status()
 		 static_cast<unsigned long long>(status.power_deadline));
 	PX4_INFO("input metadata=%d epoch=%lu (not flight admission)",
 		 status.input_metadata_valid, static_cast<unsigned long>(status.input_source_epoch));
-	PX4_INFO("routing snapshot=%d inventory_fault=%u routing_fault=%u",
-		 status.routing_snapshot_valid, status.inventory_fault, status.routing_fault);
+	PX4_INFO("routing snapshot=%d inventory_fault=%u routing_fault=%u index=%d bank=%u channel=%u",
+		 status.routing_snapshot_valid, status.inventory_fault, status.routing_fault, status.io_index,
+		 status.io_bank, status.io_channel);
 	PX4_INFO("manual preparation=%u session=%llu banks=%u deadline=%llu (no flight admission)",
 		 status.manual_preparation_status, static_cast<unsigned long long>(status.manual_preparation_session),
 		 status.manual_preparation_banks, static_cast<unsigned long long>(status.manual_preparation_deadline));
