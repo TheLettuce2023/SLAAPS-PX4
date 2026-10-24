@@ -368,6 +368,49 @@ ConfigurationResult validateCompanionConfiguration(const VehicleConfiguration &c
 	return {};
 }
 
+ConfigurationResult validatePowerConfiguration(const PowerConfiguration &power, bool required)
+{
+	if (power.battery_instance < (required ? 0 : -1) || power.battery_instance >= kPowerBatteryInstances) {
+		return {ConfigurationFault::ParameterRange, "SLA_PWR_INST"};
+	}
+
+	if (power.battery_id < (required ? 1 : 0) || power.battery_id > UINT8_MAX) {
+		return {ConfigurationFault::ParameterRange, "SLA_PWR_ID"};
+	}
+
+	// BatteryStatus v1 sources: power module, external, ESC telemetry.
+	if (power.battery_source < (required ? 0 : -1) || power.battery_source > 2) {
+		return {ConfigurationFault::ParameterRange, "SLA_PWR_SRC"};
+	}
+
+	if (power.maximum_age_us < 0 || power.maximum_age_us > kMaximumMetadataAgeUs) {
+		return {ConfigurationFault::ParameterRange, "SLA_PWR_AGE"};
+	}
+
+	if (!std::isfinite(power.voltage_min) || power.voltage_min < 0.F || power.voltage_min > 100.F) {
+		return {ConfigurationFault::ParameterRange, "SLA_PWR_VMIN"};
+	}
+
+	if (!std::isfinite(power.voltage_max) || power.voltage_max < 0.F || power.voltage_max > 100.F) {
+		return {ConfigurationFault::ParameterRange, "SLA_PWR_VMAX"};
+	}
+
+	if (required) {
+		if (!power.maximum_age_us) { return {ConfigurationFault::InvalidTiming, "SLA_PWR_AGE"}; }
+
+		if (power.voltage_min <= 0.F) { return {ConfigurationFault::ParameterRange, "SLA_PWR_VMIN"}; }
+
+		if (power.voltage_max <= power.voltage_min) { return {ConfigurationFault::ParameterRange, "SLA_PWR_VMAX"}; }
+	}
+
+	return {};
+}
+
+ConfigurationResult validatePowerConfiguration(const VehicleConfiguration &c, bool required)
+{
+	return validatePowerConfiguration(c.power, required);
+}
+
 ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use)
 {
 	if (use != ConfigurationUse::Bench && use != ConfigurationUse::StabilizedManual
@@ -380,6 +423,10 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 	const auto companion = validateCompanionConfiguration(c);
 
 	if (!companion.valid()) { return companion; }
+
+	const auto power = validatePowerConfiguration(c, use != ConfigurationUse::Bench);
+
+	if (!power.valid()) { return power; }
 
 	if (c.data_revision <= 0) { return {ConfigurationFault::MissingRecord, "SLA_DATA_REV"}; }
 
@@ -439,6 +486,14 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 	if (!positive(c.mass) || !validInertia(c)) { return {ConfigurationFault::InvalidInertia, "SLA_MASS"}; }
 
 	const bool scheduled = c.schedule.enabled == 1;
+
+	if (scheduled && c.schedule.battery_instance != c.power.battery_instance) {
+		return {ConfigurationFault::ParameterRange, "SLA_SCH_BAT_INST"};
+	}
+
+	if (scheduled && c.schedule.battery_id != c.power.battery_id) {
+		return {ConfigurationFault::ParameterRange, "SLA_SCH_BAT_ID"};
+	}
 
 	if (!scheduled && !positive(c.airflow)) { return {ConfigurationFault::InvalidEffectiveness, "SLA_AIRSPD"}; }
 

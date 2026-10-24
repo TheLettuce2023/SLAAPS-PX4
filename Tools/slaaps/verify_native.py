@@ -39,7 +39,7 @@ def verify_companion_transport(client, wait_status, out, build):
     sender.signing.timestamp = 100000000
     sender.signing.sign_outgoing = True
     request_sequence = 0
-    apply = 104  # Previous commissioning lifecycle's completed apply counter.
+    apply = 105  # Previous commissioning lifecycle's completed apply counter.
 
     def request(**changes):
         nonlocal request_sequence
@@ -344,7 +344,7 @@ def main():
         client("slaaps", "start")
         assert "configuration valid=1 use=0 apply=4" in wait_status(r"configured=1"), "Exported accepted profile did not restore"
         # Real Commander owns arming and mode intent. Synthetic selected inputs
-        # supply only estimator/manual topics; capture-only drivers never actuate.
+        # supply estimator/manual and labeled battery topics; capture-only drivers never actuate.
         client("slaaps_routing_test", "stop")
         client("slaaps_control_test", "mixing", "start")
         wait_status(r"configuration valid=1 use=1 apply=100")
@@ -353,6 +353,9 @@ def main():
         # is intentionally unsuitable here. Configure this disarmed scenario
         # through the same explicit parameter/apply path, not a source default.
         client("param", "set", "SLA_ARM_AGE", "1000000")
+        for name, value in {"SLA_PWR_INST": 0, "SLA_PWR_ID": 1, "SLA_PWR_SRC": 0,
+                            "SLA_PWR_AGE": 100000, "SLA_PWR_VMIN": 20, "SLA_PWR_VMAX": 26}.items():
+            client("param", "set", name, str(value))
         client("param", "set", "SLA_CFG_APPLY", "101")
         wait_status(r"configuration valid=1 use=1 apply=101")
         assert int(modes[0]) == 23, "Isolated fixture must register Manual in external slot 1"
@@ -360,12 +363,16 @@ def main():
         inactive = wait_status(r"manual entry=0\b")
         assert "manual preparation=0" in inactive, "Apply alone began preparation"
         client("commander", "mode", "ext1")
-        wait_status(r"manual entry=[36]\b")  # No selected manual/estimator publisher yet.
+        wait_status(r"manual entry=(?:3|6|14)\b")  # No selected input or propulsion battery yet.
         client("commander", "mode", "manual")
         wait_status(r"manual entry=0\b")
         client("slaaps_control_test", "selected", "start")
         client("slaaps_control_test", "selected", "offset")
+        client("slaaps_control_test", "selected", "power-fault")
         client("commander", "mode", "ext1")
+        wait_status(r"manual entry=14\b")
+        wait_status(r"power required=1 ready=0 status=7\b")
+        client("slaaps_control_test", "selected", "power-valid")
         wait_status(r"manual entry=4\b")
         client("slaaps_control_test", "selected", "throttle-high")
         wait_status(r"manual entry=5\b")
@@ -461,6 +468,7 @@ def main():
         # These are explicit synthetic calibration/timing values, selected raw
         # input and capture-only output devices; no test permission is supplied.
         client("slaaps_control_test", "selected", "neutral")
+        client("slaaps_control_test", "selected", "power-drop")
         bench_values = {"SLA_CFG_KIND": 0, "SLA_BENCH_EN": 0, "SLA_BENCH_CH": 1,
                         "SLA_BENCH_SEC": 5, "SLA_IN_AGE": 500, "SLA_STATUS_AGE": 1000000,
                         "SLA_ARM_AGE": 1000000, "SLA_BENCH_GAP": 200, "SLA_OUT_LEASE": 200,
@@ -595,118 +603,161 @@ def main():
         # owner and physical callback path. These limits are synthetic fixtures,
         # not an approved vehicle commissioning profile.
         client("slaaps_control_test", "selected", "neutral")
+        client("slaaps_control_test", "selected", "power-valid")
         for name, value in {"SLA_CFG_KIND": 2, "SLA_BENCH_CH": 5, "SLA_BENCH_EN": 0,
                             "SLA_BENCH_SEC": 10, "SLA_EDF_BMAX": .25,
                             "SLA_EDF_RISE": 2, "SLA_EDF_FALL": 2}.items():
             client("param", "set", name, str(value))
         client("param", "set", "SLA_CFG_APPLY", "104")
         wait_status(r"configuration valid=1 use=2 apply=104")
+        client("slaaps_control_test", "selected", "power-drop")
+        wait_status(r"power required=1 ready=0 status=9\b")
+        unavailable_power = client("listener", "slaaps_status", "1")
+        assert re.search(r"can_arm_mask:\s+0\b", unavailable_power), unavailable_power
+        assert re.search(r"bench_worker_active:\s+(?:False|false|0)\b", unavailable_power), unavailable_power
+        client("slaaps_control_test", "selected", "power-low")
+        wait_status(r"power required=1 ready=0 status=11\b")
+        client("slaaps_control_test", "selected", "power-valid")
+        wait_status(r"power required=1 ready=1 status=1\b")
         client("commander", "mode", f"ext{bench_id - 22}")
         wait_status(r"bench entry=6 active=0\b")
-        edf_before = client("slaaps_control_test", "mixing", "status")
-        edf_before_counts = tuple(map(int, re.search(r"main_writes=(\d+) aux_writes=(\d+) nonzero=(\d+)",
-                                                    edf_before).groups()))
-        client("param", "set", "SLA_BENCH_EN", "1")
-        wait_status(r"bench entry=15 active=0\b")
-        edf_ready = client("listener", "slaaps_status", "1")
-        assert re.search(r"bench_commissioning_ready:\s+(?:True|true|1)\b", edf_ready), edf_ready
-        assert re.search(rf"can_arm_mask:\s+{bench_mask}\b", edf_ready), edf_ready
-        assert tuple(map(int, re.search(r"main_writes=(\d+) aux_writes=(\d+) nonzero=(\d+)",
-                                        client("slaaps_control_test", "mixing", "status")).groups())) == edf_before_counts
-        authority = client("listener", "vehicle_status", "1")
-        assert re.search(r"\barming_state:\s+1\b", authority), authority
-        before_arm = int(re.search(r"\btimestamp:\s+(\d+)", authority).group(1))
-        client("commander", "arm")
-        arm_deadline = time.monotonic() + 2
-        while True:
-            acknowledgment = client("listener", "vehicle_command_ack", "1")
-            ack_time = re.search(r"timestamp:\s+(\d+)", acknowledgment)
-            if re.search(r"command:\s+400\b", acknowledgment) and ack_time and int(ack_time.group(1)) > before_arm:
-                break
-            assert time.monotonic() < arm_deadline, acknowledgment
-            time.sleep(.02)
-        ordinary_arming_accepted = bool(re.search(r"result:\s+0\b", acknowledgment))
-        if not ordinary_arming_accepted:
-            assert re.search(r"result:\s+[12]\b", acknowledgment), acknowledgment
-            # No-plant builds lack normal sensor/power health. Use stock internal
-            # forced arming ONLY in this capture-only test, with the limitation
-            # recorded below. Production gates/health checks are not modified.
-            client("commander", "arm", "-f")
-        wait_status(r"bench entry=16 active=1 target=5\b")
-        authority = client("listener", "vehicle_status", "1")
-        assert re.search(r"\barming_state:\s+2\b", authority), authority
-        assert re.search(rf"\bnav_state:\s+{bench_id}\b", authority), authority
-        edf_permission = client("listener", "slaaps_manual_permission", "1")
-        assert re.search(r"\bmode:\s+4\b", edf_permission), edf_permission
-        for field in ("armed", "healthy", "commissioning_admitted"):
-            assert re.search(rf"\b{field}:\s+(?:True|true|1)\b", edf_permission), edf_permission
-        for field in ("flight_admitted", "measured_condition_valid", "kill", "lockdown", "termination"):
-            assert re.search(rf"\b{field}:\s+(?:False|false|0)\b", edf_permission), edf_permission
-        zero_command = client("listener", "slaaps_manual_command", "1")
-        assert re.search(r"\bmode:\s+4\b", zero_command), zero_command
-        assert re.search(r"\bedf:\s+0(?:\.0+)?\s", zero_command), zero_command
-        client("slaaps_control_test", "selected", "throttle-high")
-        command_deadline = time.monotonic() + 1
-        while True:
-            edf_command = client("listener", "slaaps_manual_command", "1")
-            value = re.search(r"\bedf:\s+([\d.eE+-]+)", edf_command)
-            if value and 0 < float(value.group(1)) <= .25:
-                break
-            assert time.monotonic() < command_deadline, edf_command
-            time.sleep(.02)
-        assert re.search(r"\bedf_disposition:\s+1\b", edf_command), edf_command
-        edf_canards = re.search(r"\bcanards:\s*\[([^\]]+)\]", edf_command)
-        assert edf_canards and all(float(v) == 0 for v in edf_canards.group(1).split(",")), edf_command
-        edf_sample_time = int(re.search(r"\btimestamp_sample:\s+(\d+)", edf_command).group(1))
-        capture_deadline = time.monotonic() + 1
-        while True:
-            captures = client("listener", "actuator_outputs", "1")
-            vectors = [(int(stamp), [float(v) for v in values.split(",")])
-                       for stamp, values in re.findall(r"\btimestamp:\s+(\d+).*?\boutput:\s*\[([^\]]+)\]", captures, re.S)]
-            edf_aux = next((values for stamp, values in vectors if stamp >= edf_sample_time and len(values) >= 8
-                            and 1000 < values[3] <= 1250 and values[5] == values[7] == 1500
-                            and all(values[i] == 0 for i in (0, 1, 2, 4, 6))), None)
-            if edf_aux:
-                break
-            assert time.monotonic() < capture_deadline, captures
-            time.sleep(.02)
-        edf_capture_floor = max(stamp for stamp, values in vectors if len(values) >= 8)
-        client("param", "set", "SLA_BENCH_EN", "0")
-        stop_deadline = time.monotonic() + 2
-        while True:
-            captures = client("listener", "actuator_outputs", "1")
-            stopped = [(int(stamp), [float(v) for v in values.split(",")])
-                       for stamp, values in re.findall(r"\btimestamp:\s+(\d+).*?\boutput:\s*\[([^\]]+)\]", captures, re.S)]
-            if len(stopped) >= 2 and all(stamp > edf_capture_floor and all(v == 0 for v in values) for stamp, values in stopped):
-                break
-            assert time.monotonic() < stop_deadline, captures
-            time.sleep(.02)
-        wait_status(r"bench entry=11 active=0\b")
-        authority = client("listener", "vehicle_status", "1")
-        assert re.search(r"\barming_state:\s+1\b", authority), authority
-        stopped_nonzero = int(re.search(r"nonzero=(\d+)",
-                                        client("slaaps_control_test", "mixing", "status")).group(1))
-        client("param", "set", "SLA_BENCH_EN", "1")
-        time.sleep(.15)
-        stopped_status = client("slaaps", "status")
-        stopped_authority = client("listener", "vehicle_status", "1")
-        assert re.search(r"\barming_state:\s+1\b", stopped_authority), stopped_authority
-        # Commander may leave the external mode on ordinary disarm. Retained
-        # COMPLETE applies while selected; a genuine mode exit becomes INACTIVE.
-        still_selected = bool(re.search(rf"\bnav_state_user_intention:\s+{bench_id}\b", stopped_authority))
-        assert re.search(rf"bench entry={11 if still_selected else 0} active=0\b", stopped_status), stopped_status
-        assert int(re.search(r"nonzero=(\d+)",
-                             client("slaaps_control_test", "mixing", "status")).group(1)) == stopped_nonzero
-        edf_stopped = client("listener", "slaaps_status", "1")
-        assert re.search(r"can_arm_mask:\s+0\b", edf_stopped), edf_stopped
+        ordinary_arming_results = []
+        for edf_session in range(2):
+            edf_before = client("slaaps_control_test", "mixing", "status")
+            edf_before_counts = tuple(map(int, re.search(r"main_writes=(\d+) aux_writes=(\d+) nonzero=(\d+)",
+                                                        edf_before).groups()))
+            client("param", "set", "SLA_BENCH_EN", "1")
+            wait_status(r"bench entry=15 active=0\b")
+            edf_ready = client("listener", "slaaps_status", "1")
+            assert re.search(r"bench_commissioning_ready:\s+(?:True|true|1)\b", edf_ready), edf_ready
+            assert re.search(rf"can_arm_mask:\s+{bench_mask}\b", edf_ready), edf_ready
+            for field in ("power_required", "power_ready", "power_source_bound"):
+                assert re.search(rf"\b{field}:\s+(?:True|true|1)\b", edf_ready), edf_ready
+            readiness_expiry = int(re.search(r"bench_commissioning_ready_deadline:\s+(\d+)", edf_ready).group(1))
+            power_expiry = int(re.search(r"power_deadline:\s+(\d+)", edf_ready).group(1))
+            assert 0 < readiness_expiry <= power_expiry, edf_ready
+            assert tuple(map(int, re.search(r"main_writes=(\d+) aux_writes=(\d+) nonzero=(\d+)",
+                                            client("slaaps_control_test", "mixing", "status")).groups())) == edf_before_counts
+            authority = client("listener", "vehicle_status", "1")
+            assert re.search(r"\barming_state:\s+1\b", authority), authority
+            before_arm = int(re.search(r"\btimestamp:\s+(\d+)", authority).group(1))
+            client("commander", "arm")
+            arm_deadline = time.monotonic() + 2
+            while True:
+                acknowledgment = client("listener", "vehicle_command_ack", "1")
+                ack_time = re.search(r"timestamp:\s+(\d+)", acknowledgment)
+                if re.search(r"command:\s+400\b", acknowledgment) and ack_time and int(ack_time.group(1)) > before_arm:
+                    break
+                assert time.monotonic() < arm_deadline, acknowledgment
+                time.sleep(.02)
+            ordinary_arming_accepted = bool(re.search(r"result:\s+0\b", acknowledgment))
+            ordinary_arming_results.append(ordinary_arming_accepted)
+            if not ordinary_arming_accepted:
+                assert re.search(r"result:\s+[12]\b", acknowledgment), acknowledgment
+                # No-plant builds lack normal sensor/power health. Use stock internal
+                # forced arming ONLY in this capture-only test, with the limitation
+                # recorded below. Production gates/health checks are not modified.
+                client("commander", "arm", "-f")
+            wait_status(r"bench entry=16 active=1 target=5\b")
+            authority = client("listener", "vehicle_status", "1")
+            assert re.search(r"\barming_state:\s+2\b", authority), authority
+            assert re.search(rf"\bnav_state:\s+{bench_id}\b", authority), authority
+            edf_permission = client("listener", "slaaps_manual_permission", "1")
+            assert re.search(r"\bmode:\s+4\b", edf_permission), edf_permission
+            for field in ("armed", "healthy", "commissioning_admitted"):
+                assert re.search(rf"\b{field}:\s+(?:True|true|1)\b", edf_permission), edf_permission
+            for field in ("flight_admitted", "measured_condition_valid", "kill", "lockdown", "termination"):
+                assert re.search(rf"\b{field}:\s+(?:False|false|0)\b", edf_permission), edf_permission
+            zero_command = client("listener", "slaaps_manual_command", "1")
+            assert re.search(r"\bmode:\s+4\b", zero_command), zero_command
+            assert re.search(r"\bedf:\s+0(?:\.0+)?\s", zero_command), zero_command
+            client("slaaps_control_test", "selected", "throttle-high")
+            command_deadline = time.monotonic() + 1
+            while True:
+                edf_command = client("listener", "slaaps_manual_command", "1")
+                value = re.search(r"\bedf:\s+([\d.eE+-]+)", edf_command)
+                if value and 0 < float(value.group(1)) <= .25:
+                    break
+                assert time.monotonic() < command_deadline, edf_command
+                time.sleep(.02)
+            assert re.search(r"\bedf_disposition:\s+1\b", edf_command), edf_command
+            edf_canards = re.search(r"\bcanards:\s*\[([^\]]+)\]", edf_command)
+            assert edf_canards and all(float(v) == 0 for v in edf_canards.group(1).split(",")), edf_command
+            edf_sample_time = int(re.search(r"\btimestamp_sample:\s+(\d+)", edf_command).group(1))
+            capture_deadline = time.monotonic() + 1
+            while True:
+                captures = client("listener", "actuator_outputs", "1")
+                vectors = [(int(stamp), [float(v) for v in values.split(",")])
+                           for stamp, values in re.findall(r"\btimestamp:\s+(\d+).*?\boutput:\s*\[([^\]]+)\]", captures, re.S)]
+                edf_aux = next((values for stamp, values in vectors if stamp >= edf_sample_time and len(values) >= 8
+                                and 1000 < values[3] <= 1250 and values[5] == values[7] == 1500
+                                and all(values[i] == 0 for i in (0, 1, 2, 4, 6))), None)
+                if edf_aux:
+                    break
+                assert time.monotonic() < capture_deadline, captures
+                time.sleep(.02)
+            edf_capture_floor = max(stamp for stamp, values in vectors if len(values) >= 8)
+            if edf_session == 0:
+                client("slaaps_control_test", "selected", "power-fault")
+            else:
+                client("param", "set", "SLA_BENCH_EN", "0")
+            stop_deadline = time.monotonic() + 2
+            while True:
+                captures = client("listener", "actuator_outputs", "1")
+                stopped = [(int(stamp), [float(v) for v in values.split(",")])
+                           for stamp, values in re.findall(r"\btimestamp:\s+(\d+).*?\boutput:\s*\[([^\]]+)\]", captures, re.S)]
+                if len(stopped) >= 2 and all(stamp > edf_capture_floor and all(v == 0 for v in values) for stamp, values in stopped):
+                    break
+                assert time.monotonic() < stop_deadline, captures
+                time.sleep(.02)
+            terminal_entry = 12 if edf_session == 0 else 11
+            wait_status(rf"bench entry=(?:0|{terminal_entry}) active=0\b")
+            authority = client("listener", "vehicle_status", "1")
+            assert re.search(r"\barming_state:\s+1\b", authority), authority
+            stopped_nonzero = int(re.search(r"nonzero=(\d+)",
+                                            client("slaaps_control_test", "mixing", "status")).group(1))
+            if edf_session == 0:
+                client("slaaps_control_test", "selected", "power-valid")
+            client("param", "set", "SLA_BENCH_EN", "1")
+            time.sleep(.15)
+            stopped_status = client("slaaps", "status")
+            stopped_authority = client("listener", "vehicle_status", "1")
+            assert re.search(r"\barming_state:\s+1\b", stopped_authority), stopped_authority
+            # Commander may leave the external mode on ordinary disarm. The
+            # retained terminal state applies while selected; mode exit is INACTIVE.
+            still_selected = bool(re.search(rf"\bnav_state_user_intention:\s+{bench_id}\b", stopped_authority))
+            stopped_entry = terminal_entry if still_selected else 0
+            assert re.search(rf"bench entry={stopped_entry} active=0\b", stopped_status), stopped_status
+            assert int(re.search(r"nonzero=(\d+)",
+                                 client("slaaps_control_test", "mixing", "status")).group(1)) == stopped_nonzero
+            edf_stopped = client("listener", "slaaps_status", "1")
+            assert re.search(r"can_arm_mask:\s+0\b", edf_stopped), edf_stopped
+            if edf_session == 0:
+                # Restored power and reapply cannot restart a rejected session.
+                client("slaaps_control_test", "selected", "neutral")
+                client("param", "set", "SLA_CFG_APPLY", "105")
+                wait_status(r"configuration valid=1 use=2 apply=105")
+                reapplied_power = client("listener", "slaaps_status", "1")
+                assert re.search(r"bench_worker_active:\s+(?:False|false|0)\b", reapplied_power), reapplied_power
+                assert re.search(r"can_arm_mask:\s+0\b", reapplied_power), reapplied_power
+                # The preceding no-restart probe deliberately left EN=1. A new
+                # entry must observe disabled readiness before its fresh EN edge.
+                client("param", "set", "SLA_BENCH_EN", "0")
+                client("commander", "mode", "manual")
+                wait_status(r"bench entry=0 active=0\b")
+                client("commander", "mode", f"ext{bench_id - 22}")
+                wait_status(r"bench entry=6 active=0\b")
         result["production_edf_commissioning"] = dict(passed=True, actual_commander=True, actual_supervisor=True,
             actual_mixer=True, synthetic_configuration=True, synthetic_selected_inputs=True, synthetic_permission=False,
-            hardware_interface="capture_only", ordinary_arming_accepted=ordinary_arming_accepted,
-            forced_internal_test_arm=not ordinary_arming_accepted, normal_vehicle_health_qualified=False,
+            hardware_interface="capture_only", ordinary_arming_accepted=all(ordinary_arming_results),
+            forced_internal_test_arm=not all(ordinary_arming_results), normal_vehicle_health_qualified=False,
             mode_id=bench_id, target=5, normalized_ceiling=.25, duration_seconds=10,
             disarmed_preparation_no_output=True, actual_armed_state=True, flight_admitted=False,
             measured_condition_valid=False, parked_canards=True, low_throttle_zero_command=True,
-            explicit_stop=True, observed_ordinary_disarm=True, completed_entry_cannot_revive=True, aux_output=edf_aux)
+            explicit_stop=True, observed_ordinary_disarm=True, completed_entry_cannot_revive=True, aux_output=edf_aux,
+            synthetic_power=True, selected_power_required=True, stale_power_blocks_readiness=True,
+            out_of_range_power_blocks_readiness=True, active_power_fault_stops_and_disarms=True,
+            restored_power_does_not_revive=True, explicit_power_fault_reentry=True)
         client("commander", "mode", "manual")
         wait_status(r"bench entry=0 active=0\b")
         # Persist the same accepted kind2 profile, including a saved EN=1 intent.
@@ -721,7 +772,7 @@ def main():
         client("param", "load", str(edf_parameters))
         client("slaaps", "start")
         restored = wait_status(r"configured=1")
-        assert "configuration valid=1 use=2 apply=104" in restored, restored
+        assert "configuration valid=1 use=2 apply=105" in restored, restored
         client("param", "compare", "SLA_BENCH_EN", "0")
         client("param", "compare", "SLA_EDF_BMAX", ".25")
         restored_wire = client("listener", "slaaps_status", "1")

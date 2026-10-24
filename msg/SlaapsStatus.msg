@@ -29,6 +29,7 @@ uint8 MANUAL_ENTRY_ACTIVATING = 10
 uint8 MANUAL_ENTRY_FIRST_COMMAND = 11
 uint8 MANUAL_ENTRY_RUNNING = 12
 uint8 MANUAL_ENTRY_WAIT_SCHEDULE = 13 # Initial zero-EDF point outside configured bounds or invalid interpolated authority
+uint8 MANUAL_ENTRY_WAIT_POWER = 14
 uint8 bench_entry_status # Explicit servo or armed ground EDF commissioning; never flight admission
 uint8 BENCH_ENTRY_INACTIVE = 0
 uint8 BENCH_ENTRY_WAIT_CONFIGURATION = 1
@@ -49,6 +50,7 @@ uint8 BENCH_ENTRY_WAIT_ARM = 15
 uint8 BENCH_ENTRY_EDF_RUNNING = 16
 uint8 BENCH_ENTRY_WAIT_DISARM = 17
 uint8 BENCH_ENTRY_DISARM_FAILED = 18
+uint8 BENCH_ENTRY_WAIT_POWER = 19
 uint64 bench_session_deadline # Immutable operator-requested total session expiry
 uint8 bench_target # 0 combined, 1..4 individual calibrated canard, 5 armed EDF commissioning
 bool bench_worker_active
@@ -92,3 +94,22 @@ uint8 COMPANION_SEQUENCE_GAP = 10 # Deliberate disarmed configuration apply requ
 uint32 companion_receiver_revision
 uint64 companion_event_sequence
 uint64 companion_frame_deadline # Original local receipt expiry, never producer command validity
+bool power_required # Manual and EDF scopes need explicitly selected propulsion power
+bool power_ready # Fresh healthy selected report inside configured voltage bounds; not flight admission
+bool power_source_bound # Source identity is pinned to the current preparation/control session
+uint8 power_status # slaaps::PowerObservationResult
+uint8 POWER_INVALID_CONFIGURATION = 0
+uint8 POWER_VALID = 1
+uint8 POWER_UNAVAILABLE = 2
+uint8 POWER_PUBLISHER_CHANGED = 3
+uint8 POWER_IDENTITY_MISMATCH = 4
+uint8 POWER_DISCONNECTED = 5
+uint8 POWER_WARNING = 6
+uint8 POWER_FAULT = 7
+uint8 POWER_POWERING_OFF = 8
+uint8 POWER_INVALID_TIMESTAMP = 9
+uint8 POWER_INVALID_VOLTAGE = 10
+uint8 POWER_VOLTAGE_OUT_OF_RANGE = 11
+uint32 power_publisher_revision # Last successful observation; consult power_ready
+uint64 power_deadline # Original battery report expiry, not renewed by polling
+float32 power_voltage_v # Last successful observation; consult power_ready

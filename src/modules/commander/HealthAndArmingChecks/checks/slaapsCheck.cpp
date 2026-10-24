@@ -36,6 +36,7 @@ void SlaapsChecks::checkAndReport(const Context &context, Report &reporter)
 				      && status.mode_id[bench_index] <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8;
 	const bool commissioning_session = fresh && status.direct_actuator_modes_configured && bench_mode_valid
 					   && status.configuration_valid && status.configuration_use == 2 && status.routing_snapshot_valid
+					   && status.power_required && status.power_ready && status.power_source_bound && now < status.power_deadline
 					   && status.bench_target == 5 && status.bench_edf_commissioning && !status.bench_disarm_pending
 					   && status.manual_preparation_session && now < status.bench_session_deadline
 					   && (status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_ARM
@@ -86,6 +87,15 @@ void SlaapsChecks::checkAndReport(const Context &context, Report &reporter)
 
 	if ((can_arm & (1U << context.status().nav_state)) == 0) {
 		const NavModes unavailable_modes = static_cast<NavModes>(~can_arm);
+		auto report_power_failure = [&]() {
+			/* EVENT
+			 * @description
+			 * Manual and EDF commissioning require the battery selected by SLA_PWR_INST, SLA_PWR_ID and SLA_PWR_SRC. Configure SLA_PWR_AGE and explicit SLA_PWR_VMIN/VMAX bounds; check fresh connected battery telemetry, warning/fault and power-off indications. A publisher replacement or changed held report rejects an active session. Resolve the fault, reapply if required, then leave and reselect the mode before deliberate enable. These checks do not qualify flight or infer thrust from voltage.
+			 */
+			reporter.armingCheckFailure(unavailable_modes, health_component_t::system,
+						    events::ID("check_slaaps_power"), events::Log::Error,
+						    "Check SLAAPS selected propulsion power");
+		};
 
 		const bool bench_selected = fresh && status.direct_actuator_modes_configured
 					    && status.mode_id[bench_index] >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
@@ -93,6 +103,12 @@ void SlaapsChecks::checkAndReport(const Context &context, Report &reporter)
 					    && context.status().nav_state_user_intention == status.mode_id[bench_index];
 
 		if (bench_selected) {
+			if (status.configuration_use == 2 && status.power_required && !status.bench_disarm_pending
+			    && (!status.power_ready || now >= status.power_deadline)) {
+				report_power_failure();
+				return;
+			}
+
 			switch (status.bench_entry_status) {
 			case slaaps_status_s::BENCH_ENTRY_WAIT_DISARM:
 			case slaaps_status_s::BENCH_ENTRY_DISARM_FAILED:
@@ -204,6 +220,11 @@ void SlaapsChecks::checkAndReport(const Context &context, Report &reporter)
 					     && context.status().nav_state_user_intention == status.mode_id[0];
 
 		if (manual_selected) {
+			if (status.power_required && (!status.power_ready || now >= status.power_deadline)) {
+				report_power_failure();
+				return;
+			}
+
 			if (status.schedule_enabled && !status.schedule_inputs_valid) {
 				/* EVENT
 				 * @description

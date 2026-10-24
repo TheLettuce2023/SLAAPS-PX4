@@ -11,6 +11,9 @@ constexpr unsigned kCanards = 4;
 constexpr unsigned kAxes = 3;
 constexpr unsigned kThrustPoints = 5;
 constexpr unsigned kScheduleKnots = 2;
+// BatteryStatus v1 declares three instances. The native observer asserts this
+// portable configuration bound against the generated topic definition.
+constexpr int32_t kPowerBatteryInstances = 3;
 
 enum class ManualInputSource : int32_t { Unconfigured, RcOnly, MavlinkOnly };
 
@@ -94,6 +97,17 @@ struct CompanionConfiguration {
 	int32_t maximum_age_us{};
 };
 
+// Explicit propulsion supply selection. This is a health/voltage constraint,
+// never a measured thrust-curve condition or flight admission.
+struct PowerConfiguration {
+	int32_t battery_instance{-1};
+	int32_t battery_id{};
+	int32_t battery_source{-1};
+	int32_t maximum_age_us{};
+	float voltage_min{};
+	float voltage_max{};
+};
+
 struct VehicleConfiguration {
 	int32_t data_revision{}; // operator record identifier; never flight acceptance
 	float mass{};
@@ -138,6 +152,7 @@ struct VehicleConfiguration {
 	float edf_commission_max{}; // Explicit commissioning ceiling; zero denies.
 	ControlScheduleConfiguration schedule{};
 	CompanionConfiguration companion{};
+	PowerConfiguration power{};
 };
 
 enum class ConfigurationUse : uint8_t { Bench, StabilizedManual, EdfCommissioning = 2 };
@@ -176,6 +191,11 @@ ConfigurationResult validateControlSchedule(const VehicleConfiguration &configur
 // Independent source-group validation, including when no vehicle model exists.
 // Disabled in-range fields may be staged; enabled fields must all be explicit.
 ConfigurationResult validateCompanionConfiguration(const VehicleConfiguration &configuration);
+
+// Servo-bench profiles may stage scalar-valid incomplete power fields. EDF
+// commissioning and stabilized manual require the complete explicit group.
+ConfigurationResult validatePowerConfiguration(const PowerConfiguration &configuration, bool required = false);
+ConfigurationResult validatePowerConfiguration(const VehicleConfiguration &configuration, bool required = false);
 
 // Interpolation is valid only at the declared curve voltage/condition.
 // Flight admission must establish that condition separately.

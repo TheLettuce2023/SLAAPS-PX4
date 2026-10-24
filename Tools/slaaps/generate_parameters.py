@@ -60,7 +60,13 @@ def render():
             parameter.update(type="enum", values={0: "Disabled", 1: "Observe configured companion"})
         elif item["name"] == "SLA_CMP_INST":
             parameter.update(type="enum", values={-1: "Unconfigured", **{i: f"MAVLink link {i}" for i in range(4)}})
-        elif item["name"] in ("SLA_SCH_AS_INST", "SLA_SCH_AD_INST", "SLA_SCH_BAT_INST"):
+        elif item["name"] == "SLA_PWR_INST":
+            parameter.update(type="enum", values={-1: "Unconfigured", **{i: f"Battery instance {i}" for i in range(3)}})
+        elif item["name"] == "SLA_PWR_SRC":
+            parameter.update(type="enum", values={-1: "Unconfigured", 0: "Power module", 1: "External", 2: "ESC telemetry"})
+        elif item["name"] == "SLA_SCH_BAT_INST":
+            parameter.update(type="enum", values={-1: "Unconfigured", **{i: f"Instance {i}" for i in range(3)}})
+        elif item["name"] in ("SLA_SCH_AS_INST", "SLA_SCH_AD_INST"):
             parameter.update(type="enum", values={-1: "Unconfigured", **{i: f"Instance {i}" for i in range(4)}})
         elif item["name"] == "SLA_EDF_BMAX":
             parameter["description"]["long"] = (
@@ -77,6 +83,17 @@ def render():
                 "must match. The age limit bounds local packet receipt, not producer command validity. "
                 "Authentication and source selection do not establish a session, trusted clock mapping, "
                 "acceleration control or flight permission. Zero age or identity is unconfigured."
+            )
+        if item["field"].startswith("power."):
+            parameter["description"]["long"] = (
+                "Explicit propulsion battery selection and voltage limits. Configure and apply while disarmed. "
+                "Stabilized manual and EDF commissioning require the exact battery_status instance, ID, source, "
+                "positive age limit and ordered positive voltage band. Servo bench may stage incomplete fields. "
+                "The selected publisher must remain connected, fresh, without warning, fault or imminent power-off, "
+                "and within the operator-configured voltage band. There is no alternate battery fallback. "
+                "Age is bounded from the original battery report, not polling time. Zero defaults are unconfigured; "
+                "the software voltage range is not hardware qualification, a measured thrust-curve condition or "
+                "flight permission. Do not edit an active profile."
             )
         if item["field"].startswith("schedule."):
             parameter["description"]["long"] = (

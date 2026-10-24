@@ -1,5 +1,63 @@
 # SLAAPS configuration and routing implementation
 
+## October 23: selected propulsion power integration
+
+Manual and EDF commissioning now require an explicitly configured `battery_status`
+instance, ID, source, original-report age limit and voltage band (`SLA_PWR_*`).
+Defaults remain unconfigured; servo-only commissioning can operate independently.
+The enabled manual schedule must use the same propulsion battery instance/ID.
+The QGC battery selectors expose only the three supported message instances.
+
+The supervisor binds the publisher lifetime and selected identity when minting a
+preparation session. Disconnection, warning, fault, imminent power-off, invalid or
+out-of-band voltage, stale/future/backwards timestamps, held-report voltage mutation
+and publisher replacement deny continuation. Original battery expiry caps output
+permission and ready-to-arm deadlines, including external replies and Commander.
+EDF commissioning uses its existing stop/ordinary-disarm path; restored telemetry
+cannot revive the rejected session. Existing deliberate exit/re-entry and inactive
+configuration apply remain required. A concurrent explicit normal stop retains
+its established normal-stop semantics and never restores output automatically.
+
+This is selected report-health validation, not a calibrated thrust/voltage model,
+sensor authentication or flight admission. `BatteryStatus` supplies neither a
+separate measurement timestamp nor hardware device ID; neither is fabricated.
+Operator voltage bounds and the physical feed/monitor assignment still require
+vehicle definition and acceptance. No airborne recovery policy was invented.
+
+Host `/var/tmp/slaaps-configuration-lka3nypt` passes Debug, Release and ASan/UBSan
+(3,082 each) and actual PX4 metadata generation for 308 parameters. Native snapshot
+`/var/tmp/slaaps-native-fk9aazlr` links. Runtime `slaaps-native-runtime-3qbzsnvv`
+passes the isolated actual-source supervisor (1,912) and reaches actual Commander
+power-fault output inhibition/disarm, then fails the new Python re-entry sequence:
+it retained EN=1 from the no-restart check rather than observing EN=0 first.
+The rejected entry preserves the production deliberate-enable requirement.
+The corrected harness explicitly observes EN=0 before leave/re-entry and uses
+REJECTED=12 rather than FIRST_COMMAND=9 in the terminal assertion.
+
+Full runtime `/var/tmp/slaaps-native-runtime-ghh0mrhs` passes with unchanged native
+binary SHA256 `d112941ab5636304427f33572f63d384588abd3c3129145c2bc2deb69219518a`
+and separately recorded corrected-harness SHA256
+`a3b95a9ddbe8b1e1f3cf33fd8439d07c60cdb58255ec03c19f11b61f696e1b33`.
+Native control/mixer/supervisor checks are 4,742/2,126/1,912. Actual Commander
+readiness rejects stale and out-of-band power; an active battery fault produces
+fresh inhibited output captures and ordinary disarm. Restored power and reapply
+do not restart output; a deliberate second session succeeds and stops normally.
+All prior manual/schedule/mixer, seven lifecycle/persistence and signed-companion
+checks pass. Synthetic input/power and capture-only outputs remain explicit;
+no-plant EDF tests still require recorded internal forced arming because ordinary
+vehicle health is unqualified. QGC GUI acceptance and hardware were not exercised.
+
+Board/resource verification passes in `build/slaaps_firmware/power-20261023`.
+The image is 1,903,468 B (+4,016 B), leaving 62,612 B flash. AXI RAM remains
+111,100 B and SRAM4 2,048 B. All 32 probe units compiled fresh: identified
+MAIN/AUX stacks are 2,868/2,812 of 4,096 B; supervisor 3,976 of 6,500 B.
+The 49,699-entry firmware source closure matches the sealed native snapshot.
+Resource receipt SHA256: `abd43c98d34996855e9cb2920e9ac5860af74b791cda0048a404d4b7799d5ec5`.
+PX4 package SHA256: `ef6c622fca3bb0ac387b7f73052c2c81521ad8f1e00fa3b639374173240cb588`.
+All jobs are terminal. No boot, runtime timing/stack or physical qualification is claimed.
+It uses frozen `fk9aazlr` firmware inputs and records the corrected Python harness
+as an uncompiled delta, rather than attributing that correction to a rebuilt binary.
+
 ## October 23: companion receipt and preparation integration
 
 The SLAAPS targets now select the repository-owned MAVLink dialect with private

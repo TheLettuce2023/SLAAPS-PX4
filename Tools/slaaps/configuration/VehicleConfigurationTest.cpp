@@ -83,6 +83,12 @@ static VehicleConfiguration fixture()
 	c.edf_rise = 1.F;
 	c.edf_fall = 2.F;
 	c.edf_entry_max = .02F;
+	c.power.battery_instance = 0;
+	c.power.battery_id = 1;
+	c.power.battery_source = 0;
+	c.power.maximum_age_us = 100000;
+	c.power.voltage_min = 20.F;
+	c.power.voltage_max = 26.F;
 
 	for (unsigned i = 0; i < kThrustPoints; ++i) { c.edf_thrust[i] = 5.F * static_cast<float>(i); }
 
@@ -213,6 +219,50 @@ static void manualTimingConfigurationTests()
 	boundary = c;
 	boundary.cycle_max_us = std::numeric_limits<int32_t>::max();
 	check(!manualActivationTimingConfigured(boundary), "cycle maximum must fit its existing configured bound");
+}
+
+static void powerConfigurationTests()
+{
+	auto c = fixture();
+	check(validatePowerConfiguration(c, true).valid(), "explicit synthetic propulsion battery configuration is valid");
+	c.power = {};
+	check(validatePowerConfiguration(c).valid() && validate(c, ConfigurationUse::Bench).valid()
+	      && !validate(c, ConfigurationUse::StabilizedManual).valid(),
+	      "servo-only commissioning stays independent while manual propulsion requires explicit battery selection");
+	c.edf_commission_max = .25F;
+	c.activation_ack_timeout_us = 10000;
+	c.first_command_budget_us = 40000;
+	check(!validate(c, ConfigurationUse::EdfCommissioning).valid(), "armed EDF commissioning cannot use an unconfigured power gate");
+	c.power = fixture().power;
+	check(validate(c, ConfigurationUse::EdfCommissioning).valid(), "EDF commissioning accepts the same explicit power policy as manual");
+
+	for (unsigned fault = 0; fault < 10; ++fault) {
+		auto bad = c.power;
+
+		switch (fault) {
+		case 0: bad.battery_instance = -1; break;
+
+		case 1: bad.battery_instance = 3; break;
+
+		case 2: bad.battery_id = 0; break;
+
+		case 3: bad.battery_source = -1; break;
+
+		case 4: bad.battery_source = 3; break;
+
+		case 5: bad.maximum_age_us = 0; break;
+
+		case 6: bad.maximum_age_us = 1000001; break;
+
+		case 7: bad.voltage_min = 0.F; break;
+
+		case 8: bad.voltage_max = bad.voltage_min; break;
+
+		case 9: bad.voltage_max = std::numeric_limits<float>::quiet_NaN(); break;
+		}
+
+		check(!validatePowerConfiguration(bad, true).valid(), "incomplete, invalid or nonfinite required power policy is rejected");
+	}
 }
 
 static void profileTests()
@@ -1517,6 +1567,18 @@ static void scheduledControlTests()
 
 	check(validate(c, ConfigurationUse::StabilizedManual).valid(),
 	      "explicit paired four-corner schedule validates through the shared manual profile");
+
+	for (bool change_instance : {false, true}) {
+		auto mismatched = c;
+
+		if (change_instance) { ++mismatched.schedule.battery_instance; }
+
+		else { ++mismatched.schedule.battery_id; }
+
+		check(!validate(mismatched, ConfigurationUse::StabilizedManual).valid(),
+		      "enabled scheduling and propulsion must observe the same selected battery instance and ID");
+	}
+
 	auto condition = [](const VehicleConfiguration & profile, uint64_t observed, uint64_t sampled, float airspeed) {
 		OperatingConditionSample result{};
 		result.observed_us = observed;
@@ -3064,6 +3126,7 @@ static int runConfigurationTests()
 {
 	checks = 0;
 	manualTimingConfigurationTests();
+	powerConfigurationTests();
 	profileTests();
 	benchTravelBoundsTests();
 	companionConfigurationTests();
@@ -3106,6 +3169,7 @@ static int runConfigurationTests()
 #include <lib/slaaps/ManualPreparationCoordinator.hpp>
 #include <lib/slaaps/OutputRoutingObservation.hpp>
 #include <lib/slaaps/OperatingConditionObservation.hpp>
+#include <lib/slaaps/PowerObservation.hpp>
 #include <uORB/PublicationMulti.hpp>
 #include <lib/slaaps/ManualExecution.hpp>
 #include <uORB/Subscription.hpp>
@@ -3327,6 +3391,139 @@ static void nativeAwaitGrantTests()
 
 // Run before commander/sensors start. All values and source identities below
 // are synthetic; observing them grants neither flight nor output permission.
+static void nativePowerObservationTests()
+{
+	PowerConfiguration policy{};
+	PowerObservation observation;
+	PowerSample sample{};
+	sample.observed_us = 77;
+	auto rejected = [&](PowerObservationResult expected, const char *message) {
+		unsigned char original[sizeof(sample)];
+		std::memcpy(original, &sample, sizeof(sample));
+		check(observation.capture(policy, sample) == expected && std::memcmp(original, &sample, sizeof(sample)) == 0, message);
+	};
+	rejected(PowerObservationResult::InvalidConfiguration, "unconfigured power observation needs no publisher and preserves destination");
+	policy = fixture().power;
+	policy.battery_instance = 1;
+	rejected(PowerObservationResult::Unavailable, "missing selected propulsion battery cannot fall back to another instance");
+	using BatteryPublication = uORB::PublicationMulti<battery_status_s>;
+	BatteryPublication distractor{ORB_ID(battery_status)}, selected{ORB_ID(battery_status)};
+	check(distractor.advertise() && selected.advertise() && distractor.get_instance() == 0 && selected.get_instance() == 1,
+	      "synthetic power test reserves a distractor and a different explicitly selected instance");
+	rejected(PowerObservationResult::Unavailable, "battery advertisement alone supplies no power report");
+	battery_status_s battery{};
+	auto refresh = [&]() {
+		battery = {};
+		battery.timestamp = hrt_absolute_time();
+		battery.connected = true;
+		battery.id = 1;
+		battery.source = battery_status_s::SOURCE_POWER_MODULE;
+		battery.voltage_v = 24.F;
+	};
+	auto publish = [&]() { check(selected.publish(battery), "publish explicitly synthetic selected propulsion battery"); };
+	refresh();
+	auto other = battery;
+	other.id = 9;
+	other.voltage_v = 6.F;
+	check(distractor.publish(other), "publish distinguishable unhealthy power distractor on instance zero");
+	publish();
+	check(observation.capture(policy, sample) == PowerObservationResult::Valid && near(sample.voltage_v, 24.F)
+	      && sample.source.publisher_revision && sample.source.instance == 1 && sample.source.id == 1
+	      && sample.source.source == battery_status_s::SOURCE_POWER_MODULE,
+	      "power observation uses the configured battery and its actual publisher identity");
+	check(sample.timestamp_us == battery.timestamp && sample.observed_us >= battery.timestamp
+	      && sample.deadline_us == battery.timestamp + static_cast<uint64_t>(policy.maximum_age_us) + 1,
+	      "power deadline derives from the original report using inclusive age and exclusive expiry");
+	const auto retained = sample;
+	check(observation.capture(policy, sample) == PowerObservationResult::Valid && sample.deadline_us == retained.deadline_us
+	      && samePowerSource(sample.source, retained.source), "polling retained battery data cannot renew its expiry or identity");
+
+	for (float voltage : {policy.voltage_min, policy.voltage_max}) {
+		refresh();
+		battery.voltage_v = voltage;
+		publish();
+		check(observation.capture(policy, sample) == PowerObservationResult::Valid, "power voltage band includes its explicit endpoints");
+	}
+
+	for (unsigned scenario = 0; scenario < 13; ++scenario) {
+		policy.maximum_age_us = 100000;
+		refresh();
+		auto expected = PowerObservationResult::IdentityMismatch;
+
+		switch (scenario) {
+		case 0: battery.id = 2; break;
+
+		case 1: battery.source = battery_status_s::SOURCE_EXTERNAL; break;
+
+		case 2: battery.source = UINT8_MAX; break;
+
+		case 3: battery.connected = false; expected = PowerObservationResult::Disconnected; break;
+
+		case 4: battery.warning = battery_status_s::WARNING_LOW; expected = PowerObservationResult::Warning; break;
+
+		case 5: battery.warning = UINT8_MAX; expected = PowerObservationResult::Warning; break;
+
+		case 6: battery.faults = 1U << battery_status_s::FAULT_OVER_CURRENT; expected = PowerObservationResult::Fault; break;
+
+		case 7: battery.is_powering_off = true; expected = PowerObservationResult::PoweringOff; break;
+
+		case 8: battery.timestamp = 0; expected = PowerObservationResult::InvalidTimestamp; break;
+
+		case 9: battery.timestamp = UINT64_MAX; expected = PowerObservationResult::InvalidTimestamp; break;
+
+		case 10:
+			check(battery.timestamp > 2, "native power clock supports a strictly expired original report");
+			policy.maximum_age_us = 1;
+			battery.timestamp -= 2;
+			expected = PowerObservationResult::InvalidTimestamp;
+			break;
+
+		case 11: battery.voltage_v = policy.voltage_min - 1.F; expected = PowerObservationResult::VoltageOutOfRange; break;
+
+		case 12: battery.voltage_v = policy.voltage_max + 1.F; expected = PowerObservationResult::VoltageOutOfRange; break;
+		}
+
+		publish();
+		rejected(expected, "identity, connection, warning, fault, power-off, timestamp and voltage failures preserve caller sample");
+	}
+
+	for (float voltage : {0.F, -1.F, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()}) {
+		refresh();
+		battery.voltage_v = voltage;
+		publish();
+		rejected(PowerObservationResult::InvalidVoltage, "nonpositive or nonfinite battery voltage cannot authorize propulsion");
+	}
+
+	for (unsigned field = 0; field < 4; ++field) {
+		auto changed = retained.source;
+
+		switch (field) {
+		case 0: ++changed.publisher_revision; break;
+
+		case 1: ++changed.instance; break;
+
+		case 2: ++changed.id; break;
+
+		case 3: ++changed.source; break;
+		}
+
+		check(!samePowerSource(changed, retained.source), "every battery identity field is part of the session binding");
+	}
+
+	selected.~BatteryPublication();
+	rejected(PowerObservationResult::Unavailable, "selected battery publisher loss cannot consume the remaining distractor");
+	new (&selected) BatteryPublication{ORB_ID(battery_status)};
+	check(selected.advertise() && selected.get_instance() == 1, "replacement battery explicitly reclaims the same selected instance");
+	rejected(PowerObservationResult::Unavailable, "replacement advertisement cannot inherit retained old battery data");
+	refresh();
+	publish();
+	check(observation.capture(policy, sample) == PowerObservationResult::Valid
+	      && sample.source.publisher_revision != retained.source.publisher_revision && sample.source.instance == retained.source.instance
+	      && sample.source.id == retained.source.id && sample.source.source == retained.source.source
+	      && !samePowerSource(sample.source, retained.source),
+	      "stable replacement can be observed but cannot reuse the old propulsion session identity");
+}
+
 static void nativeOperatingConditionObservationTests()
 {
 	constexpr int32_t maximum_age_us = 1000000;
@@ -5362,11 +5559,25 @@ class NativeSlaapsSelectedInput final : public px4::ScheduledWorkItem
 public:
 	NativeSlaapsSelectedInput() : ScheduledWorkItem("slaaps_selected_fixture", px4::wq_configurations::test1) {}
 	void start() { ScheduleOnInterval(4000); }
-	void request(unsigned operation) { _request.store(operation); }
+	bool request(unsigned operation)
+	{
+		const auto deadline = hrt_absolute_time() + 100000;
+
+		do {
+			unsigned empty{};
+
+			if (_request.compare_exchange_strong(empty, operation)) { return true; }
+
+			px4_usleep(1000);
+		} while (hrt_absolute_time() < deadline);
+
+		return false;
+	}
 	void printStatus() const
 	{
-		PX4_INFO("SLAAPS_SELECTED_STATUS running=%u scenario=%u samples=%u failures=%u synthetic=1 authority_publishers=0",
-			 _publishing.load() ? 1U : 0U, _scenario.load(), _samples.load(), _failures.load());
+		PX4_INFO("SLAAPS_SELECTED_STATUS running=%u scenario=%u samples=%u failures=%u power_running=%u power_scenario=%u power_samples=%u synthetic=1 authority_publishers=0",
+			 _publishing.load() ? 1U : 0U, _scenario.load(), _samples.load(), _failures.load(),
+			 _power_publishing.load() ? 1U : 0U, _power_scenario.load(), _power_samples.load());
 	}
 private:
 	void Run() override
@@ -5391,6 +5602,22 @@ private:
 			    || _attitude_lifetime.revision() == previous) { ++_failures; }
 		}
 
+		if (request == 9) { _power_publishing.store(true); _power_scenario.store(0); }
+
+		if (request == 10) { _power_publishing.store(false); }
+
+		if (request >= 11 && request <= 18) { _power_scenario.store(request - 10); _power_publishing.store(true); }
+
+		if (request == 19) {
+			const unsigned previous = _power_lifetime.revision();
+			using BatteryPublication = uORB::Publication<battery_status_s>;
+			_power.~BatteryPublication();
+			new (&_power) BatteryPublication{ORB_ID(battery_status)};
+
+			if (!_power.advertise() || !_power_lifetime.revision()
+			    || _power_lifetime.revision() == previous) { ++_failures; }
+		}
+
 		if (!_publishing.load()) { return; }
 
 		vehicle_attitude_s attitude{};
@@ -5401,6 +5628,25 @@ private:
 		sensor_selection_s selection{};
 		const auto now = hrt_absolute_time();
 		const unsigned scenario = _scenario.load();
+
+		if (_power_publishing.load()) {
+			// Explicit synthetic battery, confined to this capture-only fixture.
+			battery_status_s power{};
+			const unsigned power_scenario = _power_scenario.load();
+			power.timestamp = now;
+			power.connected = power_scenario != 1;
+			power.id = power_scenario == 7 ? 2 : 1;
+			power.source = power_scenario == 8 ? battery_status_s::SOURCE_EXTERNAL : battery_status_s::SOURCE_POWER_MODULE;
+			power.voltage_v = power_scenario == 5 ? 19.F : (power_scenario == 6 ? 27.F : 24.F);
+			power.warning = power_scenario == 2 ? battery_status_s::WARNING_LOW : battery_status_s::WARNING_NONE;
+			power.faults = power_scenario == 3 ? 1U << battery_status_s::FAULT_OVER_CURRENT : 0;
+			power.is_powering_off = power_scenario == 4;
+
+			if (_power.publish(power)) { ++_power_samples; }
+
+			else { ++_failures; }
+		}
+
 		attitude.timestamp = attitude.timestamp_sample = now;
 		attitude.q[0] = scenario == 3 ? 0.F : 1.F;
 		rates.timestamp = rates.timestamp_sample = now;
@@ -5431,8 +5677,12 @@ private:
 	uORB::Publication<estimator_status_flags_s> _flags{ORB_ID(estimator_status_flags)};
 	uORB::Publication<manual_control_setpoint_s> _manual{ORB_ID(manual_control_setpoint)};
 	uORB::Publication<sensor_selection_s> _selection{ORB_ID(sensor_selection)};
+	uORB::Publication<battery_status_s> _power{ORB_ID(battery_status)};
+	uORB::ResearchSubscription _power_lifetime{ORB_ID(battery_status)};
 	std::atomic<unsigned> _request{0}, _scenario{0}, _samples{0}, _failures{0};
+	std::atomic<unsigned> _power_scenario{0}, _power_samples{0};
 	std::atomic<bool> _publishing{true};
+	std::atomic<bool> _power_publishing{true};
 };
 
 static int nativeSelectedCommand(const char *operation)
@@ -5463,10 +5713,13 @@ static int nativeSelectedCommand(const char *operation)
 
 	if (!strcmp(operation, "status")) { producer->printStatus(); return 0; }
 
-	const char *operations[] = {"stop", "resume", "neutral", "offset", "throttle-high", "invalid-state", "wrong-source", "replace"};
+	const char *operations[] = {"stop", "resume", "neutral", "offset", "throttle-high", "invalid-state", "wrong-source", "replace",
+				    "power-valid", "power-drop", "power-disconnected", "power-warning", "power-fault", "power-off",
+				    "power-low", "power-high", "power-id", "power-source", "power-replace"
+				   };
 
-	for (unsigned i = 0; i < 8; ++i) {
-		if (!strcmp(operation, operations[i])) { producer->request(i + 1); return 0; }
+	for (unsigned i = 0; i < sizeof(operations) / sizeof(operations[0]); ++i) {
+		if (!strcmp(operation, operations[i])) { return producer->request(i + 1) ? 0 : PX4_ERROR; }
 	}
 
 	return PX4_ERROR;
@@ -5924,7 +6177,7 @@ static int nativeSupervisorOrchestrationTests()
 	uORB::Publication<register_ext_component_reply_s> registration_pub{ORB_ID(register_ext_component_reply)};
 	uORB::Publication<airspeed_s> condition_airspeed_pub{ORB_ID(airspeed)};
 	uORB::Publication<vehicle_air_data_s> condition_air_data_pub{ORB_ID(vehicle_air_data)};
-	uORB::Publication<battery_status_s> condition_battery_pub{ORB_ID(battery_status)};
+	uORB::Publication<battery_status_s> power_pub{ORB_ID(battery_status)};
 	uORB::Publication<setpoint_config_reply_s> setpoint_pub{ORB_ID(setpoint_config_reply)};
 	uORB::Subscription registration{ORB_ID(register_ext_component_request)};
 	uORB::Subscription setpoint{ORB_ID(setpoint_config)};
@@ -5942,6 +6195,8 @@ static int nativeSupervisorOrchestrationTests()
 	vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 	bool publish_inputs = true, publish_estimates = true, pump_aux = true, vehicle_armed = false;
 	bool publish_conditions = false;
+	bool publish_power = true;
+	unsigned power_scenario{};
 	float condition_airspeed = 20.F;
 	float roll = 0.F, throttle = -1.F;
 	slaaps_status_s status{};
@@ -5953,10 +6208,21 @@ static int nativeSupervisorOrchestrationTests()
 		vehicle.arming_state = vehicle_armed ? vehicle_status_s::ARMING_STATE_ARMED : vehicle_status_s::ARMING_STATE_DISARMED;
 		bool published = vehicle_pub.publish(vehicle) && armed_pub.publish(armed);
 
+		if (publish_power) {
+			// One synthetic battery supplies both propulsion and optional schedule observations.
+			battery_status_s battery{};
+			battery.timestamp = now;
+			battery.connected = true;
+			battery.id = 1;
+			battery.source = battery_status_s::SOURCE_POWER_MODULE;
+			battery.voltage_v = 24.F;
+			battery.faults = power_scenario == 1 ? 1U << battery_status_s::FAULT_OVER_CURRENT : 0;
+			published &= power_pub.publish(battery);
+		}
+
 		if (publish_conditions) {
 			airspeed_s airspeed{};
 			vehicle_air_data_s air_data{};
-			battery_status_s battery{};
 			airspeed.timestamp = airspeed.timestamp_sample = now;
 			airspeed.indicated_airspeed_m_s = condition_airspeed;
 			airspeed.confidence = 1.F;
@@ -5965,13 +6231,7 @@ static int nativeSupervisorOrchestrationTests()
 			air_data.baro_device_id = 456;
 			air_data.calibration_count = 2;
 			air_data.temperature_source = 1;
-			battery.timestamp = now;
-			battery.connected = true;
-			battery.id = 1;
-			battery.source = battery_status_s::SOURCE_POWER_MODULE;
-			battery.voltage_v = 22.F;
-			published &= condition_airspeed_pub.publish(airspeed) && condition_air_data_pub.publish(air_data)
-				     && condition_battery_pub.publish(battery);
+			published &= condition_airspeed_pub.publish(airspeed) && condition_air_data_pub.publish(air_data);
 		}
 
 		if (publish_inputs) {
@@ -6117,11 +6377,24 @@ static int nativeSupervisorOrchestrationTests()
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE; }, 1000000,
 		"actual disarmed leave enables a deliberate new supervisor entry");
 		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[0];
+
+		if (!scenario) {
+			power_scenario = 1;
+			wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_WAIT_POWER; }, 1000000,
+			"manual readiness waits for a healthy selected propulsion battery before preparing any output");
+			check(status.power_required && !status.power_ready && status.power_status == slaaps_status_s::POWER_FAULT
+			      && !status.manual_preparation_session && !status.manual_worker_active && !status.can_arm_mask,
+			      "battery fault cannot mint manual preparation, flight permission or propulsion output");
+			power_scenario = 0;
+		}
+
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED; }, 1000000,
 		"actual supervisor observes centered low-throttle entry and prepares both mixers");
 		const auto session = status.manual_preparation_session;
 		check(session > previous_session && status.manual_preparation_banks == 3 && !status.manual_worker_active,
 		      "deliberate supervisor reentry creates a fresh non-actuating two-bank session");
+		check(status.power_ready && status.power_source_bound && status.power_publisher_revision
+		      && status.power_deadline > status.timestamp, "manual preparation pins the healthy source and its original report expiry");
 		previous_session = session;
 		const auto before = main.nonzeroWrites() + aux.nonzeroWrites();
 		slaaps_manual_activation_s activation{};
@@ -6344,6 +6617,7 @@ static int nativeSupervisorOrchestrationTests()
 	// Flight admission stays false, estimator publications stop, and the accepted
 	// profile contains only servo/input/timing data. No test seam grants Bench.
 	VehicleConfiguration bench{};
+	publish_power = false;
 	bench.data_revision = 2;
 	bench.manual_source = c.manual_source;
 	bench.manual_instance = c.manual_instance;
@@ -6584,6 +6858,9 @@ static int nativeSupervisorOrchestrationTests()
 	bench.edf_entry_max = .02F;
 	bench.edf_rise = 1.F;
 	bench.edf_fall = 2.F;
+	bench.power = c.power;
+	publish_power = true;
+	power_scenario = 0;
 	installNativeMixerConfiguration(bench);
 	const int32_t edf_scope = 2, edf_apply = 500, edf_target = 5, three_seconds = 3;
 	check(param_set(param_find("SLA_CFG_KIND"), &edf_scope) == 0
@@ -6628,7 +6905,7 @@ static int nativeSupervisorOrchestrationTests()
 	}, 1000000, "fresh disarmed exit and coherent reapply permit an intentional ground commissioning entry");
 	uint64_t edf_previous_session{};
 
-	for (unsigned scenario = 0; scenario < 3; ++scenario) {
+	for (unsigned scenario = 0; scenario < 5; ++scenario) {
 		if (scenario) {
 			vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 			throttle = -1.F;
@@ -6641,6 +6918,13 @@ static int nativeSupervisorOrchestrationTests()
 		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kBenchMode];
 
 		if (!scenario) {
+			publish_power = false;
+			wait([&]() { return status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_POWER; }, 1000000,
+			"EDF selection loses readiness when the selected original battery report expires");
+			check(!status.can_run_mask && !status.can_arm_mask && !status.manual_preparation_session
+			      && !status.bench_worker_active && !status.power_ready,
+			      "stale power cannot authorize preparation, arming or any commissioned EDF output");
+			publish_power = true;
 			throttle = 1.F;
 			wait([&]() { return status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_THROTTLE; }, 1000000,
 			"small accepted EDF ceiling cannot hide unscaled high raw throttle during supervisor entry");
@@ -6667,6 +6951,9 @@ static int nativeSupervisorOrchestrationTests()
 		      && !edf_permission.healthy && !edf_permission.commissioning_admitted && !edf_permission.flight_admitted
 		      && !status.bench_worker_active && status.bench_commissioning_ready_deadline > status.timestamp,
 		      "preparation and arming readiness carry denied output permission with original input and authority expiry");
+		check(status.power_ready && status.power_source_bound
+		      && status.bench_commissioning_ready_deadline <= status.power_deadline,
+		      "EDF arming readiness is capped by the pinned battery's original report expiry");
 
 		if (!scenario) {
 			const auto human_wait = hrt_absolute_time() + 1100000;
@@ -6719,18 +7006,27 @@ static int nativeSupervisorOrchestrationTests()
 
 		const unsigned disarms_before_stop = disarm_requests;
 
-		if (!scenario) { check(param_set(enable_parameter, &disabled) == 0, "operator stops visibly armed EDF through native GUI enable zero"); }
+		if (!scenario || scenario == 4) { check(param_set(enable_parameter, &disabled) == 0, "operator stops visibly armed EDF through native GUI enable zero"); }
 
 		else if (scenario == 1) { publish_inputs = false; }
 
+		else if (scenario == 3) { power_scenario = 1; }
+
 		wait([&]() { return status.bench_disarm_pending && !status.bench_worker_active && disarm_requests > disarms_before_stop; },
-		scenario == 2 ? 1200000 : 500000, "stop, original duration or input loss revokes EDF and requests real ordinary Commander disarm");
+		scenario == 2 ? 1200000 : 500000, "stop, original duration, input loss or power fault revokes EDF and requests ordinary Commander disarm");
+
+		if (scenario == 3) {
+			check(status.power_status == slaaps_status_s::POWER_FAULT && !status.power_ready && !status.power_deadline,
+			      "active power fault remains attributable after commissioned output is canceled");
+		}
+
 		vehicle_command_ack_s accepted_ack{};
 		accepted_ack.timestamp = hrt_absolute_time();
 		accepted_ack.command = vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM;
 		accepted_ack.result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED;
 		check(disarm_ack_pub.publish(accepted_ack), "fixture acknowledges disarm without changing either actual arming observation");
 		publish_inputs = true;
+		power_scenario = 0;
 		throttle = -1.F;
 		const auto pending_check = hrt_absolute_time() + (scenario ? 60000 : 1200000);
 
@@ -6752,15 +7048,16 @@ static int nativeSupervisorOrchestrationTests()
 
 		vehicle_armed = armed.armed = false;
 		wait([&]() {
-			return !status.bench_disarm_pending && status.bench_entry_status == (scenario == 1 ?
+			return !status.bench_disarm_pending && status.bench_entry_status == (scenario == 1 || scenario == 3 ?
 					slaaps_status_s::BENCH_ENTRY_REJECTED : slaaps_status_s::BENCH_ENTRY_COMPLETE);
 		}, 1000000, "only both fresh actual disarmed observations finish the ground commissioning stop");
 		check(param_get(enable_parameter, &enable_value) == 0 && enable_value == 0,
 		      "commissioning completion never retains an enabled GUI command");
 
-		if (scenario == 1) {
-			const int32_t after_fault_apply = 502;
-			check(param_set(param_find("SLA_CFG_APPLY"), &after_fault_apply) == 0, "input fault requires explicit disarmed ground-profile reapply");
+		if (scenario == 1 || scenario == 3) {
+			const int32_t after_fault_apply = scenario == 1 ? 502 : 503;
+			check(param_set(param_find("SLA_CFG_APPLY"), &after_fault_apply) == 0,
+			      "input or power fault requires explicit disarmed ground-profile reapply");
 			wait([&]() { return status.configuration_valid && status.apply_counter == after_fault_apply; }, 1000000,
 			"coherent scope2 reapply restores profile without reviving selected faulted commissioning");
 			check(status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_REJECTED && !status.bench_worker_active,
@@ -7696,6 +7993,7 @@ int slaaps_control_test_main(int argc, char *argv[])
 	SlaapsNativeTest::companionTransportTests();
 	nativePermissionTests();
 	nativeAwaitGrantTests();
+	nativePowerObservationTests();
 	nativeOperatingConditionObservationTests();
 	nativeTransportTests();
 	nativePreparationWireTests();

@@ -80,8 +80,11 @@ def main():
         "SLA_BENCH_CH": {"0": "Combined response", "1": "Canard 1", "2": "Canard 2",
                          "3": "Canard 3", "4": "Canard 4", "5": "EDF (deliberately armed)"},
         "SLA_SCH_EN": {"0": "Disabled", "1": "Empirical 2x2 table"},
+        "SLA_PWR_INST": {"-1": "Unconfigured", **{str(i): f"Battery instance {i}" for i in range(3)}},
+        "SLA_PWR_SRC": {"-1": "Unconfigured", "0": "Power module", "1": "External", "2": "ESC telemetry"},
+        "SLA_SCH_BAT_INST": {"-1": "Unconfigured", **{str(i): f"Instance {i}" for i in range(3)}},
         **{name: {"-1": "Unconfigured", **{str(i): f"Instance {i}" for i in range(4)}}
-           for name in ("SLA_SCH_AS_INST", "SLA_SCH_AD_INST", "SLA_SCH_BAT_INST")},
+           for name in ("SLA_SCH_AS_INST", "SLA_SCH_AD_INST")},
         **{name: {"-1": "Unconfigured", "0": "Roll", "1": "Pitch", "2": "Yaw"}
            for name in ("SLA_R_INPUT", "SLA_P_INPUT", "SLA_Y_INPUT")},
     }

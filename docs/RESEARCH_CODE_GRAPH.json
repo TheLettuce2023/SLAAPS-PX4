@@ -7,6 +7,24 @@
     "freshness":  "sha256 fingerprints exact anchor bytes, including untracked files; revalidate changed nodes and adjacent edges, never use HEAD alone",
     "nodes":  [
 {
+    "id": "slaaps_power_native_evidence",
+    "path": "/var/tmp/slaaps-native-runtime-ghh0mrhs/result.json",
+    "scope": "actual_supervisor_Commander_power_readiness_fault_off_disarm_no_revival_deliberate_reentry_capture_only",
+    "sha256": "1cf2d16c7435dd27d0aa4a6b745bb2550a419b331cb30943577a09329731156e"
+},
+{
+    "id": "slaaps_power_host_evidence",
+    "path": "/var/tmp/slaaps-configuration-lka3nypt/result.json",
+    "scope": "308_parameter_metadata_Debug_Release_ASanUBSan_shared_configuration_checks_no_native_or_physical_admission",
+    "sha256": "81aa09d3b154760b927344c1ccb064347b4fd9479948dd18631448b297073871"
+},
+{
+    "id": "slaaps_power_observation",
+    "path": "src/lib/slaaps/PowerObservation.hpp",
+    "scope": "selected_battery_identity_health_voltage_original_report_expiry_atomic_publisher_revision_no_hardware_authentication",
+    "sha256": "441e2cafe54dc159e80c332cbcf09c082cd5a1c7033de7bd8928f1159223f10b"
+},
+{
     "id": "slaaps_companion_preparation_content_closure",
     "path": "build/slaaps_firmware/companion-20261023/readiness-final/source-closure.json",
     "scope": "49696_firmware_build_entries_match_native_222_changed_anchors_retained_metadata_distinguished",
@@ -700,7 +718,7 @@
     "id": "slaaps_native_anchor_4",
     "path": "msg/SlaapsStatus.msg",
     "scope": "commissioning_manual_schedule_and_companion_receipt_status_no_flight_admission",
-    "sha256": "c0905348199cb26c92e10c90888efa8db2615cdb9e8cd679db1bcd6162b9ba59"
+    "sha256": "0e309427876ec46d8141b7ed064843cc2fff2e96290449fc64b9eda727b2355e"
 },
 {
     "id": "slaaps_native_anchor_5",
@@ -729,8 +747,8 @@
 {
     "id": "slaaps_native_supervisor",
     "path": "src/modules/slaaps/Slaaps.cpp",
-    "scope": "manual_flight_denied_zero_EDF_schedule_prearm_live_condition_worker_composition_native_capture_and_board_verified",
-    "sha256": "8a3c512ae622f7c50805a073431dbe1517e2908e40a501e3e76857bd91b24211"
+    "scope": "session_bound_power_health_original_expiry_manual_EDF_permission_and_existing_companion_receipt_no_flight_admission",
+    "sha256": "022da6a0e21977aee4573c6354a59fb750912042c1e8aa9b619bd38edde051f0"
 },
 {
     "id": "slaaps_parameter_capture",
@@ -742,7 +760,7 @@
     "id": "slaaps_native_gate",
     "path": "src/modules/commander/HealthAndArmingChecks/checks/slaapsCheck.cpp",
     "scope": "actionable_schedule_prearm_and_commissioning_events_native_health_preserved_flight_denied",
-    "sha256": "24ecb80ed4a09827c6dba579e8f6b5bacff7591ff2134a83634eaf65345c318c"
+    "sha256": "c464a4c3f0e722363b57cc03ed619835263246e2226639a578affcdb4cb044ed"
 },
 {
     "id": "slaaps_airframe",
@@ -766,43 +784,43 @@
     "id": "slaaps_native_test",
     "path": "Tools/slaaps/verify_native.py",
     "scope": "actual_parser_signed_loopback_and_supervisor_mixer_lifecycles_synthetic_no_flight_acceptance",
-    "sha256": "b46620e5a29026b4578eb37a1f4b71869b49e7418b179800602732d45f155c84"
+    "sha256": "a3b95a9ddbe8b1e1f3cf33fd8439d07c60cdb58255ec03c19f11b61f696e1b33"
 },
 {
     "id": "slaaps_configuration_record",
     "path": "docs/SLAAPS_CONFIGURATION_INTEGRATION.md",
     "scope": "configuration_routing_native_and_board_evidence_no_flight_acceptance",
-    "sha256": "c4fec0f2d11268756ae295cd4edd2177d7cc065ee50bb80acb305c0ca9c27cd5"
+    "sha256": "f47905858fb14014b5d7736622eafc6ffb613f26a4710ad070735c3e9cdc8f73"
 },
 {
     "id": "slaaps_configuration_api",
     "path": "src/lib/slaaps/VehicleConfiguration.hpp",
-    "scope": "shared_typed_profile_optional_explicit_four_corner_PID_effectiveness_and_condition_envelope",
-    "sha256": "8037a3cd26e5df6e7e9aff72208cfbcb0aa32ae15272b7576a23ffbcec6f7465"
+    "scope": "shared_profile_power_source_health_band_schedule_and_companion_config_no_flight_qualification",
+    "sha256": "0ce5bb8c07afa986e398e1a5ce6873a80dac6135c94d9b103500c9a1e34520c0"
 },
 {
     "id": "slaaps_configuration_core",
     "path": "src/lib/slaaps/VehicleConfiguration.cpp",
     "scope": "manual_servo_EDF_scopes_and_explicit_schedule_corner_validation_no_invented_calibration",
-    "sha256": "5ada600ce6fb0db73eebd67babdc6e20511f6cf8e70c56b29f8c7b400d443aa2"
+    "sha256": "f41e0b85acf0102821c93febd572da5820854bdbb5f78a9d73d0602eb86cb292"
 },
 {
     "id": "slaaps_parameter_schema",
     "path": "src/lib/slaaps/VehicleParameters.def",
-    "scope": "canonical_293_vehicle_fields_including_schedule_and_companion_receipt_configuration",
-    "sha256": "79ddb2bc260658b38772717a5ba9e358b1bf092e2108f8ea0ffb237203b3e59b"
+    "scope": "canonical_299_vehicle_fields_including_explicit_selected_propulsion_power",
+    "sha256": "b21205e10dec7a766b87afac4e813788bfb4290e630bc8f14d17ac7f013b47f7"
 },
 {
     "id": "slaaps_parameter_metadata",
     "path": "src/modules/slaaps/module.yaml",
-    "scope": "generated_302_native_PX4_parameters_including_companion_schedule_commissioning",
-    "sha256": "1361b3675de2c4e26e2edacaeef28d8b607a5f14de857560c93d326a2812065c"
+    "scope": "generated_308_native_PX4_parameters_power_schedule_companion_commissioning",
+    "sha256": "1e7e6065f56d27aaaf29327e53e8c21b84b5d804cf931d871c98f08073912b0c"
 },
 {
     "id": "slaaps_parameter_generator",
     "path": "Tools/slaaps/generate_parameters.py",
     "scope": "canonical_schema_to_px4_qgc_metadata",
-    "sha256": "e5627b845bf1cbc09034035ccad7da74ed2fe54979421161e08b074aba6275a6"
+    "sha256": "f9632376afc16ee91013d545cd7b0adbe2e4230de9c63823be0c905a701044b5"
 },
 {
     "id": "slaaps_routing_api",
@@ -832,19 +850,19 @@
     "id": "slaaps_configuration_tests",
     "path": "Tools/slaaps/configuration/VehicleConfigurationTest.cpp",
     "scope": "host_scheduled_control_native_sensor_adapter_disarmed_readiness_scheduled_worker_mixer_capture_no_hardware",
-    "sha256": "3a2114e9acc4cac091a6574302845cd4463b329a0b1df642d8ea5134dc966ea9"
+    "sha256": "bca4b3cb7e4bf82dc065c24d0966344698650b6cb67fc0fd98f7edd2d8aca74b"
 },
 {
     "id": "slaaps_configuration_verifier",
     "path": "Tools/slaaps/verify_configuration.py",
     "scope": "debug_release_sanitizers_and_actual_metadata_pipeline",
-    "sha256": "e97dfc7816575f166b880d38d2fcba66d36c13bba19e4ad656e1f07b4a1a6875"
+    "sha256": "95527c245932c5205eab1012acd558317fbda2cf556385a95f2e8025c1e4428f"
 },
 {
     "id": "slaaps_airframe_goal",
     "path": "docs/SLAAPS_AIRFRAME_GOAL.md",
     "scope": "active_goal_qgc_modes_configurable_vehicle_data_routing_edf_ownership_implementation_pending",
-    "sha256": "fe7211738416611ca813d31e6017801b4d27bc0d50042a5274d110cf1acc2e66"
+    "sha256": "2c068612d8c2e49346e28041a68c7cb235702d563c14d6d2de254e565c29aa16"
 },
 {
     "id": "session_request_owner_build",
@@ -2182,7 +2200,7 @@
                       "id":  "project_context",
                       "path":  "docs/PROJECT_CONTEXT.md",
                       "scope":  "compact_current_handoff",
-                      "sha256":  "c7546fbdb001527685f8e4b9791882564bff77fcd6269df6f496dc41b50cf490"
+                      "sha256":  "a25323b842da22196d1940c1f2ce424d6c439b439e45f6ec200c327a91157244"
                   },
                   {
                       "id":  "phase_gate_status",

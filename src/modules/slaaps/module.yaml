@@ -185,6 +185,88 @@
       }
     },
     {
+      "group": "SLAAPS Power",
+      "definitions": {
+        "SLA_PWR_INST": {
+          "description": {
+            "short": "Selected propulsion battery instance; -1 is unconfigured",
+            "long": "Explicit propulsion battery selection and voltage limits. Configure and apply while disarmed. Stabilized manual and EDF commissioning require the exact battery_status instance, ID, source, positive age limit and ordered positive voltage band. Servo bench may stage incomplete fields. The selected publisher must remain connected, fresh, without warning, fault or imminent power-off, and within the operator-configured voltage band. There is no alternate battery fallback. Age is bounded from the original battery report, not polling time. Zero defaults are unconfigured; the software voltage range is not hardware qualification, a measured thrust-curve condition or flight permission. Do not edit an active profile."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 2,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Battery instance 0",
+            "1": "Battery instance 1",
+            "2": "Battery instance 2"
+          }
+        },
+        "SLA_PWR_ID": {
+          "description": {
+            "short": "Exact propulsion battery ID; zero is unconfigured",
+            "long": "Explicit propulsion battery selection and voltage limits. Configure and apply while disarmed. Stabilized manual and EDF commissioning require the exact battery_status instance, ID, source, positive age limit and ordered positive voltage band. Servo bench may stage incomplete fields. The selected publisher must remain connected, fresh, without warning, fault or imminent power-off, and within the operator-configured voltage band. There is no alternate battery fallback. Age is bounded from the original battery report, not polling time. Zero defaults are unconfigured; the software voltage range is not hardware qualification, a measured thrust-curve condition or flight permission. Do not edit an active profile."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 255,
+          "default": 0
+        },
+        "SLA_PWR_SRC": {
+          "description": {
+            "short": "Exact propulsion battery source; -1 is unconfigured",
+            "long": "Explicit propulsion battery selection and voltage limits. Configure and apply while disarmed. Stabilized manual and EDF commissioning require the exact battery_status instance, ID, source, positive age limit and ordered positive voltage band. Servo bench may stage incomplete fields. The selected publisher must remain connected, fresh, without warning, fault or imminent power-off, and within the operator-configured voltage band. There is no alternate battery fallback. Age is bounded from the original battery report, not polling time. Zero defaults are unconfigured; the software voltage range is not hardware qualification, a measured thrust-curve condition or flight permission. Do not edit an active profile."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 2,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Power module",
+            "1": "External",
+            "2": "ESC telemetry"
+          }
+        },
+        "SLA_PWR_AGE": {
+          "description": {
+            "short": "Maximum original propulsion battery report age; zero is unconfigured",
+            "long": "Explicit propulsion battery selection and voltage limits. Configure and apply while disarmed. Stabilized manual and EDF commissioning require the exact battery_status instance, ID, source, positive age limit and ordered positive voltage band. Servo bench may stage incomplete fields. The selected publisher must remain connected, fresh, without warning, fault or imminent power-off, and within the operator-configured voltage band. There is no alternate battery fallback. Age is bounded from the original battery report, not polling time. Zero defaults are unconfigured; the software voltage range is not hardware qualification, a measured thrust-curve condition or flight permission. Do not edit an active profile."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 1000000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_PWR_VMIN": {
+          "description": {
+            "short": "Minimum accepted propulsion voltage; zero is unconfigured",
+            "long": "Explicit propulsion battery selection and voltage limits. Configure and apply while disarmed. Stabilized manual and EDF commissioning require the exact battery_status instance, ID, source, positive age limit and ordered positive voltage band. Servo bench may stage incomplete fields. The selected publisher must remain connected, fresh, without warning, fault or imminent power-off, and within the operator-configured voltage band. There is no alternate battery fallback. Age is bounded from the original battery report, not polling time. Zero defaults are unconfigured; the software voltage range is not hardware qualification, a measured thrust-curve condition or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "V",
+          "decimal": 6
+        },
+        "SLA_PWR_VMAX": {
+          "description": {
+            "short": "Maximum accepted propulsion voltage; must exceed minimum",
+            "long": "Explicit propulsion battery selection and voltage limits. Configure and apply while disarmed. Stabilized manual and EDF commissioning require the exact battery_status instance, ID, source, positive age limit and ordered positive voltage band. Servo bench may stage incomplete fields. The selected publisher must remain connected, fresh, without warning, fault or imminent power-off, and within the operator-configured voltage band. There is no alternate battery fallback. Age is bounded from the original battery report, not polling time. Zero defaults are unconfigured; the software voltage range is not hardware qualification, a measured thrust-curve condition or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "V",
+          "decimal": 6
+        }
+      }
+    },
+    {
       "group": "SLAAPS Companion",
       "definitions": {
         "SLA_CMP_EN": {
@@ -2325,14 +2407,13 @@
           },
           "type": "enum",
           "min": -1,
-          "max": 3,
+          "max": 2,
           "default": -1,
           "values": {
             "-1": "Unconfigured",
             "0": "Instance 0",
             "1": "Instance 1",
-            "2": "Instance 2",
-            "3": "Instance 3"
+            "2": "Instance 2"
           }
         },
         "SLA_SCH_BAT_ID": {

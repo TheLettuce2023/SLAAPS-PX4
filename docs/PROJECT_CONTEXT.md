@@ -1,6 +1,9 @@
 # SLAAPS implementation: start here
 
 Updated 2026-10-23 by Codex. Software progress is not flight acceptance.
+Current power-health checkpoint: shared selected-battery health gates Manual/EDF
+readiness and permission, with original report expiry and session identity binding.
+Host/metadata, full native integration and FMUv6X board/resource validation pass.
 User confirmed the unexpected older-file restore was unintentional. Supervisor,
 native verifier and status schema were recovered from verified native snapshot
 `/var/tmp/slaaps-native-lgi2s_y4`; replacements remain preserved under
@@ -26,7 +29,7 @@ Historical startup context: [October 22 archive](PROJECT_CONTEXT_ARCHIVE_2026102
 
 | Task | Entry / graph nodes |
 | --- | --- |
-| Current integration/evidence | [Companion checkpoint](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-companion-receipt-and-preparation-integration), [scheduling milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-scheduled-manual-control), [goal](SLAAPS_AIRFRAME_GOAL.md) |
+| Current integration/evidence | [Power checkpoint](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-selected-propulsion-power-integration), [scheduling milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-scheduled-manual-control), [goal](SLAAPS_AIRFRAME_GOAL.md) |
 | Manual activation/output | `slaaps_preparation_coordinator`, `slaaps_preparation_endpoint`, `slaaps_manual_worker_transport`, `slaaps_manual_bank_transport`, `slaaps_production_mixer_preparation` |
 | Shared configuration/QGC | `slaaps_configuration_api`, `slaaps_parameter_capture`, `slaaps_parameter_schema`, `slaaps_parameter_metadata`, `slaaps_routing_core` |
 | Scheduling | `slaaps_control_schedule`, `slaaps_operating_condition`, `slaaps_operating_condition_observation`, `slaaps_schedule_portable_evidence` |
@@ -70,7 +73,7 @@ there is no invented airborne cut/hold-thrust policy. Native callbacks capture o
 One typed configuration and native QGC parameter metadata provide coherent inactive
 apply, persistence and export/restore: mass/CG/inertia, geometry, servo conversion,
 dynamics, controller, EDF curve, input mapping, timing and optional schedule.
-302 parameters are supported; this is not a custom QGC graphical editor or GUI test.
+308 parameters are supported; this is not a custom QGC graphical editor or GUI test.
 Never retune/remap an armed controller. Supported production routing is MAIN/AUX PWM;
 do not imply other boards/banks/protocols are implemented.
 
@@ -107,14 +110,13 @@ bounded time mapping, session grant and wire status return remain missing.
 ## Latest evidence
 
 Detailed results, failures, hashes and earlier scheduling evidence are in the
-linked integration record. Current native build `kywjnp4q` and runtime `k5zzs5a3`
-pass manual/bench lifecycles, shared schedule/mixer checks and companion signed
-loopback receipt. Isolated manual execution uses explicit synthetic authority;
+linked integration record. Current native build `fk9aazlr` and runtime `ghh0mrhs`
+pass selected-power readiness/fault/re-entry, manual/bench lifecycles, shared
+schedule/mixer checks and companion signed receipt. Isolated manual uses synthetic authority;
 Commander EDF commissioning uses recorded internal forced arming in no-plant
 tests. Normal vehicle health, physical outputs and QGC GUI remain unqualified.
-Earlier scheduling board stage `build/slaaps_firmware/scheduling-20261023`
-passed with image1,892,652 bytes/headroom73,428, but predates companion changes.
-Current companion board/resource evidence is below. Snapshots retain baseline
+Latest closed board stage `companion-20261023/readiness-final` has image1,899,452
+and headroom66,628; the power change is being checked separately. Snapshots retain baseline
 Git metadata472a7d6786 with explicit committed+dirty overlays; the commit alone
 does not identify tested content. Runtime stack/timing and target boot remain open.
 
@@ -130,30 +132,21 @@ does not identify tested content. Runtime stack/timing and target boot remain op
 Still unavailable: actual mass/CG/inertia/CAD, signed effectiveness across qualified
 flow/wash, loaded servo dynamics, EDF thrust/response/voltage measurements, authority
 acceptance and recovery hardware/policy. These questions are pending; do not repeat
-unchanged requests or invent fallback values. Battery/propulsion and landed/takeoff
-behavior still need vehicle-supported integration. EDF ceiling/duration is pending.
+unchanged requests or invent fallback values. Physical power-feed assignment/voltage
+bounds, propulsion response and landed/takeoff behavior still need vehicle acceptance.
+EDF ceiling/duration is pending.
 Preserve working e8ea98b404/NuttX11 servo baseline. Newer-base boot issue is unresolved;
 R01-R10 operator servo passes are not numerical flight calibration or exact provenance.
 Use WSL Ubuntu-24.04 and existing Tools/slaaps workflows. Subagents use Sol xhigh.
-Consumer/configuration/status are restored. Host `slaaps-configuration-frcvrnt7`
-passes Debug/Release/ASan-UBSan and302 parameters. Queued lifetime-bound reads
-and immediate exhausted-disarm-retry status pass native `slaaps-native-nrgcpc4s`
-runtime `slaaps-native-runtime-id206wl9` through existing lifecycle checks.
-Its new MAVLink loopback check exposed missing dataman startup in the harness.
-That prerequisite and serialized signing-key updates are in linked snapshot
-`slaaps-native-_r7ah9m7`; runtime `slaaps-native-runtime-phom4snz` passes actual
-parser/supervisor signing, source/target, replay, expiry and reapply checks plus
-all existing lifecycles. Prior `6buyl3gj` EDF preparation rejection remains an
-unresolved timing/fixture limitation; no deadline was relaxed. See evidence record.
-The `_r7ah9m7` board checkpoint passes (image1,899,300/headroom66,780) and the
-unlinked acceleration library's six portability fixes pass host and ARM checks.
-Follow-up found a deterministic begin/listen readiness-tombstone race; its bounded
-coordinator fix passes full native `kywjnp4q` / `k5zzs5a3`, including actual-driver
-ordering, unchanged rejection gates and signed companion loopback. Board stage
-`companion-20261023/readiness-final` passes for this exact source: image1,899,452,
-headroom66,628; AXI111,100/SRAM4 2,048. Identified stack sums MAIN2,876/AUX2,820
-of4,096 and supervisor3,976 of6,500; runtime stack/timing remains unqualified.
-Recovery audits are terminal; `observed-now/` preserves replacements and
-`verified-source/` preserves the verified pre-replacement supervisor/verifier.
-All build/runtime/subagent jobs are terminal. This checkpoint is recorded;
-clearing history or starting a fresh chat is safe with this handoff.
+Earlier failures, recovery copies and companion/preparation evidence are retained
+in the linked integration record. The deterministic initial-readiness race is fixed;
+the old intermittent `6buyl3gj` failure cannot be conclusively attributed to it.
+Unlinked acceleration-library host/ARM portability passes; it is not a controller.
+Power host matrix `/var/tmp/slaaps-configuration-lka3nypt` passes Debug/Release/
+ASan-UBSan (3,082 each) and308 parameters. Native build
+`/var/tmp/slaaps-native-fk9aazlr` links; full runtime `slaaps-native-runtime-ghh0mrhs`
+passes power readiness/fault/disarm/deliberate-reentry and existing regressions.
+Earlier `3qbzsnvv` exposed a Python EN1 re-entry sequencing error; corrected harness
+is hashed separately, unchanged native binary reused. Board `power-20261023` passes:
+image 1,903,468 B, flash headroom 62,612 B; all 32 stack probe units compiled fresh.
+All verification jobs are terminal; clearing history or starting a fresh chat is safe.

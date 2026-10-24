@@ -5,6 +5,7 @@
 #include <lib/slaaps/ManualPermissionTransport.hpp>
 #include <lib/research_stabilized_manual/SelectedStateObservation.hpp>
 #include <lib/slaaps/OperatingConditionObservation.hpp>
+#include <lib/slaaps/PowerObservation.hpp>
 #include <lib/research_stabilized_manual/StabilizedInputValidation.hpp>
 #include <lib/parameters/atomic_transaction.h>
 
@@ -89,6 +90,13 @@ private:
 	void publishStatus(hrt_abstime now);
 	void updateSchedule();
 	void updateCompanion(hrt_abstime now);
+	bool observePower(hrt_abstime &now, bool bind = false);
+	slaaps::PowerObservation _power{};
+	slaaps::PowerSample _power_sample{};
+	slaaps::PowerSourceIdentity _power_source{};
+	slaaps::PowerObservationResult _power_result{slaaps::PowerObservationResult::InvalidConfiguration};
+	bool _power_valid{};
+	bool _power_bound{};
 	uORB::ResearchSubscription _companion_input[4] {
 		{ORB_ID::slaaps_companion_packet_0}, {ORB_ID::slaaps_companion_packet_1},
 		{ORB_ID::slaaps_companion_packet_2}, {ORB_ID::slaaps_companion_packet_3}
@@ -416,7 +424,7 @@ void Slaaps::answerChecks(hrt_abstime now)
 		// Bench is selectable independently of its explicit output enable. Its
 		// prevent-arming requirement and zero can_arm mask remain independent.
 		reply.can_arm_and_run = i == kBenchMode && _bench_can_run && _configuration.hasCandidate()
-					&& (_selected_use == 0 || _selected_use == 2);
+					&& (_selected_use == 0 || (_selected_use == 2 && _power_valid && now < _power_sample.deadline_us));
 		_arming_reply.publish(reply);
 	}
 }
@@ -452,6 +460,7 @@ void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status
 	_manual_activation_owned = false;
 	_manual_first_command_deadline = 0;
 	_manual_permission = {};
+	_power_bound = false;
 
 	if (_manual_configuration_active) {
 		_manual_profile_restore_pending = normal_disarm && _configuration.eligible();
@@ -836,6 +845,44 @@ bool Slaaps::observePrearmInput(hrt_abstime now, bool armed)
 	return true;
 }
 
+bool Slaaps::observePower(hrt_abstime &now, bool bind)
+{
+	slaaps::PowerSample sample{};
+	auto result = _configuration.hasCandidate() ? _power.capture(_configuration.configuration().power, sample) :
+		      slaaps::PowerObservationResult::InvalidConfiguration;
+	now = hrt_absolute_time();
+
+	if (result == slaaps::PowerObservationResult::Valid) {
+		if (now < sample.observed_us || now >= sample.deadline_us) {
+			result = slaaps::PowerObservationResult::InvalidTimestamp;
+
+		} else if (_power_bound && !slaaps::samePowerSource(sample.source, _power_source)) {
+			result = slaaps::PowerObservationResult::PublisherChanged;
+
+		} else if (_power_bound && (sample.timestamp_us < _power_sample.timestamp_us
+					    || (sample.timestamp_us == _power_sample.timestamp_us
+						&& (sample.voltage_v < _power_sample.voltage_v || sample.voltage_v > _power_sample.voltage_v)))) {
+			// A held report may be reread, but its measurement cannot mutate or
+			// move backwards while retaining the bound session's identity.
+			result = slaaps::PowerObservationResult::InvalidTimestamp;
+		}
+	}
+
+	_power_result = result;
+	_power_valid = result == slaaps::PowerObservationResult::Valid;
+
+	if (!_power_valid) { return false; }
+
+	_power_sample = sample;
+
+	if (bind) {
+		_power_source = sample.source;
+		_power_bound = true;
+	}
+
+	return true;
+}
+
 bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting)
 {
 	if (waiting) { *waiting = false; }
@@ -869,11 +916,20 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting)
 	    || now > UINT64_MAX - lease || vehicle.timestamp > UINT64_MAX - authority_span
 	    || armed.timestamp > UINT64_MAX - authority_span) { return false; }
 
+	const bool propulsion = !bench || edf;
+
+	if (propulsion && (!_power_bound || !observePower(now))) { return false; }
+
+	if (now > UINT64_MAX - lease) { return false; }
+
 	slaaps::ManualPermissionSample sample{};
 	auto &permission = sample.permission;
 	permission.timestamp_us = now;
 	permission.deadline_us = math::min(now + lease,
 					   math::min(vehicle.timestamp + authority_span, armed.timestamp + authority_span));
+
+	if (propulsion) { permission.deadline_us = math::min(permission.deadline_us, _power_sample.deadline_us); }
+
 	permission.session = _preparation_session;
 	permission.source = _modes[bench ? kBenchMode : kManualMode].request;
 	permission.configuration = _configuration.identity();
@@ -1154,7 +1210,8 @@ void Slaaps::updateBench(hrt_abstime now)
 					 readiness_target >= 0 && readiness_target <= static_cast<int32_t>(slaaps::kCanards));
 	const bool configured = _bench_controls_initialized && _configuration.hasCandidate() && _selected_use == (edf ? 2 : 0)
 				&& slaaps::ManualBankPreparation::validConfiguration(configuration, control_mode);
-	_bench_can_run = configured && coherent_target && mode_valid && registered && healthy
+	const bool power_ready = !edf || observePower(now);
+	_bench_can_run = configured && coherent_target && mode_valid && registered && healthy && power_ready
 			 && (disarmed || (edf && session && _bench_edf_authorized && _bench_arming_authorized)) && _routing_valid
 			 && _manual.commandRevision() && permissionRevision() && _preparation.revision() && _preparation.transitionRevision();
 	slaaps::RoutingPlan available_routing{};
@@ -1247,6 +1304,16 @@ void Slaaps::updateBench(hrt_abstime now)
 		return;
 	}
 
+	if (!power_ready) {
+		_bench_enable_ready = false;
+
+		if (session || enable) { cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); }
+
+		else { _bench_entry_status = slaaps_status_s::BENCH_ENTRY_WAIT_POWER; }
+
+		return;
+	}
+
 	if (!observeBenchInput(now, !_manual.active(), edf)) {
 		_bench_enable_ready = false;
 
@@ -1330,6 +1397,8 @@ void Slaaps::updateBench(hrt_abstime now)
 			request.acknowledgment_revisions[bank] = handled[bank];
 			request.binding.driver[bank] = _routing_snapshot.driver[bank];
 		}
+
+		if (edf && !observePower(now, true)) { cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return; }
 
 		_edf.revoke();
 		_prepared_request = request;
@@ -1584,6 +1653,14 @@ void Slaaps::updatePreparation(hrt_abstime now)
 		return;
 	}
 
+	if (!observePower(now)) {
+		if (bound || _preparation_pending) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); }
+
+		else { _manual_entry_status = slaaps_status_s::MANUAL_ENTRY_WAIT_POWER; }
+
+		return;
+	}
+
 	if (!observePrearmInput(now)) {
 		if (bound || _preparation_pending) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); }
 
@@ -1650,6 +1727,9 @@ void Slaaps::updatePreparation(hrt_abstime now)
 	}
 
 	const slaaps::ReportedRoutingPolicy policy{2 * kIntervalUs, slaaps::kMaximumOutputReportAgeUs};
+
+	if (!observePower(now, true)) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); return; }
+
 	_preparation_requested = false;
 	_preparation_session = request.session;
 	_preparation_deadline = request.deadline_us;
@@ -1867,6 +1947,14 @@ void Slaaps::publishStatus(hrt_abstime now)
 	status.schedule_enabled = _selected_use == 1 && _configuration.configuration().schedule.enabled == 1;
 	status.schedule_inputs_valid = status.schedule_enabled && _condition_valid && now < _condition_sample.deadline_us;
 	status.schedule_status = static_cast<uint8_t>(_manual.scheduleStatus());
+	status.power_required = _selected_use == 1 || _selected_use == 2;
+	status.power_ready = status.power_required && _configuration.hasCandidate() && _power_valid && now < _power_sample.deadline_us;
+	status.power_source_bound = _power_bound;
+	status.power_status = static_cast<uint8_t>(_power_valid && now >= _power_sample.deadline_us ?
+			      slaaps::PowerObservationResult::InvalidTimestamp : _power_result);
+	status.power_publisher_revision = _power_sample.source.publisher_revision;
+	status.power_deadline = _power_valid ? _power_sample.deadline_us : 0;
+	status.power_voltage_v = _power_sample.voltage_v;
 	status.input_source_epoch = _input_epoch;
 	status.configuration_valid = _configuration.hasCandidate();
 	status.configuration_identity = status.configuration_valid ? _configuration.identity() : 0;
@@ -1888,7 +1976,7 @@ void Slaaps::publishStatus(hrt_abstime now)
 				    status.configuration_valid ? slaaps_status_s::UNAVAILABLE_OUTPUT_INTEGRATION :
 				    slaaps_status_s::UNAVAILABLE_CONFIGURATION;
 
-	if (_bench_can_run && status.configuration_valid && (_selected_use == 0 || _selected_use == 2)
+	if (_bench_can_run && status.configuration_valid && (_selected_use == 0 || (_selected_use == 2 && status.power_ready))
 	    && _modes[kBenchMode].id >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
 	    && _modes[kBenchMode].id <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8) {
 		status.can_run_mask = 1U << _modes[kBenchMode].id;
@@ -2104,6 +2192,10 @@ int Slaaps::print_status()
 		 status.manual_worker_status);
 	PX4_INFO("control schedule enabled=%d inputs=%d status=%u (not envelope qualification)",
 		 status.schedule_enabled, status.schedule_inputs_valid, status.schedule_status);
+	PX4_INFO("power required=%d ready=%d status=%u bound=%d revision=%lu voltage=%.3f deadline=%llu",
+		 status.power_required, status.power_ready, status.power_status, status.power_source_bound,
+		 static_cast<unsigned long>(status.power_publisher_revision), static_cast<double>(status.power_voltage_v),
+		 static_cast<unsigned long long>(status.power_deadline));
 	PX4_INFO("input metadata=%d epoch=%lu (not flight admission)",
 		 status.input_metadata_valid, static_cast<unsigned long>(status.input_source_epoch));
 	PX4_INFO("routing snapshot=%d inventory_fault=%u routing_fault=%u",

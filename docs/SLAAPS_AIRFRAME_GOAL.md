@@ -3,6 +3,8 @@
 Updated 2026-10-23, Codex. The objective remains unfinished. Shared configuration,
 manual activation/worker/mixer handling, deliberate armed EDF commissioning and
 scheduled PID/effectiveness are implemented with synthetic software evidence.
+Shared selected-power health and original-report expiry now gate Manual/EDF
+readiness and permission; voltage limits and physical feed assignment are explicit.
 Authenticated companion receipt now passes actual-parser/native integration;
 command admission, acceleration control, manual flight admission and physical
 qualification remain incomplete. See [current handoff](PROJECT_CONTEXT.md) and
@@ -33,7 +35,7 @@ wiring assignments. Preserve the shared typed configuration and explicit apply
 transaction as that workflow's boundary; do not add a second runtime profile
 source that can disagree with QGC parameters.
 
-The present 173 vehicle fields include mass, CG, inertia, measured canard moment
+The present 299 vehicle fields include mass, CG, inertia, measured canard moment
 derivatives, calibration, controller limits and the EDF curve. They do not yet
 include a geometry-to-effectiveness derivation or automatic controller tuning.
 A future geometry model must specify body-FRD positions relative to a declared
