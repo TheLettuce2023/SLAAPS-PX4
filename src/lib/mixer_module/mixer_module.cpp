@@ -107,6 +107,9 @@ MixingOutput::MixingOutput(const char *param_prefix, uint8_t max_num_outputs, Ou
 
 MixingOutput::~MixingOutput()
 {
+#if defined(CONFIG_MODULES_SLAAPS)
+	destroySlaapsPreparation();
+#endif
 	perf_free(_control_latency_perf);
 	px4_sem_destroy(&_lock);
 
@@ -362,25 +365,35 @@ bool MixingOutput::updateSubscriptions(bool allow_wq_switch)
 	}
 
 	if (_scheduling_policy == SchedulingPolicy::Auto) {
-		if (_subscription_callback) {
-			if (_subscription_callback->registerCallback()) {
-				PX4_DEBUG("Scheduling via callback");
-				_has_backup_schedule = true;
-				_interface.ScheduleDelayed(50_ms);
+#if defined(CONFIG_MODULES_SLAAPS)
+
+		if (_slaaps_preparation) {
+			// Dedicated banks must service expiry, stop retries and inventory even
+			// when an invalid mixed mapping contains a quiet stock provider.
+			_subscription_callback = nullptr;
+			_interface.ScheduleOnInterval(_lowrate_schedule_interval);
+
+		} else
+#endif
+			if (_subscription_callback) {
+				if (_subscription_callback->registerCallback()) {
+					PX4_DEBUG("Scheduling via callback");
+					_has_backup_schedule = true;
+					_interface.ScheduleDelayed(50_ms);
+
+				} else {
+					PX4_ERR("registerCallback failed, scheduling at fixed rate");
+					_interface.ScheduleOnInterval(fixed_rate_scheduling_interval);
+				}
+
+			} else if (all_disabled) {
+				_interface.ScheduleOnInterval(_lowrate_schedule_interval);
+				PX4_DEBUG("Scheduling at low rate");
 
 			} else {
-				PX4_ERR("registerCallback failed, scheduling at fixed rate");
 				_interface.ScheduleOnInterval(fixed_rate_scheduling_interval);
+				PX4_DEBUG("Scheduling at fixed rate");
 			}
-
-		} else if (all_disabled) {
-			_interface.ScheduleOnInterval(_lowrate_schedule_interval);
-			PX4_DEBUG("Scheduling at low rate");
-
-		} else {
-			_interface.ScheduleOnInterval(fixed_rate_scheduling_interval);
-			PX4_DEBUG("Scheduling at fixed rate");
-		}
 	}
 
 	setMaxTopicUpdateRate(_max_topic_update_interval_us);
@@ -469,6 +482,12 @@ bool MixingOutput::update()
 		 * We also need to arm throttle for the ESC calibration. */
 		_throttle_armed = (_armed.armed && !_armed.lockdown) || _armed.in_esc_calibration_mode;
 	}
+
+#if defined(CONFIG_MODULES_SLAAPS)
+
+	if (updateSlaapsPreparation()) { return true; }
+
+#endif
 
 	// only used for sitl with lockstep
 	bool has_updates = _subscription_callback && _subscription_callback->updated();

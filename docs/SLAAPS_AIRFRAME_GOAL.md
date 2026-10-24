@@ -1,15 +1,18 @@
 # SLAAPS airframe and flight-mode integration goal
 
-2026-10-20, Codex. Active chat goal; first configuration/routing increment
-implemented and host-tested. Native startup/supervisor scaffolding links, and
-mode registration/configuration lifecycle tests pass. Active control workers,
-physical integration, acceleration port and actual QGC acceptance remain pending.
+Updated 2026-10-23, Codex. The objective remains unfinished. Shared configuration,
+manual activation/worker/mixer handling, deliberate armed EDF commissioning and
+scheduled PID/effectiveness are implemented with synthetic software evidence.
+Authenticated companion receipt now passes actual-parser/native integration;
+command admission, acceleration control, manual flight admission and physical
+qualification remain incomplete. See [current handoff](PROJECT_CONTEXT.md) and
+[integration evidence](SLAAPS_CONFIGURATION_INTEGRATION.md) for exact boundaries.
 
 ## User direction
 
 Create a SLAAPS airframe and startup behavior that runs the relevant modules.
 Provide end-user QGroundControl flight-mode selection for stabilized manual
-control, a future acceleration interface, and servo-only bench testing using
+control, companion acceleration control, and bench commissioning using
 the existing bench module. Physical output channels must be user-configurable
 in QGC. Define EDF command and ownership. Vehicle-specific control data will
 follow; do not request it again or substitute synthetic fixture values.
@@ -17,8 +20,8 @@ Follow-up direction: vehicle data must also be easily configurable and
 changeable within the QGC GUI.
 
 This direction settles the previous scope question: develop the flight-capable
-architecture with propulsion ownership, and retain servo-only bench operation
-as a separate mode. It does not establish measured flight readiness.
+implementation with propulsion ownership. The October 22 instruction expands
+bench scope to deliberate armed EDF commissioning as well as disarmed servo work. It does not establish measured flight readiness.
 The current request authorizes implementation and software verification, not
 flashing or physical operation.
 
@@ -52,12 +55,13 @@ software/physical qualification; no implicit retuning while armed is permitted.
 | --- | --- | --- |
 | SLAAPS Manual | Selected PX4 manual input; body-rate commands with attitude hold on stick release; existing controller and four-canard allocator | Selected manual throttle through the common propulsion owner, subject to armed admission |
 | SLAAPS Acceleration | Reserved interface for the existing body-FRD inertial-acceleration-at-CG contract; unavailable for activation until a validated producer and controller are integrated | Future acceleration controller requests thrust through the same propulsion owner |
-| SLAAPS Servo Bench | Selected manual input drives the existing calibrated bench controller; requires disarmed/prearmed servo admission and centered entry | Disabled for the entire mode and its transitions |
+| SLAAPS Bench / Commissioning | Shared logical routing and calibration; servo-only work may use disarmed/prearmed admission; EDF work requires deliberate visibly armed commissioning or an explicit actuator-test mechanism | Bounded enable/duration, stop/kill and input-loss handling; never silent operation while disarmed |
 
 Mode selection is a request, not permission to bypass profile, health, arming,
 input, routing or output checks. Flight modes without required vehicle data
-must report an actionable unavailable reason. Bench mode must prohibit arming
-and reject entry from armed flight; it is not an airborne fallback.
+must report an actionable unavailable reason. Bench must reject entry from active flight and must never be an airborne
+fallback. Ordinary disarmed state inhibits EDF output. EDF commissioning is a
+separate deliberate armed/test state, not ordinary flight arming.
 
 Use named mode discovery through PX4/MAVLink AVAILABLE_MODES and CURRENT_MODE,
 with ordinary QGC mode requests. Check the actual QGC build during acceptance.
@@ -117,8 +121,9 @@ Do not weaken those old paths globally to implement the new airframe.
 
 One SLAAPS actuator supervisor owns the final propulsion command. Manual and
 future acceleration modes supply requests, never independently publish to the
-physical EDF output. Bench, boot, unconfigured, disarmed and revoked states
-cannot acquire propulsion ownership.
+physical EDF output. Boot, unconfigured, ordinary disarmed and revoked states cannot acquire
+propulsion ownership. A future explicit EDF commissioning state must use this
+same owner with bounded commands and visibly indicated armed/test permission.
 
 The internal propulsion request must identify the selected mode/session,
 source, timestamp/deadline and command units. Manual throttle enters as a
@@ -135,7 +140,9 @@ source and establish the new one without overlapping writers or accepting a
 stale command. Define command-loss and armed-flight fallback explicitly;
 do not assume either holding thrust or immediately cutting thrust is a
 universally safe airborne policy. Unimplemented policies prevent flight
-admission. Bench EDF inhibition is unconditional.
+admission. The former blanket bench EDF prohibition is superseded by the October 22
+commissioning requirement; the existing implementation still inhibits it until
+that distinct permission and bounded operational path are implemented.
 
 Independent driver-side expiry and revoke handling remain required. A
 software acknowledgment is not proof of electrical output or motor response.
@@ -252,3 +259,32 @@ driver provider yet. The library remains excluded from default firmware.
 No airframe startup or native flight mode is implemented yet. Next implement
 the synchronized native parameter/apply path and SLAAPS supervisor, then
 startup, mode lifecycle and driver/EDF ownership. Goal remains active.
+
+## October 22 completion requirements
+
+Operating mode and arming state are separate. Complete manual control through
+Commander, supervisor, selected input/state, controller/allocation, common EDF
+ownership and configured MAIN/AUX driver handling first. Separate prearm
+preparation from armed output permission; cover first command, cancellation,
+partial activation, expiry, exit and deliberate re-entry. Registered names and
+diagnostic reports do not complete a mode.
+
+Commissioning must persist the same typed configuration consumed by flight,
+with explicit apply/save, version/provenance and incomplete/calibrated/qualified
+status. Stock QGC native parameters are the baseline GUI; custom graphical
+editors require a separately identified QGC repository change. No hardware
+operation is authorized by software implementation work.
+
+Implement scheduled PID gains and matching allocation effectiveness over a
+declared calibrated envelope: QGC-editable breakpoints/model data, bounded
+interpolation, filtered scheduling, bumpless integral/derivative handling and
+anti-windup. Vehicle airspeed and local canard airflow/EDF wash are distinct;
+ground speed is not a substitute. Stale scheduling data and out-of-envelope
+conditions require explicit behavior, without invented measured coefficients.
+
+Companion acceleration remains body-FRD inertial acceleration at CG in m/s^2,
+body-fixed between updates. The fixed EDF/canard force constraints and required
+attitude/yaw command must make the controller well-posed. Implement source/time/
+sequence/freshness limits and exclusive manual/acceleration handoff; do not
+assume independent control of arbitrary forces. Recovery policy and actual
+vehicle measurements remain pending; continue independent software integration.

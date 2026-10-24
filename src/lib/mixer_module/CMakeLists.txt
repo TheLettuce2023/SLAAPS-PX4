@@ -65,7 +65,8 @@ set_property(GLOBAL APPEND PROPERTY PX4_MODULE_CONFIG_FILES ${CMAKE_CURRENT_SOUR
 
 add_dependencies(mixer_module output_functions_header)
 if(CONFIG_MODULES_SLAAPS)
-	target_sources(mixer_module PRIVATE SlaapsOutputInventory.cpp)
+	target_sources(mixer_module PRIVATE SlaapsOutputInventory.cpp SlaapsOutputPreparation.cpp)
+	target_link_libraries(mixer_module PRIVATE slaaps_configuration)
 endif()
 if(CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK)
 	target_sources(mixer_module PRIVATE ResearchStabilizedOutput.cpp)

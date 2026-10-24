@@ -89,7 +89,14 @@ def main():
     changed = subprocess.check_output(["git", "ls-files", "-m", "-o", "--exclude-standard"], cwd=ROOT, text=True).splitlines()
     required += [name for name in changed if name.startswith(("src/", "platforms/", "boards/", "msg/", "ROMFS/", "cmake/")) or name == "CMakeLists.txt"]
     hashes = {}
+    removed = []
     for name in sorted(set(required)):
+        path = (ROOT / name).resolve()
+        assert path.is_relative_to(ROOT), name
+        if not path.exists():
+            assert name not in manifest["inputs"], "Removed source remains in board snapshot: " + name
+            removed.append(name)
+            continue
         path = bound_path(ROOT, name)
         assert manifest["inputs"][name]["kind"] == "file"
         assert digest(path) == manifest["inputs"][name]["sha256"], name
@@ -98,7 +105,7 @@ def main():
                   board_id=53, embedded_git_tag=tag[1], image_bytes=len(image), flash_capacity=capacity,
                   flash_headroom=capacity-len(image), flash_load_segments=segments,
                   board_receipt_sha256=digest(receipt_path), verifier_sha256=digest(Path(__file__)),
-                  checked_source_hashes=hashes, hardware_operated=False, boot_verified=False)
+                  checked_source_hashes=hashes, removed_sources=removed, hardware_operated=False, boot_verified=False)
     verifier_snapshot = stage / "verify_board.py"
     assert not verifier_snapshot.exists()
     verifier_snapshot.write_bytes(Path(__file__).read_bytes())

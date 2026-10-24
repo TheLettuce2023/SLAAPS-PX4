@@ -1,6 +1,6 @@
 #pragma once
 
-#include <lib/slaaps/VehicleConfiguration.hpp>
+#include "VehicleConfiguration.hpp"
 #include <parameters/param.h>
 
 namespace slaaps
@@ -10,6 +10,9 @@ struct ParameterSnapshot {
 	VehicleConfiguration configuration{};
 	int32_t apply_counter{};
 	int32_t use{};
+	int32_t saved_apply{};
+	int32_t saved_use{};
+	int32_t saved_identity[2] {};
 };
 
 // A complete read under the same lock used by the parameter storage layers.
@@ -20,6 +23,8 @@ class Px4ConfigurationSource
 public:
 	bool initialize();
 	bool capture(ParameterSnapshot &snapshot, uint32_t &duration_us) const;
+	bool remember(const ParameterSnapshot &snapshot) const;
+	static bool remembered(const ParameterSnapshot &snapshot);
 private:
 	static constexpr unsigned kParameterCount = 0
 #define SLAAPS_FLOAT(field, name, group, description, unit, minimum, maximum, initial) + 1
@@ -31,6 +36,9 @@ private:
 	param_t _handles[kParameterCount] {};
 	param_t _apply{PARAM_INVALID};
 	param_t _use{PARAM_INVALID};
+	param_t _saved_apply{PARAM_INVALID};
+	param_t _saved_use{PARAM_INVALID};
+	param_t _saved_identity[2] {PARAM_INVALID, PARAM_INVALID};
 	bool _initialized{};
 };
 

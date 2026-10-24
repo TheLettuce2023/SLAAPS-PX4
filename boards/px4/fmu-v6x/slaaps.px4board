@@ -3,6 +3,9 @@ CONFIG_MODULES_SLAAPS=y
 CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL=n
 CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK=n
 CONFIG_MODULES_RESEARCH_BENCH_CONTROL=n
+# MAIN/AUX activation validates the shared profile on hp_default. The measured
+# ARM call chain exceeds 2.6 KiB; reserve stack here without changing stock PX4.
+CONFIG_WQ_HP_DEFAULT_STACKSIZE=4096
 CONFIG_MODULES_FW_AUTOTUNE_ATTITUDE_CONTROL=n
 CONFIG_MODULES_MC_AUTOTUNE_ATTITUDE_CONTROL=n
 # QGC-based SLAAPS target does not use MSP video overlay; retain flash for its control/output owners.
@@ -11,3 +14,17 @@ CONFIG_DRIVERS_OSD_MSP_OSD=n
 CONFIG_MODULES_GIMBAL=n
 # SLAAPS uses its own fixed-EDF controller; stock winged-VTOL transitions are not a supported mode.
 CONFIG_MODULES_VTOL_ATT_CONTROL=n
+# rc.slaaps_apps exclusively owns this dedicated target's control/output path.
+# Stock fixed-wing/multicopter controllers are neither started nor supported
+# as fallback. Retain the allocator build for native QGC actuator metadata;
+# rc.slaaps_apps does not start it as an output owner.
+CONFIG_MODULES_FLIGHT_MODE_MANAGER=n
+CONFIG_MODULES_FW_ATT_CONTROL=n
+CONFIG_MODULES_FW_LATERAL_LONGITUDINAL_CONTROL=n
+CONFIG_MODULES_FW_MODE_MANAGER=n
+CONFIG_MODULES_FW_RATE_CONTROL=n
+CONFIG_MODULES_MC_ATT_CONTROL=n
+CONFIG_MODULES_MC_POS_CONTROL=n
+CONFIG_MODULES_MC_HOVER_THRUST_ESTIMATOR=n
+CONFIG_MODULES_MC_RATE_CONTROL=n
+CONFIG_MAVLINK_DIALECT="slaaps"

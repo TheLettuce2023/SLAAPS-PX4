@@ -518,12 +518,15 @@ int Commander::custom_command(int argc, char *argv[])
 				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
 						     PX4_CUSTOM_SUB_MODE_AUTO_PRECLAND);
 
-			} else if (!strcmp(argv[1], "ext1")) {
-				send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
-						     PX4_CUSTOM_SUB_MODE_EXTERNAL1);
+			} else if (strlen(argv[1]) == 4 && !strncmp(argv[1], "ext", 3) && argv[1][3] >= '1' && argv[1][3] <= '8') {
+				// Accept exactly ext1..ext8, using the normal mode-command path.
+				const float sub_mode = static_cast<float>(PX4_CUSTOM_SUB_MODE_EXTERNAL1 + argv[1][3] - '1');
+				return send_vehicle_command(vehicle_command_s::VEHICLE_CMD_DO_SET_MODE, 1, PX4_CUSTOM_MAIN_MODE_AUTO,
+							    sub_mode) ? 0 : 1;
 
 			} else {
 				PX4_ERR("argument %s unsupported.", argv[1]);
+				return 1;
 			}
 
 			return 0;
@@ -3259,7 +3262,7 @@ The commander module contains the state machine for mode switching and failsafe 
 	PRINT_MODULE_USAGE_COMMAND("land");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("transition", "VTOL transition");
 	PRINT_MODULE_USAGE_COMMAND_DESCR("mode", "Change flight mode");
-	PRINT_MODULE_USAGE_ARG("manual|acro|offboard|stabilized|altctl|posctl|altitude_cruise|position:slow|auto:mission|auto:loiter|auto:course|auto:rtl|auto:takeoff|auto:land|auto:precland|ext1",
+	PRINT_MODULE_USAGE_ARG("manual|acro|offboard|stabilized|altctl|posctl|altitude_cruise|position:slow|auto:mission|auto:loiter|auto:course|auto:rtl|auto:takeoff|auto:land|auto:precland|ext1..ext8",
 			"Flight mode", false);
 	PRINT_MODULE_USAGE_COMMAND("pair");
 	PRINT_MODULE_USAGE_COMMAND("termination");

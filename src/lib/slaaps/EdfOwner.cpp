@@ -25,8 +25,11 @@ EdfFault EdfOwner::reject(EdfFault fault)
 
 bool EdfOwner::permitted(uint64_t now, const EdfPermission &p) const
 {
-	return !inhibited(p) && p.flight_admitted && p.healthy && p.measured_condition_valid
-	       && p.timestamp_us != 0 && p.timestamp_us <= now && now < p.deadline_us
+	const bool admitted = _grant.mode == ControlMode::EdfBench ?
+			      (p.commissioning_admitted && !p.flight_admitted && !p.measured_condition_valid) :
+			      (!p.commissioning_admitted && p.flight_admitted && p.measured_condition_valid);
+	return !inhibited(p) && admitted && p.healthy
+	       && p.timestamp_us != 0 && p.session <= p.timestamp_us && p.timestamp_us <= now && now < p.deadline_us
 	       && p.deadline_us - p.timestamp_us <= _lease_us
 	       && p.session == _grant.session && p.source == _grant.source
 	       && p.configuration == _grant.configuration && p.mode == _grant.mode;
@@ -39,21 +42,27 @@ EdfFault EdfOwner::begin(uint64_t now, const VehicleConfiguration &configuration
 	_received = false;
 	_output = 0.F;
 	_target = 0.F;
+	_grant = permission;
 
 	if (now == 0 || now < _clock) { return reject(EdfFault::InvalidTime); }
 
 	_clock = now;
 
-	if (permission.session == 0 || permission.session <= _last_session || permission.session > now
-	    || permission.source == 0 || permission.configuration == 0
-	    || (permission.mode != ControlMode::Manual && permission.mode != ControlMode::Acceleration)) {
+	if (permission.session == 0 || permission.session <= _last_session || permission.session > now) {
 		return reject(EdfFault::InvalidGrant);
 	}
 
 	// Consume even a rejected token; retry needs a deliberate new session.
 	_last_session = permission.session;
 
-	if (!validate(configuration, ConfigurationUse::StabilizedManual).valid()) {
+	if (permission.source == 0 || permission.configuration == 0
+	    || (permission.mode != ControlMode::Manual && permission.mode != ControlMode::Acceleration
+		&& permission.mode != ControlMode::EdfBench)) { return reject(EdfFault::InvalidGrant); }
+
+	const bool commissioning = permission.mode == ControlMode::EdfBench;
+
+	if (!validate(configuration, commissioning ? ConfigurationUse::EdfCommissioning : ConfigurationUse::StabilizedManual).valid()
+	    || (commissioning && permission.configuration != fingerprint(configuration))) {
 		return reject(EdfFault::InvalidConfiguration);
 	}
 
@@ -63,7 +72,7 @@ EdfFault EdfOwner::begin(uint64_t now, const VehicleConfiguration &configuration
 
 	if (!permitted(now, permission)) { return reject(EdfFault::PermissionLost); }
 
-	_grant.timestamp_us = now;
+	_started_us = now;
 	_request = {};
 	_last_sample = now;
 	_active = true;
@@ -82,7 +91,7 @@ EdfFault EdfOwner::check(uint64_t now, const EdfPermission &permission)
 	if (!permitted(now, permission)) { return reject(EdfFault::PermissionLost); }
 
 	if ((_received && now >= _request.deadline_us)
-	    || (!_received && now - _grant.timestamp_us >= _lease_us)) { return reject(EdfFault::Expired); }
+	    || (!_received && now - _started_us >= _lease_us)) { return reject(EdfFault::Expired); }
 
 	return EdfFault::None;
 }
@@ -97,15 +106,17 @@ EdfFault EdfOwner::accept(uint64_t now, const EdfPermission &permission, const E
 	}
 
 	if (request.sequence == 0 || request.sequence <= _request.sequence
-	    || request.timestamp_us < _grant.timestamp_us || request.timestamp_us > now
+	    || request.timestamp_us < _grant.session || request.timestamp_us > now
 	    || (_received && request.timestamp_us <= _request.timestamp_us)
 	    || request.deadline_us <= now || request.deadline_us - request.timestamp_us > _lease_us
 	    || !std::isfinite(request.value)) { return reject(EdfFault::InvalidRequest); }
 
 	float target{};
 
-	if (request.mode == ControlMode::Manual) {
-		if (request.units != EdfUnits::Normalized || request.value < 0.F || request.value > 1.F) {
+	if (request.mode == ControlMode::Manual || request.mode == ControlMode::EdfBench) {
+		const float maximum = request.mode == ControlMode::EdfBench ? _configuration.edf_commission_max : 1.F;
+
+		if (request.units != EdfUnits::Normalized || request.value < 0.F || request.value > maximum) {
 			return reject(EdfFault::InvalidRequest);
 		}
 
@@ -117,7 +128,9 @@ EdfFault EdfOwner::accept(uint64_t now, const EdfPermission &permission, const E
 		}
 	}
 
-	if (!_received && target > _configuration.edf_entry_max) { return reject(EdfFault::NotLowThrottle); }
+	if (!_received && target > (_grant.mode == ControlMode::EdfBench ? 0.F : _configuration.edf_entry_max)) {
+		return reject(EdfFault::NotLowThrottle);
+	}
 
 	// Account for time under the previous target before installing this one.
 	// A new request cannot spend slew budget accumulated before its arrival.
@@ -135,13 +148,17 @@ EdfCommand EdfOwner::sample(uint64_t now, const EdfPermission &permission)
 	EdfCommand command{};
 
 	if (check(now, permission) != EdfFault::None || !_received) {
-		command.disposition = inhibited(permission) ? EdfDisposition::Inhibited : EdfDisposition::RecoveryRequired;
+		command.disposition = inhibited(permission) || _grant.mode == ControlMode::EdfBench ?
+				      EdfDisposition::Inhibited : EdfDisposition::RecoveryRequired;
 		return command;
 	}
 
 	// The consumer must check this expiry independently of this producer.
 	const float dt = static_cast<float>(now - _last_sample) * kSecondsPerUs;
 	_output += math::constrain(_target - _output, -_configuration.edf_fall * dt, _configuration.edf_rise * dt);
+
+	if (_grant.mode == ControlMode::EdfBench) { _output = math::constrain(_output, 0.F, _configuration.edf_commission_max); }
+
 	_last_sample = now;
 	command.disposition = EdfDisposition::Command;
 	command.normalized = _output;

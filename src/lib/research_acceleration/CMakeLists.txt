@@ -1,11 +1,23 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(research_acceleration LANGUAGES CXX)
+set(RESEARCH_ACCELERATION_SOURCES
+	RequestGuard.cpp
+	FrameMath.cpp
+	TrustedTimeMap.cpp
+	WireAdapter.cpp
+	WireStatus.cpp
+)
 
-# This build entry is for host-only contract tests, not PX4 module integration.
 if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-	message(FATAL_ERROR "Use this directory as a standalone host-test project")
+	if(RESEARCH_SITL_DIAGNOSTIC_TESTS OR RESEARCH_SITL_NATIVE_OWNER_TESTS OR RESEARCH_SITL_NATIVE_INGRESS_TESTS)
+		message(FATAL_ERROR "Diagnostic validation requires standalone native Linux tests, not PX4/hardware/lockstep/proxy")
+	endif()
+	px4_add_library(research_acceleration ${RESEARCH_ACCELERATION_SOURCES})
+	target_include_directories(research_acceleration PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/..)
+	return()
 endif()
+
+project(research_acceleration LANGUAGES CXX)
 
 include(CTest)
 
@@ -21,13 +33,7 @@ if(RESEARCH_SITL_DIAGNOSTIC_TESTS OR RESEARCH_SITL_NATIVE_OWNER_TESTS OR RESEARC
 	endif()
 endif()
 
-add_library(research_acceleration STATIC
-	RequestGuard.cpp
-	FrameMath.cpp
-	TrustedTimeMap.cpp
-	WireAdapter.cpp
-	WireStatus.cpp
-)
+add_library(research_acceleration STATIC ${RESEARCH_ACCELERATION_SOURCES})
 
 target_include_directories(research_acceleration PUBLIC
 	${CMAKE_CURRENT_LIST_DIR}

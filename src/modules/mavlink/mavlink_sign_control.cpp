@@ -188,6 +188,10 @@ void MavlinkSignControl::reload_key()
 
 void MavlinkSignControl::_update_signing_state()
 {
+	// Reloading even the same key ends the prior command-admission lifetime.
+	// Unsigned wrap reaches terminal zero; another update must not reuse it.
+	if (_signing_generation) { ++_signing_generation; }
+
 	if (_is_signing_initialized) {
 		_mavlink_signing.flags = MAVLINK_SIGNING_FLAG_SIGN_OUTGOING;
 		_mavlink_status->signing = &_mavlink_signing;

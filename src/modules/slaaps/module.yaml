@@ -185,6 +185,83 @@
       }
     },
     {
+      "group": "SLAAPS Companion",
+      "definitions": {
+        "SLA_CMP_EN": {
+          "description": {
+            "short": "Enable configured companion transport source; no acceleration authority",
+            "long": "Companion transport source selection. Configure and apply while disarmed. The exact MAVLink link, signed header system/component and positive 31-bit payload source ID must match. The age limit bounds local packet receipt, not producer command validity. Authentication and source selection do not establish a session, trusted clock mapping, acceleration control or flight permission. Zero age or identity is unconfigured."
+          },
+          "type": "enum",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "values": {
+            "0": "Disabled",
+            "1": "Observe configured companion"
+          }
+        },
+        "SLA_CMP_INST": {
+          "description": {
+            "short": "Selected MAVLink instance; -1 is unconfigured",
+            "long": "Companion transport source selection. Configure and apply while disarmed. The exact MAVLink link, signed header system/component and positive 31-bit payload source ID must match. The age limit bounds local packet receipt, not producer command validity. Authentication and source selection do not establish a session, trusted clock mapping, acceleration control or flight permission. Zero age or identity is unconfigured."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 3,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "MAVLink link 0",
+            "1": "MAVLink link 1",
+            "2": "MAVLink link 2",
+            "3": "MAVLink link 3"
+          }
+        },
+        "SLA_CMP_SYS": {
+          "description": {
+            "short": "Exact companion MAVLink system ID; zero is unconfigured",
+            "long": "Companion transport source selection. Configure and apply while disarmed. The exact MAVLink link, signed header system/component and positive 31-bit payload source ID must match. The age limit bounds local packet receipt, not producer command validity. Authentication and source selection do not establish a session, trusted clock mapping, acceleration control or flight permission. Zero age or identity is unconfigured."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 255,
+          "default": 0
+        },
+        "SLA_CMP_COMP": {
+          "description": {
+            "short": "Exact companion MAVLink component ID; zero is unconfigured",
+            "long": "Companion transport source selection. Configure and apply while disarmed. The exact MAVLink link, signed header system/component and positive 31-bit payload source ID must match. The age limit bounds local packet receipt, not producer command validity. Authentication and source selection do not establish a session, trusted clock mapping, acceleration control or flight permission. Zero age or identity is unconfigured."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 255,
+          "default": 0
+        },
+        "SLA_CMP_SOURCE": {
+          "description": {
+            "short": "Exact request payload source ID; zero is unconfigured",
+            "long": "Companion transport source selection. Configure and apply while disarmed. The exact MAVLink link, signed header system/component and positive 31-bit payload source ID must match. The age limit bounds local packet receipt, not producer command validity. Authentication and source selection do not establish a session, trusted clock mapping, acceleration control or flight permission. Zero age or identity is unconfigured."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 2147483647,
+          "default": 0
+        },
+        "SLA_CMP_AGE": {
+          "description": {
+            "short": "Maximum original companion request age; zero is unconfigured",
+            "long": "Companion transport source selection. Configure and apply while disarmed. The exact MAVLink link, signed header system/component and positive 31-bit payload source ID must match. The age limit bounds local packet receipt, not producer command validity. Authentication and source selection do not establish a session, trusted clock mapping, acceleration control or flight permission. Zero age or identity is unconfigured."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 1000000,
+          "default": 0,
+          "unit": "us"
+        }
+      }
+    },
+    {
       "group": "SLAAPS Canard 1",
       "definitions": {
         "SLA_C1_DMR": {
@@ -213,7 +290,7 @@
         },
         "SLA_C1_BMR": {
           "description": {
-            "short": "Bench selected-input R mix coefficient",
+            "short": "Bench logical body roll demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -248,7 +325,7 @@
         },
         "SLA_C1_BMP": {
           "description": {
-            "short": "Bench selected-input P mix coefficient",
+            "short": "Bench logical body pitch demand (positive nose-up) mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -283,7 +360,7 @@
         },
         "SLA_C1_BMY": {
           "description": {
-            "short": "Bench selected-input Y mix coefficient",
+            "short": "Bench logical body yaw demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -486,7 +563,7 @@
         },
         "SLA_C2_BMR": {
           "description": {
-            "short": "Bench selected-input R mix coefficient",
+            "short": "Bench logical body roll demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -521,7 +598,7 @@
         },
         "SLA_C2_BMP": {
           "description": {
-            "short": "Bench selected-input P mix coefficient",
+            "short": "Bench logical body pitch demand (positive nose-up) mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -556,7 +633,7 @@
         },
         "SLA_C2_BMY": {
           "description": {
-            "short": "Bench selected-input Y mix coefficient",
+            "short": "Bench logical body yaw demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -759,7 +836,7 @@
         },
         "SLA_C3_BMR": {
           "description": {
-            "short": "Bench selected-input R mix coefficient",
+            "short": "Bench logical body roll demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -794,7 +871,7 @@
         },
         "SLA_C3_BMP": {
           "description": {
-            "short": "Bench selected-input P mix coefficient",
+            "short": "Bench logical body pitch demand (positive nose-up) mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -829,7 +906,7 @@
         },
         "SLA_C3_BMY": {
           "description": {
-            "short": "Bench selected-input Y mix coefficient",
+            "short": "Bench logical body yaw demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -1032,7 +1109,7 @@
         },
         "SLA_C4_BMR": {
           "description": {
-            "short": "Bench selected-input R mix coefficient",
+            "short": "Bench logical body roll demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -1067,7 +1144,7 @@
         },
         "SLA_C4_BMP": {
           "description": {
-            "short": "Bench selected-input P mix coefficient",
+            "short": "Bench logical body pitch demand (positive nose-up) mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -1102,7 +1179,7 @@
         },
         "SLA_C4_BMY": {
           "description": {
-            "short": "Bench selected-input Y mix coefficient",
+            "short": "Bench logical body yaw demand mix coefficient",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -1291,6 +1368,22 @@
           "unit": "Nm",
           "decimal": 6
         },
+        "SLA_R_INPUT": {
+          "description": {
+            "short": "Selected input slot for body roll; -1 unconfigured 0 roll 1 pitch 2 yaw",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 2,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Roll",
+            "1": "Pitch",
+            "2": "Yaw"
+          }
+        },
         "SLA_R_SIGN": {
           "description": {
             "short": "Stick sign; must be +1 or -1",
@@ -1444,9 +1537,25 @@
           "unit": "Nm",
           "decimal": 6
         },
+        "SLA_P_INPUT": {
+          "description": {
+            "short": "Selected input slot for body pitch; -1 unconfigured 0 roll 1 pitch 2 yaw",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 2,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Roll",
+            "1": "Pitch",
+            "2": "Yaw"
+          }
+        },
         "SLA_P_SIGN": {
           "description": {
-            "short": "Stick sign; must be +1 or -1",
+            "short": "Body pitch stick sign +/-1; selected forward-stick pitch normally needs -1",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "float",
@@ -1597,6 +1706,22 @@
           "unit": "Nm",
           "decimal": 6
         },
+        "SLA_Y_INPUT": {
+          "description": {
+            "short": "Selected input slot for body yaw; -1 unconfigured 0 roll 1 pitch 2 yaw",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 2,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Roll",
+            "1": "Pitch",
+            "2": "Yaw"
+          }
+        },
         "SLA_Y_SIGN": {
           "description": {
             "short": "Stick sign; must be +1 or -1",
@@ -1738,9 +1863,24 @@
     {
       "group": "SLAAPS Input Timing",
       "definitions": {
+        "SLA_IN_SOURCE": {
+          "description": {
+            "short": "Selected input policy; 0 unconfigured 1 RC only 2 pinned MAVLink only",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "enum",
+          "min": 0,
+          "max": 2,
+          "default": 0,
+          "values": {
+            "0": "Unconfigured",
+            "1": "RC only",
+            "2": "Pinned MAVLink only"
+          }
+        },
         "SLA_IN_INST": {
           "description": {
-            "short": "Selected MAVLink input instance; -1 unconfigured",
+            "short": "Selected MAVLink input instance; -1 required for RC only",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "int32",
@@ -1767,6 +1907,28 @@
           "min": 0,
           "max": 255,
           "default": 0
+        },
+        "SLA_THR_LOW": {
+          "description": {
+            "short": "Raw selected throttle at zero EDF demand; descending endpoints reverse",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_THR_HIGH": {
+          "description": {
+            "short": "Raw selected throttle at full EDF demand; must differ from low",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": -1.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
         },
         "SLA_IN_AGE": {
           "description": {
@@ -1800,6 +1962,50 @@
           "max": 500,
           "default": 0,
           "unit": "ms"
+        },
+        "SLA_STATUS_AGE": {
+          "description": {
+            "short": "Maximum selected estimator status and flags age; zero unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 1000000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_ARM_AGE": {
+          "description": {
+            "short": "Maximum Commander and actuator arming metadata age; zero unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 1000000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_ACT_ACK_US": {
+          "description": {
+            "short": "Activation reply timeout; below cycle maximum minus first-command budget",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_FIRST_CMD_US": {
+          "description": {
+            "short": "First-command budget; strictly between cycle minimum and maximum",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500000,
+          "default": 0,
+          "unit": "us"
         },
         "SLA_CYCLE_MIN": {
           "description": {
@@ -2047,6 +2253,1254 @@
           "max": 0.1,
           "default": 0.0,
           "decimal": 6
+        },
+        "SLA_EDF_BMAX": {
+          "description": {
+            "short": "Explicit armed EDF commissioning ceiling; zero denies commissioning",
+            "long": "Explicit normalized EDF commissioning ceiling; zero denies commissioning. Choose a hardware-appropriate limit while disarmed and apply the complete EDF commissioning profile. This software range is not a qualified hardware ceiling. Select Bench/EDF, observe low throttle and readiness, deliberately enable, then deliberately arm through Commander. Profile, limit and duration remain bound; stop, disarm, kill or input/permission loss ends the session. This is ground commissioning, never flight admission."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Schedule",
+      "definitions": {
+        "SLA_SCH_EN": {
+          "description": {
+            "short": "Enable empirical 2x2 control schedule; never flight qualification",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "enum",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "values": {
+            "0": "Disabled",
+            "1": "Empirical 2x2 table"
+          }
+        },
+        "SLA_SCH_AS_INST": {
+          "description": {
+            "short": "Pinned raw airspeed IAS instance; -1 unconfigured and no fallback",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 3,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Instance 0",
+            "1": "Instance 1",
+            "2": "Instance 2",
+            "3": "Instance 3"
+          }
+        },
+        "SLA_SCH_AD_INST": {
+          "description": {
+            "short": "Pinned vehicle_air_data density instance; -1 unconfigured",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 3,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Instance 0",
+            "1": "Instance 1",
+            "2": "Instance 2",
+            "3": "Instance 3"
+          }
+        },
+        "SLA_SCH_BAT_INST": {
+          "description": {
+            "short": "Pinned battery_status voltage instance; -1 unconfigured",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 3,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Instance 0",
+            "1": "Instance 1",
+            "2": "Instance 2",
+            "3": "Instance 3"
+          }
+        },
+        "SLA_SCH_BAT_ID": {
+          "description": {
+            "short": "Required selected battery ID; zero unconfigured",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 255,
+          "default": 0
+        },
+        "SLA_SCH_AGE": {
+          "description": {
+            "short": "Maximum schedule source age; zero unconfigured",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 1000000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_SCH_AS_LO": {
+          "description": {
+            "short": "Low raw indicated-airspeed knot; never groundspeed",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 300.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        },
+        "SLA_SCH_AS_HI": {
+          "description": {
+            "short": "High raw indicated-airspeed knot; must exceed low",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 300.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        },
+        "SLA_SCH_EDF_LO": {
+          "description": {
+            "short": "Low normalized EDF owner-command knot; not thrust",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_SCH_EDF_HI": {
+          "description": {
+            "short": "High normalized EDF owner-command knot; must exceed low",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_SCH_RHO_MIN": {
+          "description": {
+            "short": "Minimum empirical table density; no density scaling inferred",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "kg/m^3",
+          "decimal": 6
+        },
+        "SLA_SCH_RHO_MAX": {
+          "description": {
+            "short": "Maximum empirical table density; must exceed minimum",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "kg/m^3",
+          "decimal": 6
+        },
+        "SLA_SCH_V_MIN": {
+          "description": {
+            "short": "Minimum empirical table battery voltage",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "V",
+          "decimal": 6
+        },
+        "SLA_SCH_V_MAX": {
+          "description": {
+            "short": "Maximum empirical table battery voltage; must exceed minimum",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "V",
+          "decimal": 6
+        },
+        "SLA_SCH_FILT_T": {
+          "description": {
+            "short": "Configured schedule coordinate filter time constant",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_SCH_AS_RATE": {
+          "description": {
+            "short": "Maximum filtered indicated-airspeed coordinate slew",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "m/s^2",
+          "decimal": 6
+        },
+        "SLA_SCH_E_RATE": {
+          "description": {
+            "short": "Maximum filtered normalized EDF coordinate slew",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "1/s",
+          "decimal": 6
+        },
+        "SLA_SCH_AS_TRAN": {
+          "description": {
+            "short": "Maximum accepted raw indicated-airspeed transient rate",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 10000.0,
+          "default": 0.0,
+          "unit": "m/s^2",
+          "decimal": 6
+        },
+        "SLA_SCH_E_TRAN": {
+          "description": {
+            "short": "Maximum accepted normalized EDF command transient rate",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "1/s",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Schedule 00",
+      "definitions": {
+        "SLA_S00_R_P": {
+          "description": {
+            "short": "Corner 00 body R rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_R_I": {
+          "description": {
+            "short": "Corner 00 body R rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_R_D": {
+          "description": {
+            "short": "Corner 00 body R rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_R_C1": {
+          "description": {
+            "short": "Corner 00 signed body R moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_R_C2": {
+          "description": {
+            "short": "Corner 00 signed body R moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_R_C3": {
+          "description": {
+            "short": "Corner 00 signed body R moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_R_C4": {
+          "description": {
+            "short": "Corner 00 signed body R moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_P_P": {
+          "description": {
+            "short": "Corner 00 body P rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_P_I": {
+          "description": {
+            "short": "Corner 00 body P rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_P_D": {
+          "description": {
+            "short": "Corner 00 body P rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_P_C1": {
+          "description": {
+            "short": "Corner 00 signed body P moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_P_C2": {
+          "description": {
+            "short": "Corner 00 signed body P moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_P_C3": {
+          "description": {
+            "short": "Corner 00 signed body P moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_P_C4": {
+          "description": {
+            "short": "Corner 00 signed body P moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_Y_P": {
+          "description": {
+            "short": "Corner 00 body Y rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_Y_I": {
+          "description": {
+            "short": "Corner 00 body Y rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_Y_D": {
+          "description": {
+            "short": "Corner 00 body Y rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S00_Y_C1": {
+          "description": {
+            "short": "Corner 00 signed body Y moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_Y_C2": {
+          "description": {
+            "short": "Corner 00 signed body Y moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_Y_C3": {
+          "description": {
+            "short": "Corner 00 signed body Y moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S00_Y_C4": {
+          "description": {
+            "short": "Corner 00 signed body Y moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Schedule 01",
+      "definitions": {
+        "SLA_S01_R_P": {
+          "description": {
+            "short": "Corner 01 body R rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_R_I": {
+          "description": {
+            "short": "Corner 01 body R rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_R_D": {
+          "description": {
+            "short": "Corner 01 body R rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_R_C1": {
+          "description": {
+            "short": "Corner 01 signed body R moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_R_C2": {
+          "description": {
+            "short": "Corner 01 signed body R moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_R_C3": {
+          "description": {
+            "short": "Corner 01 signed body R moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_R_C4": {
+          "description": {
+            "short": "Corner 01 signed body R moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_P_P": {
+          "description": {
+            "short": "Corner 01 body P rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_P_I": {
+          "description": {
+            "short": "Corner 01 body P rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_P_D": {
+          "description": {
+            "short": "Corner 01 body P rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_P_C1": {
+          "description": {
+            "short": "Corner 01 signed body P moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_P_C2": {
+          "description": {
+            "short": "Corner 01 signed body P moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_P_C3": {
+          "description": {
+            "short": "Corner 01 signed body P moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_P_C4": {
+          "description": {
+            "short": "Corner 01 signed body P moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_Y_P": {
+          "description": {
+            "short": "Corner 01 body Y rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_Y_I": {
+          "description": {
+            "short": "Corner 01 body Y rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_Y_D": {
+          "description": {
+            "short": "Corner 01 body Y rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S01_Y_C1": {
+          "description": {
+            "short": "Corner 01 signed body Y moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_Y_C2": {
+          "description": {
+            "short": "Corner 01 signed body Y moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_Y_C3": {
+          "description": {
+            "short": "Corner 01 signed body Y moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S01_Y_C4": {
+          "description": {
+            "short": "Corner 01 signed body Y moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Schedule 10",
+      "definitions": {
+        "SLA_S10_R_P": {
+          "description": {
+            "short": "Corner 10 body R rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_R_I": {
+          "description": {
+            "short": "Corner 10 body R rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_R_D": {
+          "description": {
+            "short": "Corner 10 body R rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_R_C1": {
+          "description": {
+            "short": "Corner 10 signed body R moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_R_C2": {
+          "description": {
+            "short": "Corner 10 signed body R moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_R_C3": {
+          "description": {
+            "short": "Corner 10 signed body R moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_R_C4": {
+          "description": {
+            "short": "Corner 10 signed body R moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_P_P": {
+          "description": {
+            "short": "Corner 10 body P rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_P_I": {
+          "description": {
+            "short": "Corner 10 body P rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_P_D": {
+          "description": {
+            "short": "Corner 10 body P rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_P_C1": {
+          "description": {
+            "short": "Corner 10 signed body P moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_P_C2": {
+          "description": {
+            "short": "Corner 10 signed body P moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_P_C3": {
+          "description": {
+            "short": "Corner 10 signed body P moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_P_C4": {
+          "description": {
+            "short": "Corner 10 signed body P moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_Y_P": {
+          "description": {
+            "short": "Corner 10 body Y rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_Y_I": {
+          "description": {
+            "short": "Corner 10 body Y rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_Y_D": {
+          "description": {
+            "short": "Corner 10 body Y rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S10_Y_C1": {
+          "description": {
+            "short": "Corner 10 signed body Y moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_Y_C2": {
+          "description": {
+            "short": "Corner 10 signed body Y moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_Y_C3": {
+          "description": {
+            "short": "Corner 10 signed body Y moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S10_Y_C4": {
+          "description": {
+            "short": "Corner 10 signed body Y moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Schedule 11",
+      "definitions": {
+        "SLA_S11_R_P": {
+          "description": {
+            "short": "Corner 11 body R rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_R_I": {
+          "description": {
+            "short": "Corner 11 body R rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_R_D": {
+          "description": {
+            "short": "Corner 11 body R rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_R_C1": {
+          "description": {
+            "short": "Corner 11 signed body R moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_R_C2": {
+          "description": {
+            "short": "Corner 11 signed body R moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_R_C3": {
+          "description": {
+            "short": "Corner 11 signed body R moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_R_C4": {
+          "description": {
+            "short": "Corner 11 signed body R moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_P_P": {
+          "description": {
+            "short": "Corner 11 body P rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_P_I": {
+          "description": {
+            "short": "Corner 11 body P rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_P_D": {
+          "description": {
+            "short": "Corner 11 body P rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_P_C1": {
+          "description": {
+            "short": "Corner 11 signed body P moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_P_C2": {
+          "description": {
+            "short": "Corner 11 signed body P moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_P_C3": {
+          "description": {
+            "short": "Corner 11 signed body P moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_P_C4": {
+          "description": {
+            "short": "Corner 11 signed body P moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_Y_P": {
+          "description": {
+            "short": "Corner 11 body Y rate P gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_Y_I": {
+          "description": {
+            "short": "Corner 11 body Y rate I gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_Y_D": {
+          "description": {
+            "short": "Corner 11 body Y rate D gain",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "decimal": 6
+        },
+        "SLA_S11_Y_C1": {
+          "description": {
+            "short": "Corner 11 signed body Y moment derivative for canard 1",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_Y_C2": {
+          "description": {
+            "short": "Corner 11 signed body Y moment derivative for canard 2",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_Y_C3": {
+          "description": {
+            "short": "Corner 11 signed body Y moment derivative for canard 3",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
+        },
+        "SLA_S11_Y_C4": {
+          "description": {
+            "short": "Corner 11 signed body Y moment derivative for canard 4",
+            "long": "Optional empirical control table, disabled by default. Configure and apply the complete profile while disarmed. Coordinates are raw indicated airspeed from the pinned airspeed instance and normalized EDF owner command; neither groundspeed nor inferred thrust is substituted. Corner indices are [IAS low/high][EDF low/high]. Every corner supplies body-rate P/I/D gains and signed moment derivatives about CG; the existing moment normalization and calibrated servo conversion remain fixed. Pinned vehicle_air_data density and battery_status voltage must stay fresh and inside the declared ranges; no density or voltage scaling is inferred. Selectors have no automatic fallback. Filter and raw transient limits must be explicitly configured. Enabling or numerically validating this table establishes neither angle-of-attack/sideslip or EDF-wash coverage nor a qualified envelope, measured coefficients or flight permission. Do not edit an active profile."
+          },
+          "type": "float",
+          "min": -1000.0,
+          "max": 1000.0,
+          "default": 0.0,
+          "unit": "Nm/rad",
+          "decimal": 6
         }
       }
     },
@@ -2056,7 +3510,7 @@
         "SLA_CFG_APPLY": {
           "description": {
             "short": "Apply completed configuration edits",
-            "long": "Increase this counter after all vehicle parameters have been edited. Requires disarmed status. Each increase validates one complete snapshot. Restarting the supervisor requires a new increase; a saved value never automatically activates a configuration."
+            "long": "Increase this counter after all vehicle parameters have been edited. Requires disarmed status. Each increase validates one complete snapshot. An unchanged previously accepted snapshot is restored after a disarmed restart. Later edits require another increase. Restoration grants no output permission."
           },
           "type": "int32",
           "min": 0,
@@ -2071,9 +3525,94 @@
           "type": "enum",
           "values": {
             "0": "Servo bench",
-            "1": "Stabilized manual"
+            "1": "Stabilized manual",
+            "2": "EDF commissioning"
           },
           "default": 0
+        },
+        "SLA_CFG_SAVED": {
+          "description": {
+            "short": "Accepted configuration apply counter",
+            "long": "Supervisor-maintained acceptance marker. Export and restore with all SLAAPS parameters. Do not edit manually. A matching marker permits revalidation after disarmed restart, never arming or output permission."
+          },
+          "type": "int32",
+          "min": -2147483648,
+          "max": 2147483647,
+          "default": 0
+        },
+        "SLA_CFG_SCOPE": {
+          "description": {
+            "short": "Accepted configuration validation scope",
+            "long": "Supervisor-maintained acceptance marker. Export and restore with all SLAAPS parameters. Do not edit manually. A matching marker permits revalidation after disarmed restart, never arming or output permission."
+          },
+          "type": "int32",
+          "min": -2147483648,
+          "max": 2147483647,
+          "default": 0
+        },
+        "SLA_CFG_ID_LO": {
+          "description": {
+            "short": "Accepted configuration identity low word",
+            "long": "Supervisor-maintained acceptance marker. Export and restore with all SLAAPS parameters. Do not edit manually. A matching marker permits revalidation after disarmed restart, never arming or output permission."
+          },
+          "type": "int32",
+          "min": -2147483648,
+          "max": 2147483647,
+          "default": 0
+        },
+        "SLA_CFG_ID_HI": {
+          "description": {
+            "short": "Accepted configuration identity high word",
+            "long": "Supervisor-maintained acceptance marker. Export and restore with all SLAAPS parameters. Do not edit manually. A matching marker permits revalidation after disarmed restart, never arming or output permission."
+          },
+          "type": "int32",
+          "min": -2147483648,
+          "max": 2147483647,
+          "default": 0
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Commissioning",
+      "definitions": {
+        "SLA_BENCH_EN": {
+          "description": {
+            "short": "Deliberately enable commissioning",
+            "long": "Select SLAAPS Bench while disarmed, with an applied commissioning profile, valid routing and centered selected input. Set to 1 only after readiness. Set to 0 to stop. The supervisor resets this command on startup, exit or fault; restoring parameters never enables outputs. Servo targets require PX4 prearm permission and keep EDF inhibited. For EDF target 5, select/apply kind 2 disarmed, observe low throttle/readiness, enable, then deliberately arm through Commander. Controls and original duration remain bound. Disarm, kill or loss stops EDF. This command never grants flight admission."
+          },
+          "type": "enum",
+          "values": {
+            "0": "Stop / disabled",
+            "1": "Enable commissioning session"
+          },
+          "default": 0
+        },
+        "SLA_BENCH_CH": {
+          "description": {
+            "short": "Commissioning target",
+            "long": "Choose before enabling. Combined uses the applied body-axis bench mix. An individual canard uses the configured logical roll input, mapping and reversal; the other canards target physical neutral. All use the shared calibrated travel and slew limits. EDF target 5 parks every canard at physical zero and requires the accepted EDF commissioning profile, positive SLA_EDF_BMAX, low-throttle entry and deliberate armed permission. Changing this selection stops an active session."
+          },
+          "type": "enum",
+          "values": {
+            "0": "Combined response",
+            "1": "Canard 1",
+            "2": "Canard 2",
+            "3": "Canard 3",
+            "4": "Canard 4",
+            "5": "EDF (deliberately armed)"
+          },
+          "default": 0
+        },
+        "SLA_BENCH_SEC": {
+          "description": {
+            "short": "Maximum commissioning session duration",
+            "long": "Set a finite duration before deliberately enabling commissioning. Zero denies enable. Expiry stops the session and requires deliberate re-entry. The 60 second software ceiling is not measured hardware qualification. Input freshness, command leases and stop/kill checks remain independently enforced."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 60,
+          "default": 0,
+          "unit": "s"
         }
       }
     }

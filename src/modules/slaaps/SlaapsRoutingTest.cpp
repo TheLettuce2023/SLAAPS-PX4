@@ -14,12 +14,14 @@
 extern "C" __EXPORT int slaaps_routing_test_main(int argc, char *argv[])
 {
 	if (argc != 2 || (strcmp(argv[1], "valid") && strcmp(argv[1], "duplicate") && strcmp(argv[1], "unavailable")
-			  && strcmp(argv[1], "calibration") && strcmp(argv[1], "stale"))) { return PX4_ERROR; }
+			  && strcmp(argv[1], "calibration") && strcmp(argv[1], "stale") && strcmp(argv[1], "stop"))) { return PX4_ERROR; }
 
 	static uORB::PublicationMulti<slaaps_output_bank_s> publishers[2] {
 		uORB::PublicationMulti<slaaps_output_bank_s>{ORB_ID(slaaps_output_bank)},
 		uORB::PublicationMulti<slaaps_output_bank_s>{ORB_ID(slaaps_output_bank)}
 	};
+
+	if (!strcmp(argv[1], "stop")) { publishers[0].unadvertise(); publishers[1].unadvertise(); return PX4_OK; }
 
 	for (unsigned bank = 0; bank < 2; ++bank) {
 		slaaps_output_bank_s report{};

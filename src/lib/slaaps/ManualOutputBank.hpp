@@ -1,7 +1,6 @@
 #pragma once
 
-#include "ManualOutput.hpp"
-#include "ActuatorRouting.hpp"
+#include "ManualBankPreparation.hpp"
 #include <lib/mathlib/math/Limits.hpp>
 #include <cmath>
 #include <cstring>
@@ -25,6 +24,10 @@ struct ManualBankOutput {
 	uint64_t configuration{};
 	uint64_t command_timestamp_us{};
 	ManualOutputBinding binding{};
+	// Whole-bank command eligibility is separate from the EDF disposition.
+	// ServoBench canards are handled while EDF remains explicitly inhibited.
+	bool command_valid{};
+	ControlMode mode{ControlMode::Manual};
 };
 
 // Independent consumer clock. Preserve this endpoint across session changes.
@@ -53,20 +56,22 @@ public:
 
 		_session = permission.session; // Failed entry also consumes the token.
 
-		if (!validate(configuration, ConfigurationUse::StabilizedManual).valid()
+		const uint64_t cycle_max = ManualBankPreparation::cycleMaximumUs(configuration, permission.mode);
+
+		if (!ManualBankPreparation::validConfiguration(configuration, permission.mode)
 		    || permission.configuration != fingerprint(configuration) || !permission.source
 		    || !validManualOutputBinding(binding) || bank >= 2 || !(binding.banks & (1U << bank))
-		    || !makeRoutingPlan(configuration, inventory, true, _routing).valid() || binding.banks != _routing.bank_mask
-		    || now > UINT64_MAX - static_cast<uint64_t>(configuration.cycle_max_us)) {
+		    || !makeRoutingPlan(configuration, inventory, ManualBankPreparation::requiresEdf(permission.mode), _routing).valid()
+		    || binding.banks != _routing.bank_mask
+		    || !cycle_max || now > UINT64_MAX - cycle_max) {
 			return reject(ManualBankFault::InvalidConfiguration);
 		}
 
 		_configuration = configuration;
 		_binding = binding;
 		_grant = permission;
-		_grant.timestamp_us = now;
 		_bank = bank;
-		_deadline = now + configuration.cycle_max_us;
+		_deadline = now + cycle_max;
 		_sequence = 0;
 		_last_timestamp = now;
 		_active = true;
@@ -80,17 +85,23 @@ public:
 		if (poll(now, permission, inventory, binding) != ManualBankFault::None) { return _fault; }
 
 		const auto &edf = frame.edf;
+		const bool bench = _grant.mode == ControlMode::ServoBench;
+		const bool edf_bench = _grant.mode == ControlMode::EdfBench;
 		const uint64_t lease = static_cast<uint64_t>(math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
 
 		if (_awaiting_handling || _sequence == UINT64_MAX || frame.sequence != _sequence + 1 || frame.timestamp_us < _last_timestamp
 		    || (_received && frame.timestamp_us == _last_timestamp) || frame.timestamp_us > now
-		    || frame.deadline_us <= now || frame.deadline_us - frame.timestamp_us > static_cast<uint64_t>(_configuration.cycle_max_us)
+		    || frame.deadline_us <= now || frame.deadline_us - frame.timestamp_us > ManualBankPreparation::cycleMaximumUs(_configuration, _grant.mode)
 		    || frame.deadline_us > edf.deadline_us || !sameManualOutputBinding(frame.binding, _binding)
-		    || edf.disposition != EdfDisposition::Command || edf.session != _grant.session || edf.source != _grant.source
-		    || edf.configuration != _grant.configuration || !edf.sequence || edf.request_timestamp_us < _grant.timestamp_us
+		    || frame.mode != _grant.mode
+		    || (bench ? (edf.disposition != EdfDisposition::Inhibited || !(edf.normalized >= 0.F && edf.normalized <= 0.F)) :
+			(edf.disposition != EdfDisposition::Command))
+		    || edf.session != _grant.session || edf.source != _grant.source
+		    || edf.configuration != _grant.configuration || !edf.sequence || edf.request_timestamp_us < _grant.session
 		    || edf.request_timestamp_us > frame.timestamp_us || edf.deadline_us - edf.request_timestamp_us > lease
 		    || !std::isfinite(edf.normalized) || edf.normalized < 0.F || edf.normalized > 1.F
-		    || (!_received && edf.normalized > _configuration.edf_entry_max)
+		    || (!bench && !_received && edf.normalized > _configuration.edf_entry_max)
+		    || (edf_bench && (edf.normalized > _configuration.edf_commission_max || (!_received && edf.normalized > 0.F)))
 		    || (_received && (edf.sequence < _last_edf.sequence || edf.request_timestamp_us < _last_edf.request_timestamp_us
 				      || (edf.sequence == _last_edf.sequence && edf.request_timestamp_us != _last_edf.request_timestamp_us)
 				      || (edf.sequence > _last_edf.sequence && edf.request_timestamp_us <= _last_edf.request_timestamp_us)))) {
@@ -98,7 +109,9 @@ public:
 		}
 
 		ManualBankOutput candidate{};
-		candidate.disposition = EdfDisposition::Command;
+		candidate.disposition = edf.disposition;
+		candidate.command_valid = true;
+		candidate.mode = frame.mode;
 		candidate.deadline_us = frame.deadline_us;
 		candidate.sequence = frame.sequence;
 		candidate.session = edf.session;
@@ -111,7 +124,8 @@ public:
 			const float value = frame.canards[i];
 			const auto &servo = _configuration.canard[i];
 
-			if (!std::isfinite(value) || value < servo.minimum || value > servo.maximum) { return reject(ManualBankFault::InvalidFrame); }
+			if (!std::isfinite(value) || value < servo.minimum || value > servo.maximum
+			    || (edf_bench && !(value >= 0.F && value <= 0.F))) { return reject(ManualBankFault::InvalidFrame); }
 
 			const float endpoint = value < 0.F ? servo.pwm_negative : servo.pwm_positive;
 			const float pwm = servo.pwm_neutral + std::fabs(value) * (endpoint - servo.pwm_neutral);
@@ -119,9 +133,19 @@ public:
 			if (!map(_routing.canard[i], pwm, candidate)) { return reject(ManualBankFault::InvalidFrame); }
 		}
 
-		const float edf_pwm = _routing.edf.minimum_us + edf.normalized * (_routing.edf.maximum_us - _routing.edf.minimum_us);
+		if (bench) {
+			// An assigned EDF is part of this transaction only as an explicit
+			// stopped channel. Zero normalized thrust is not an active command.
+			if (_routing.edf_assigned && static_cast<unsigned>(_routing.edf.bank) == _bank) {
+				candidate.channel_mask |= 1U << _routing.edf.channel;
+				candidate.pwm_us[_routing.edf.channel] = _routing.edf.disarmed_us;
+			}
 
-		if (!map(_routing.edf, edf_pwm, candidate)) { return reject(ManualBankFault::InvalidFrame); }
+		} else {
+			const float edf_pwm = _routing.edf.minimum_us + edf.normalized * (_routing.edf.maximum_us - _routing.edf.minimum_us);
+
+			if (!map(_routing.edf, edf_pwm, candidate)) { return reject(ManualBankFault::InvalidFrame); }
+		}
 
 		_candidate = candidate;
 		_received = true;
@@ -140,7 +164,8 @@ public:
 	{
 		if (poll(now, permission, inventory, binding) != ManualBankFault::None) { return _fault; }
 
-		if (!success || !_awaiting_handling || now < _accepted_us || handled.disposition != EdfDisposition::Command
+		if (!success || !_awaiting_handling || now < _accepted_us || !handled.command_valid
+		    || handled.mode != _grant.mode || handled.disposition != _candidate.disposition
 		    || handled.channel_mask != _candidate.channel_mask || handled.sequence != _candidate.sequence
 		    || handled.session != _grant.session || handled.source != _grant.source || handled.configuration != _grant.configuration
 		    || handled.command_timestamp_us != _last_timestamp || !sameManualOutputBinding(handled.binding, _binding)
@@ -168,7 +193,8 @@ public:
 		candidate.configuration = _grant.configuration;
 		candidate.routing = _binding.routing;
 		candidate.driver = _binding.driver[_bank];
-		candidate.activated_us = _grant.timestamp_us;
+		// No command has been received, so this is still actual bank entry time.
+		candidate.activated_us = _last_timestamp;
 		candidate.first_command_deadline_us = math::min(_deadline, math::min(_grant.deadline_us, permission.deadline_us));
 		candidate.bank = _bank;
 		ack = candidate;
@@ -186,8 +212,9 @@ public:
 		}
 
 		ManualBankOutput result{};
+		result.mode = _grant.mode;
 		result.disposition = !permission.armed || permission.kill || permission.lockdown || permission.termination
-				     || permission.mode == ControlMode::ServoBench ? EdfDisposition::Inhibited : EdfDisposition::RecoveryRequired;
+				     || ManualBankPreparation::commissioningMode(_grant.mode) ? EdfDisposition::Inhibited : EdfDisposition::RecoveryRequired;
 		return result;
 	}
 
@@ -216,17 +243,18 @@ private:
 		_clock = now;
 		const uint64_t lease = static_cast<uint64_t>(_configuration.output_lease_ms) * 1000;
 
-		if (!permission.armed || !permission.flight_admitted || !permission.healthy || !permission.measured_condition_valid
-		    || permission.kill || permission.lockdown || permission.termination || permission.mode != ControlMode::Manual
+		if (!ManualBankPreparation::permitted(permission, _grant.mode)
 		    || permission.session != _grant.session || permission.source != _grant.source || permission.configuration != _grant.configuration
-		    || !permission.timestamp_us || permission.timestamp_us > now || now >= permission.deadline_us
+		    || !permission.timestamp_us || permission.session > permission.timestamp_us
+		    || permission.timestamp_us > now || now >= permission.deadline_us
 		    || permission.deadline_us - permission.timestamp_us > lease) { return reject(ManualBankFault::PermissionLost); }
 
 		if (now >= _deadline) { return reject(ManualBankFault::Expired); }
 
 		RoutingPlan live{};
 
-		if (!sameManualOutputBinding(binding, _binding) || !makeRoutingPlan(_configuration, inventory, true, live).valid()
+		if (!sameManualOutputBinding(binding, _binding)
+		    || !makeRoutingPlan(_configuration, inventory, ManualBankPreparation::requiresEdf(_grant.mode), live).valid()
 		    || !sameRoutingPlan(live, _routing)) { return reject(ManualBankFault::RoutingChanged); }
 
 		return ManualBankFault::None;

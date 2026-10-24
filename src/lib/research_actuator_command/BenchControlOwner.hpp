@@ -23,15 +23,23 @@ struct BenchServoCalibration {
 	float maximum_deflection_deg{};
 	float rise_deg_per_s{};
 	float fall_deg_per_s{};
+	// Travel within the same normalized PWM calibration. Physical neutral is
+	// zero, independent of a flight trim. Appended defaults preserve file profiles.
+	float minimum_normalized{-1.0F};
+	float maximum_normalized{1.0F};
 };
 
 struct BenchConfiguration {
+	ManualSourcePolicy source_policy{ManualSourcePolicy::MavlinkOnly};
 	uint8_t mavlink_instance{kNoMavlinkManualInstance};
 	uint8_t source_system_id{};
 	uint8_t source_component_id{};
-	BenchMix mix{}; // PX4 roll, forward-stick pitch, yaw -> normalized C1..C4.
+	uint8_t stick_axis[kBenchAxisCount] {0, 1, 2};
+	float stick_sign[kBenchAxisCount] {1.F, 1.F, 1.F};
+	BenchMix mix{}; // Logical roll/pitch/yaw demand -> normalized C1..C4.
 	FixedArray<BenchServoCalibration, kBenchCanardCount> servos{};
 	float neutral_entry_tolerance{}; // Caller-measured joystick deadband.
+	RuntimeTimeUs maximum_manual_age_us{kBenchSampleAgeUs};
 	RuntimeTimeUs maximum_cycle_gap_us{}; // Requires measured scheduling budget.
 };
 
@@ -64,9 +72,15 @@ public:
 	BenchControlOwner(BenchControlOwner &&) = delete;
 	BenchControlOwner &operator=(BenchControlOwner &&) = delete;
 
-	BenchStatus configure(const BenchConfiguration &configuration);
+	// Zero selects the configured combined mix; 1..4 select one canard driven
+	// by logical roll. Selection and optional shaping are fixed until reset.
+	BenchStatus configure(const BenchConfiguration &configuration, unsigned target = 0, float deadzone = 0.F);
+	static BenchStatus validateConfiguration(const BenchConfiguration &configuration, unsigned target = 0, float deadzone = 0.F);
 	BenchStatus enable(RuntimeTimeUs now_us, const ManualControlSample &sample);
 	BenchStatus cycle(RuntimeTimeUs now_us, const ManualControlSample &sample, BenchReport &report);
+	// Validate raw input while the output acknowledgment is pending, without
+	// advancing slew history or calculating another command.
+	BenchStatus monitor(RuntimeTimeUs now_us, const ManualControlSample &sample);
 	void disable();
 	void reset();
 	bool neutralCandidate(BenchReport &report) const;
@@ -78,6 +92,7 @@ public:
 	static constexpr bool outputsEnabled() { return false; }
 
 private:
+	BenchStatus inspect(RuntimeTimeUs now_us, const ManualControlSample &sample, RuntimeInput &input);
 	BenchStatus latch(BenchStatus fault);
 	BenchReport makeReport(RuntimeTimeUs now_us, const Command &command, float scale, bool neutral) const;
 	BenchConfiguration _configuration{};
@@ -85,6 +100,9 @@ private:
 	ManualControlInput _input{};
 	BenchReport _last_report{};
 	RuntimeTimeUs _last_cycle_us{};
+	RuntimeTimeUs _last_observed_us{};
+	float _deadzone{};
+	unsigned _target{};
 	BenchState _state{BenchState::Disabled};
 	BenchStatus _fault{BenchStatus::Ok};
 	ManualControlStatus _input_status{ManualControlStatus::NotConfigured};

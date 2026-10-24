@@ -110,6 +110,11 @@ def main():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(path, target)
                 inputs[name.as_posix()] = dict(kind="file", sha256=digest(target), mode="100644")
+        # The repository-owned dialect is deliberately outside the pinned
+        # MAVLink submodule and may still be untracked during development.
+        dialect = Path("src/modules/mavlink/slaaps.xml")
+        shutil.copyfile(ROOT / dialect, source / dialect)
+        inputs[dialect.as_posix()] = dict(kind="file", sha256=digest(source / dialect), mode="100644")
         record = dict(scope="current_checkout_native_slaaps_no_plant", inputs=inputs, repositories=repositories)
         if args.wall_clock_test:
             record["config"] = "px4_sitl_slaaps-test"

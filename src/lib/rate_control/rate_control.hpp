@@ -59,6 +59,15 @@ public:
 	void setPidGains(const matrix::Vector3f &P, const matrix::Vector3f &I, const matrix::Vector3f &D);
 
 	/**
+	 * Change gains while preserving the current P+I-D output at the supplied
+	 * error and measured angular acceleration. Feed forward remains unchanged.
+	 * Returns false without changing gains/integral if validation fails or the
+	 * exact compensation does not fit the existing integral limits.
+	 */
+	bool setPidGainsBumpless(const matrix::Vector3f &P, const matrix::Vector3f &I, const matrix::Vector3f &D,
+				 const matrix::Vector3f &rate_error, const matrix::Vector3f &angular_accel);
+
+	/**
 	 * Set the mximum absolute value of the integrator for all axes
 	 * @param integrator_limit limit value for all axes x, y, z
 	 */

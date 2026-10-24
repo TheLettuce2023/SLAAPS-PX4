@@ -58,6 +58,12 @@ PWMOut::~PWMOut()
 
 bool PWMOut::update_pwm_out_state(bool on)
 {
+#if defined(CONFIG_MODULES_SLAAPS)
+	// Serialized with MixingOutput::update(): hardware state changes invalidate
+	// the prepared/active routing before the next physical command.
+	_mixing_output.invalidateSlaapsInventory();
+#endif
+
 	if (on && !_pwm_initialized && _pwm_mask != 0) {
 
 		for (int timer = 0; timer < MAX_IO_TIMERS; ++timer) {

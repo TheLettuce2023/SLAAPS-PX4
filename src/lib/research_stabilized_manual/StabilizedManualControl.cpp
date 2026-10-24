@@ -28,12 +28,11 @@ bool centered(const ManualSample &sample, float limit)
 }
 
 
-}
-
-Status StabilizedManualControl::configure(const Configuration &configuration)
+// Share the exact admission checks without constructing PID, attitude-history
+// and controller state on physical-driver validation stacks.
+Status validateControlConfiguration(const Configuration &configuration,
+				    research_actuator_command::ManualControlInput &input)
 {
-	if (_state != State::Disabled) { return Status::InvalidState; }
-
 	if (configuration.maximum_manual_age_us == 0 || configuration.maximum_state_age_us == 0
 	    || configuration.maximum_state_skew_us == 0 || configuration.minimum_cycle_us == 0
 	    || configuration.maximum_cycle_us < configuration.minimum_cycle_us
@@ -45,6 +44,12 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 	    || !validAllocationConfiguration(configuration.allocation)) { return Status::InvalidConfiguration; }
 
 	for (unsigned axis = 0; axis < 3; ++axis) {
+		if (configuration.stick_axis[axis] >= 3) { return Status::InvalidConfiguration; }
+
+		for (unsigned previous = 0; previous < axis; ++previous) {
+			if (configuration.stick_axis[axis] == configuration.stick_axis[previous]) { return Status::InvalidConfiguration; }
+		}
+
 		const float positive[] = {configuration.maximum_rate_rad_s(axis), configuration.maximum_rate_setpoint_accel_rad_s2(axis),
 					  configuration.maximum_measured_rate_rad_s(axis), configuration.maximum_measured_accel_rad_s2(axis),
 					  configuration.attitude_gain(axis), configuration.rate_p(axis), configuration.integrator_limit(axis),
@@ -60,7 +65,25 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 		    || configuration.maximum_normalized_moment(axis) > 1.0F) { return Status::InvalidConfiguration; }
 	}
 
-	if (configureStabilizedManualInput(configuration, _manual) != research_actuator_command::ManualControlStatus::Ok) { return Status::InvalidConfiguration; }
+	if (configureStabilizedManualInput(configuration, input) != research_actuator_command::ManualControlStatus::Ok) { return Status::InvalidConfiguration; }
+
+	return Status::Ok;
+}
+}
+
+Status StabilizedManualControl::validateConfiguration(const Configuration &configuration)
+{
+	research_actuator_command::ManualControlInput input{};
+	return validateControlConfiguration(configuration, input);
+}
+
+Status StabilizedManualControl::configure(const Configuration &configuration)
+{
+	if (_state != State::Disabled) { return Status::InvalidState; }
+
+	const auto validation = validateControlConfiguration(configuration, _manual);
+
+	if (validation != Status::Ok) { return validation; }
 
 	_configuration = configuration;
 	_rate_control = RateControl{};
@@ -144,6 +167,18 @@ Status StabilizedManualControl::monitor(TimeUs now, const ManualSample &manual, 
 
 Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report)
 {
+	return cycleImpl(now, manual, sample, report, nullptr);
+}
+
+Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report,
+				      const ScheduledControlPoint &scheduled)
+{
+	return cycleImpl(now, manual, sample, report, &scheduled);
+}
+
+Status StabilizedManualControl::cycleImpl(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report,
+		const ScheduledControlPoint *scheduled)
+{
 	if (!eligible()) { return Status::InvalidState; }
 
 	if (now <= _last_cycle_us) { return reject(Status::InvalidTime); }
@@ -174,9 +209,10 @@ Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, co
 
 	} else {
 		for (unsigned axis = 0; axis < 3; ++axis) {
-			const float magnitude = ::fmaxf(0.0F, (std::fabs(manual.axes[axis]) - _configuration.centered_enter)
+			const float stick = manual.axes[_configuration.stick_axis[axis]];
+			const float magnitude = ::fmaxf(0.0F, (std::fabs(stick) - _configuration.centered_enter)
 							/ (1.0F - _configuration.centered_enter));
-			rate_setpoint(axis) = (manual.axes[axis] < 0.0F ? -magnitude : magnitude)
+			rate_setpoint(axis) = (stick < 0.0F ? -magnitude : magnitude)
 					      * _configuration.stick_sign(axis) * _configuration.maximum_rate_rad_s(axis);
 		}
 	}
@@ -193,6 +229,23 @@ Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, co
 	}
 
 	RateControl rate_control = _rate_control;
+	AllocationConfiguration allocation = _configuration.allocation;
+
+	if (scheduled) {
+		for (unsigned axis = 0; axis < 3; ++axis) {
+			if (!std::isfinite(scheduled->rate_p(axis)) || scheduled->rate_p(axis) <= 0.0F
+			    || !std::isfinite(scheduled->rate_i(axis)) || scheduled->rate_i(axis) < 0.0F
+			    || !std::isfinite(scheduled->rate_d(axis)) || scheduled->rate_d(axis) < 0.0F) { return reject(Status::InvalidSchedule); }
+		}
+
+		allocation.effectiveness = scheduled->effectiveness;
+
+		if (!validAllocationConfiguration(allocation)) { return reject(Status::InvalidSchedule); }
+
+		if (!rate_control.setPidGainsBumpless(scheduled->rate_p, scheduled->rate_i, scheduled->rate_d,
+						      rate_setpoint - sample.rate_rad_s, sample.angular_accel_rad_s2)) { return reject(Status::GainTransitionRejected); }
+	}
+
 	const Vector3f requested = rate_control.update(sample.rate_rad_s, rate_setpoint, sample.angular_accel_rad_s2, dt_s, false);
 	Vector3f bounded{};
 
@@ -204,7 +257,7 @@ Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, co
 
 	Report candidate{};
 
-	if (!allocateCanards(_configuration.allocation, bounded, _last_command, dt_s, candidate.allocation)) { return reject(Status::AllocationFailure); }
+	if (!allocateCanards(allocation, bounded, _last_command, dt_s, candidate.allocation)) { return reject(Status::AllocationFailure); }
 
 	for (unsigned axis = 0; axis < 3; ++axis) {
 		candidate.allocation.residual(axis) = requested(axis) - candidate.allocation.achieved(axis);
@@ -230,6 +283,14 @@ Status StabilizedManualControl::cycle(TimeUs now, const ManualSample &manual, co
 	candidate.bounded_moment = bounded;
 	candidate.fixed_simulated_thrust_n = _configuration.fixed_simulated_thrust_n;
 	_rate_control = rate_control;
+
+	if (scheduled) {
+		_configuration.rate_p = scheduled->rate_p;
+		_configuration.rate_i = scheduled->rate_i;
+		_configuration.rate_d = scheduled->rate_d;
+		_configuration.allocation.effectiveness = scheduled->effectiveness;
+	}
+
 	_last_command = candidate.allocation.command;
 	_rate_setpoint = rate_setpoint;
 	_reference = reference;

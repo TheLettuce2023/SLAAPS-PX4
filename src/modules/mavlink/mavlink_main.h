@@ -535,8 +535,10 @@ public:
 	bool radio_status_critical() const;
 
 	bool accept_unsigned(uint32_t message_id) { return _sign_control.accept_unsigned(message_id); }
+	// Called only by the instance's receiver thread, which owns key updates.
+	uint32_t signing_generation() const { return _sign_control.signing_generation(); }
 	void set_signing_key_dirty() { _signing_key_dirty.store(true); }
-	void check_signing_key_dirty() { if (_signing_key_dirty.load()) { _signing_key_dirty.store(false); _sign_control.reload_key(); } }
+	void check_signing_key_dirty();
 
 
 private:

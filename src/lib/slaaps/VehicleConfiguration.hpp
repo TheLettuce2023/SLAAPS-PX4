@@ -10,6 +10,9 @@ namespace slaaps
 constexpr unsigned kCanards = 4;
 constexpr unsigned kAxes = 3;
 constexpr unsigned kThrustPoints = 5;
+constexpr unsigned kScheduleKnots = 2;
+
+enum class ManualInputSource : int32_t { Unconfigured, RcOnly, MavlinkOnly };
 
 // Body FRD, inertia about CG. All physical defaults are deliberately absent.
 // Parameter metadata and native readers share VehicleParameters.def.
@@ -35,6 +38,7 @@ struct CanardConfiguration {
 
 struct AxisConfiguration {
 	float moment_scale{}; // N m/normalized moment
+	int32_t input_axis{-1}; // Selected roll/pitch/yaw slot; explicit permutation.
 	float sign{};
 	float rate_limit{};
 	float setpoint_accel_limit{};
@@ -49,6 +53,47 @@ struct AxisConfiguration {
 	float allocation_weight{};
 };
 
+struct ControlScheduleCorner {
+	float rate_p[kAxes] {};
+	float rate_i[kAxes] {};
+	float rate_d[kAxes] {};
+	float moment_derivative[kAxes][kCanards] {}; // Signed N m/rad about CG in body FRD.
+};
+
+// Optional empirical table. Sensor selection and numerical validity do not
+// establish aerodynamic coverage, a qualified envelope or output permission.
+struct ControlScheduleConfiguration {
+	int32_t enabled{};
+	int32_t airspeed_instance{-1}; // Raw airspeed.indicated_airspeed_m_s, never groundspeed.
+	int32_t air_data_instance{-1}; // vehicle_air_data.rho.
+	int32_t battery_instance{-1}; // battery_status.voltage_v.
+	int32_t battery_id{};
+	int32_t maximum_age_us{};
+	float indicated_airspeed_m_s[kScheduleKnots] {};
+	float edf_command[kScheduleKnots] {}; // Normalized owner command, not inferred thrust.
+	float density_min{};
+	float density_max{};
+	float voltage_min{};
+	float voltage_max{};
+	float filter_time_s{};
+	float airspeed_filter_rate{}; // m/s per second, filtered coordinate slew limit.
+	float edf_filter_rate{}; // Normalized command/s, filtered coordinate slew limit.
+	float airspeed_transient_rate{}; // Maximum accepted raw IAS change, m/s per second.
+	float edf_transient_rate{}; // Maximum accepted owner-command change per second.
+	ControlScheduleCorner corner[kScheduleKnots][kScheduleKnots] {}; // [IAS knot][EDF knot].
+};
+
+// Transport source selection and freshness only. Enabling this group grants
+// no trusted session, clock map, acceleration or actuator authority.
+struct CompanionConfiguration {
+	int32_t enabled{};
+	int32_t mavlink_instance{-1};
+	int32_t source_system{};
+	int32_t source_component{};
+	int32_t source_id{}; // Exact positive 31-bit identity from the request payload.
+	int32_t maximum_age_us{};
+};
+
 struct VehicleConfiguration {
 	int32_t data_revision{}; // operator record identifier; never flight acceptance
 	float mass{};
@@ -60,12 +105,19 @@ struct VehicleConfiguration {
 	float condition_thrust{};
 	CanardConfiguration canard[kCanards] {};
 	AxisConfiguration axis[kAxes] {};
+	int32_t manual_source{}; // 0 unconfigured, 1 RC only, 2 pinned MAVLink only.
 	int32_t manual_instance{-1};
 	int32_t manual_system{};
 	int32_t manual_component{};
+	float manual_throttle_low{}; // Raw selected throttle at zero EDF demand.
+	float manual_throttle_high{}; // Raw selected throttle at full EDF demand.
 	int32_t manual_age_ms{};
 	int32_t state_age_ms{};
 	int32_t state_skew_ms{};
+	int32_t selected_status_age_us{};
+	int32_t actuator_permission_age_us{};
+	int32_t activation_ack_timeout_us{};
+	int32_t first_command_budget_us{};
 	int32_t cycle_min_us{};
 	int32_t cycle_max_us{};
 	int32_t bench_gap_ms{};
@@ -83,9 +135,12 @@ struct VehicleConfiguration {
 	float edf_rise{}; // normalized command/s
 	float edf_fall{};
 	float edf_entry_max{}; // normalized low-throttle admission limit
+	float edf_commission_max{}; // Explicit commissioning ceiling; zero denies.
+	ControlScheduleConfiguration schedule{};
+	CompanionConfiguration companion{};
 };
 
-enum class ConfigurationUse : uint8_t { Bench, StabilizedManual };
+enum class ConfigurationUse : uint8_t { Bench, StabilizedManual, EdfCommissioning = 2 };
 enum class ConfigurationFault : uint8_t {
 	None, ParameterRange, MissingRecord, InvalidInertia, InvalidServo,
 	InvalidTiming, InvalidEffectiveness, InvalidController, InvalidThrustCurve,
@@ -108,9 +163,28 @@ bool makeBenchProfile(const VehicleConfiguration &configuration,
 bool makeManualConfiguration(const VehicleConfiguration &configuration,
 			     research_stabilized_manual::Configuration &control);
 
+// Independent timing-group check. All-zero timing may be staged in a profile,
+// but cannot activate. Configured bounds are not runtime timing qualification.
+bool manualActivationTimingConfigured(const VehicleConfiguration &configuration);
+bool benchActivationTimingConfigured(const VehicleConfiguration &configuration);
+
+// Enabled-table checks, including fixed moment normalization and servo limits
+// at every corner. Disabled tables may be staged. No envelope qualification,
+// interpolation, sensor admission or flight permission is supplied here.
+ConfigurationResult validateControlSchedule(const VehicleConfiguration &configuration);
+
+// Independent source-group validation, including when no vehicle model exists.
+// Disabled in-range fields may be staged; enabled fields must all be explicit.
+ConfigurationResult validateCompanionConfiguration(const VehicleConfiguration &configuration);
+
 // Interpolation is valid only at the declared curve voltage/condition.
 // Flight admission must establish that condition separately.
 bool thrustToCommand(const VehicleConfiguration &configuration, float thrust_n, float &command);
+
+// Raw selected throttle at the declared zero/full endpoints, including reversal.
+// Source/freshness/duplicate validation remains with ManualControlInput. Failure
+// preserves command; no clipping, ownership, request or permission is supplied.
+bool normalizeManualThrottle(float raw, float low, float high, float &command);
 
 // Complete candidates only. Native parameter capture must supply a coherent
 // transaction; this store does not pretend individual param_get calls are atomic.

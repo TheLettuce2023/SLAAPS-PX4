@@ -497,6 +497,17 @@ void PX4IO::updateDisarmed()
 
 	for (unsigned i = 0; i < _max_actuators; i++) {
 		values[i] = _mixing_output.disarmedValue(i);
+#if defined(CONFIG_MODULES_SLAAPS)
+		// IO applies these registers independently of SLAAPS admission. Only
+		// no-pulse EDF inhibition is supported by this driver.
+		int32_t pending_function {};
+		const bool edf = _mixing_output.outputFunction(i) == OutputFunction::SLAAPS_EDF
+				 || (param_get(_mixing_output.functionParamHandle(i), &pending_function) == 0
+				     && pending_function == static_cast<int32_t>(OutputFunction::SLAAPS_EDF));
+
+		if (edf) { values[i] = 0; }
+
+#endif
 	}
 
 	io_reg_set(PX4IO_PAGE_DISARMED_PWM, 0, values, _max_actuators);
@@ -508,6 +519,16 @@ void PX4IO::updateFailsafe()
 
 	for (unsigned i = 0; i < _max_actuators; i++) {
 		values[i] = static_cast<uint16_t>(lroundf(_mixing_output.actualFailsafeValue(i)));
+#if defined(CONFIG_MODULES_SLAAPS)
+		int32_t pending_function {};
+		const bool edf = _mixing_output.outputFunction(i) == OutputFunction::SLAAPS_EDF
+				 || (param_get(_mixing_output.functionParamHandle(i), &pending_function) == 0
+				     && pending_function == static_cast<int32_t>(OutputFunction::SLAAPS_EDF));
+
+		// IO ignores zero failsafe writes, so readiness also checks readback.
+		if (edf) { values[i] = 0; }
+
+#endif
 	}
 
 	io_reg_set(PX4IO_PAGE_FAILSAFE_PWM, 0, values, _max_actuators);
@@ -638,8 +659,12 @@ void PX4IO::Run()
 		}
 	}
 
-	// minimal backup scheduling
+	// Keep admitted SLAAPS command/expiry service at its configured cadence.
+#if defined(CONFIG_MODULES_SLAAPS)
+	ScheduleDelayed(_mixing_output.slaapsServiceInterval());
+#else
 	ScheduleDelayed(20_ms);
+#endif
 
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)
 #if defined(CONFIG_MODULES_SLAAPS)
@@ -665,6 +690,21 @@ void PX4IO::Run()
 
 		// Serial servo output is outside the supported PWM inventory.
 		valid &= _param_pwm_sbus_mode.get() == 0;
+
+		for (unsigned channel = 0; channel < _max_actuators && valid; ++channel) {
+			if (_mixing_output.outputFunction(channel) == OutputFunction::SLAAPS_EDF) {
+				uint16_t disarmed{}, failsafe{};
+				const float configured_failsafe = _mixing_output.actualFailsafeValue(channel);
+				// A successful write does not prove IO accepted zero: its failsafe
+				// page ignores zero and can retain an earlier nonzero value.
+				valid = io_reg_get(PX4IO_PAGE_DISARMED_PWM, channel, &disarmed, 1) == OK
+					&& io_reg_get(PX4IO_PAGE_FAILSAFE_PWM, channel, &failsafe, 1) == OK
+					&& disarmed == 0 && failsafe == 0
+					&& _mixing_output.disarmedValue(channel) == 0
+					&& configured_failsafe <= 0.f && configured_failsafe >= 0.f;
+			}
+		}
+
 		_mixing_output.reportSlaapsInventory(_max_actuators, mask, rates, valid);
 	}
 
@@ -1198,6 +1238,21 @@ int PX4IO::io_reg_set(uint8_t page, uint8_t offset, const uint16_t *values, unsi
 		PX4_DEBUG("io_reg_set: too many registers (%u, max %u)", num_values, _max_transfer / 2);
 		return -EINVAL;
 	}
+
+#if defined(CONFIG_MODULES_SLAAPS)
+	// All callers hold the driver's lock. Catch configuration mutations from
+	// both the work queue and ioctl before stale routing can authorize a write.
+	const unsigned end = static_cast<unsigned>(offset) + num_values;
+	const bool rates = page == PX4IO_PAGE_SETUP && offset <= PX4IO_P_SETUP_PWM_RATE_GROUP3
+			   && end > PX4IO_P_SETUP_PWM_RATE_GROUP0;
+	const bool features = page == PX4IO_PAGE_SETUP && offset <= PX4IO_P_SETUP_FEATURES
+			      && end > PX4IO_P_SETUP_FEATURES;
+
+	if (num_values && (rates || features || page == PX4IO_PAGE_DISARMED_PWM || page == PX4IO_PAGE_FAILSAFE_PWM)) {
+		_mixing_output.invalidateSlaapsInventory();
+	}
+
+#endif
 
 	perf_begin(_interface_write_perf);
 	int ret = _interface->write((page << 8) | offset, (void *)values, num_values);

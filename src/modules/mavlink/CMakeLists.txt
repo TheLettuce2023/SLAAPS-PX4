@@ -56,6 +56,22 @@ add_custom_command(
 add_custom_target(mavlink_c_generate_uavionix DEPENDS ${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/${MAVLINK_DIALECT_UAVIONIX}.h)
 set_source_files_properties(${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/${MAVLINK_DIALECT_UAVIONIX}.h PROPERTIES GENERATED true)
 
+# The dedicated SLAAPS dialect belongs to this repository, not the MAVLink
+# submodule. Other targets keep their configured upstream dialect unchanged.
+if(CONFIG_MAVLINK_DIALECT STREQUAL "slaaps")
+	if(NOT CONFIG_MODULES_SLAAPS)
+		message(FATAL_ERROR "The private SLAAPS dialect requires the SLAAPS module")
+	endif()
+	set(MAVLINK_PRIMARY_DIALECT_XML "${CMAKE_CURRENT_LIST_DIR}/slaaps.xml")
+	set(MAVLINK_PRIMARY_DIALECT_INCLUDES
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/development.xml"
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/common.xml"
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/standard.xml"
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/minimal.xml")
+else()
+	set(MAVLINK_PRIMARY_DIALECT_XML "${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml")
+	set(MAVLINK_PRIMARY_DIALECT_INCLUDES)
+endif()
 # generate the primary dialect
 add_custom_command(
 	OUTPUT ${MAVLINK_LIBRARY_DIR}/${CONFIG_MAVLINK_DIALECT}/${CONFIG_MAVLINK_DIALECT}.h
@@ -63,18 +79,19 @@ add_custom_command(
 		${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 			--lang C --wire-protocol 2.0
 			--output ${MAVLINK_LIBRARY_DIR}
-			${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml > ${CMAKE_CURRENT_BINARY_DIR}/mavgen_${CONFIG_MAVLINK_DIALECT}.log
+			${MAVLINK_PRIMARY_DIALECT_XML} > ${CMAKE_CURRENT_BINARY_DIR}/mavgen_${CONFIG_MAVLINK_DIALECT}.log
 	DEPENDS
 		git_mavlink_v2
 		${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
-		${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml
+		${MAVLINK_PRIMARY_DIALECT_XML}
+		${MAVLINK_PRIMARY_DIALECT_INCLUDES}
 		${BOARD_DEFCONFIG}
 
 		# generate after uAvionix
 		mavlink_c_generate_uavionix
 		${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/${MAVLINK_DIALECT_UAVIONIX}.h
 
-	COMMENT "Generating Mavlink ${CONFIG_MAVLINK_DIALECT}: ${MAVLINK_GIT_DIR_RELATIVE}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml"
+	COMMENT "Generating Mavlink ${CONFIG_MAVLINK_DIALECT}: ${MAVLINK_PRIMARY_DIALECT_XML}"
 )
 add_custom_target(mavlink_c_generate DEPENDS ${MAVLINK_LIBRARY_DIR}/${CONFIG_MAVLINK_DIALECT}/${CONFIG_MAVLINK_DIALECT}.h)
 set_source_files_properties(${MAVLINK_LIBRARY_DIR}/${CONFIG_MAVLINK_DIALECT}/${CONFIG_MAVLINK_DIALECT}.h PROPERTIES GENERATED true)

@@ -178,7 +178,7 @@ ManualControlStatus mapInput(const ManualControlConfiguration &configuration,
 
 } // namespace
 
-ManualControlStatus ManualControlInput::configure(const ManualControlConfiguration &configuration)
+ManualControlStatus ManualControlInput::validateConfiguration(const ManualControlConfiguration &configuration)
 {
 	if (configuration.required_axis_mask == 0U
 	    || (configuration.required_axis_mask & ~kAllManualAxesMask) != 0U
@@ -197,6 +197,15 @@ ManualControlStatus ManualControlInput::configure(const ManualControlConfigurati
 		   || configuration.mavlink_system_id != 0U || configuration.mavlink_component_id != 0U) {
 		return ManualControlStatus::InvalidConfiguration;
 	}
+
+	return ManualControlStatus::Ok;
+}
+
+ManualControlStatus ManualControlInput::configure(const ManualControlConfiguration &configuration)
+{
+	const auto status = validateConfiguration(configuration);
+
+	if (status != ManualControlStatus::Ok) { return status; }
 
 	_configuration = configuration;
 	_last_sample = {};

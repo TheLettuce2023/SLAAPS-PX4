@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("/output"))
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--refresh-file", action="append", default=[])
+    parser.add_argument("--remove-file", action="append", default=[])
     args = parser.parse_args()
     out = args.output.resolve()
     if args.operation == "export":
@@ -73,9 +74,19 @@ def main():
         record = json.loads(manifest_path.read_text())
     if args.operation == "refresh":
         assert not (out / "board-result.json").exists()
-        assert args.workspace and args.refresh_file
+        assert args.workspace and (args.refresh_file or args.remove_file)
         verify(source, record)
         workspace = args.workspace.resolve()
+        for name in args.remove_file:
+            path = (workspace / name).resolve()
+            target = (source / name).resolve()
+            assert path.is_relative_to(workspace) and not path.exists(), name
+            assert target.is_relative_to(source) and target.is_file(), name
+            previous = record["inputs"][name]
+            assert previous["kind"] == "file" and digest(target) == previous["sha256"], name
+            record.setdefault("board_revisions", []).append(dict(path=name, before=digest(target), after=None))
+            target.unlink()
+            del record["inputs"][name]
         for name in args.refresh_file:
             path = (workspace / name).resolve()
             assert path.is_relative_to(workspace) and path.is_file()

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ReportedRouting.hpp"
-#include "ManualOutput.hpp"
+#include "ManualBankPreparation.hpp"
 
 namespace slaaps
 {
@@ -18,14 +18,16 @@ class ObservedRoutingBinding
 {
 public:
 	bool begin(uint64_t now, const VehicleConfiguration &configuration, const ReportedRoutingSnapshot &snapshot,
-		   InventoryFault capture_result, const ManualOutputBinding &binding, const ReportedRoutingPolicy &policy)
+		   InventoryFault capture_result, const ManualOutputBinding &binding, const ReportedRoutingPolicy &policy,
+		   ControlMode mode = ControlMode::Manual)
 	{
 		_valid = false;
 		_policy = policy;
+		_mode = mode;
 
 		if (!observationValid(now, snapshot, capture_result) || !validManualOutputBinding(binding)
-		    || !validate(configuration, ConfigurationUse::StabilizedManual).valid()
-		    || !makeRoutingPlan(configuration, snapshot.inventory, true, _routing).valid()
+		    || !ManualBankPreparation::validConfiguration(configuration, mode)
+		    || !makeRoutingPlan(configuration, snapshot.inventory, ManualBankPreparation::requiresEdf(mode), _routing).valid()
 		    || _routing.bank_mask != binding.banks) { return false; }
 
 		for (unsigned bank = 0; bank < 2; ++bank) {
@@ -51,7 +53,8 @@ public:
 
 		if (!_valid || now < _clock || !observationValid(now, snapshot, capture_result)
 		    || snapshot.captured_us < _captured || fingerprint(configuration) != _configuration
-		    || !makeRoutingPlan(configuration, snapshot.inventory, true, routing).valid() || !sameRoutingPlan(routing, _routing)) {
+		    || !makeRoutingPlan(configuration, snapshot.inventory, ManualBankPreparation::requiresEdf(_mode), routing).valid()
+		    || !sameRoutingPlan(routing, _routing)) {
 			_valid = false;
 			return false;
 		}
@@ -92,6 +95,7 @@ private:
 	unsigned _revision[2] {};
 	uint8_t _instance[2] {};
 	bool _valid{};
+	ControlMode _mode{ControlMode::Manual};
 };
 
 } // namespace slaaps

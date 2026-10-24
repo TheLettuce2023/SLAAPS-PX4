@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Fail-closed, temporary C0c MAVLink-2 conformance harness.
+"""Fail-closed, temporary generated MAVLink-2 conformance harness.
 
-This is offline generated-code evidence only.  It does not implement a
+The default is the offline C0c dialect; --production checks the production
+dialect's generated bindings. Both are generated-code evidence only, not a
 production parser, transport, authentication, adapter, or control path.
 """
 
@@ -28,12 +29,20 @@ PYMAVLINK = MAVLINK / "pymavlink"
 MAVGEN = PYMAVLINK / "tools/mavgen.py"
 SCHEMA = PYMAVLINK / "generator/mavschema.xsd"
 XML = WIRE / "research.xml"
+PRODUCTION_XML = ROOT / "src/modules/mavlink/slaaps.xml"
+PRODUCTION_INCLUDE = "mavlink/message_definitions/v1.0/development.xml"
 FIXTURE = WIRE / "GeneratedMavlinkFixture.cpp"
 IDS = {
     "RESEARCH_ACCELERATION_REQUEST": 200000,
     "RESEARCH_ACCELERATION_SESSION": 200001,
     "RESEARCH_ACCELERATION_STATUS": 200002,
 }
+PRODUCTION_IDS = {
+    "RESEARCH_ACCELERATION_REQUEST": 200010,
+    "RESEARCH_ACCELERATION_SESSION": 200011,
+    "RESEARCH_ACCELERATION_STATUS": 200012,
+}
+INHERITED = {"HEARTBEAT": (0, 50), "TIMESYNC": (111, 34)}
 PAYLOADS = {
     "RESEARCH_ACCELERATION_REQUEST": bytes.fromhex(
         "0100000000000000020000000000000003000000000000000400000000000000"
@@ -131,19 +140,25 @@ def crc_extra(name, fields):
     return (value & 0xff) ^ (value >> 8)
 
 
-def validate_and_scan():
+def validate_and_scan(production):
     try:
         from lxml import etree
     except ImportError as error:
         fail("lxml is mandatory for schema validation: %s" % error)
     if not all(path.is_file() for path in (XML, SCHEMA, MAVGEN, FIXTURE)):
-        fail("required C0c source is absent")
+        fail("required generated-wire source is absent")
     schema = etree.XMLSchema(etree.parse(str(SCHEMA)))
     document = etree.parse(str(XML))
     schema.assertValid(document)
     messages = document.xpath("/mavlink/messages/message")
-    if len(messages) != 3 or document.xpath("/mavlink/include") or document.xpath("//extensions"):
-        fail("research XML must contain exactly three base messages with no include/extensions")
+    includes = document.xpath("/mavlink/include/text()")
+    if (len(messages) != 3 or includes != ([PRODUCTION_INCLUDE] if production else [])
+            or document.xpath("//extensions")):
+        fail("dialect must contain three frozen base messages and only its declared include")
+    if production:
+        included = (XML.parent / PRODUCTION_INCLUDE).resolve()
+        if included != (MAVLINK / "message_definitions/v1.0/development.xml").resolve() or not included.is_file():
+            fail("production include escaped pinned development.xml")
     found = {}
     for message in messages:
         name, identifier = message.get("name"), int(message.get("id"))
@@ -180,11 +195,11 @@ def generate(temp):
     c_output, py_output = temp / "c", temp / "python"
     py_output.mkdir()
     run([sys.executable, MAVGEN, "--lang=C", "--wire-protocol=2.0", "--output", c_output, XML], env=environment)
-    run([sys.executable, MAVGEN, "--lang=Python3", "--wire-protocol=2.0", "--output", py_output / "research.py", XML],
+    run([sys.executable, MAVGEN, "--lang=Python3", "--wire-protocol=2.0", "--output", py_output / (XML.stem + ".py"), XML],
         env=environment)
-    header = c_output / "research/mavlink.h"
+    header = c_output / XML.stem / "mavlink.h"
     if not header.is_file():
-        fail("C generator did not create expected research header")
+        fail("C generator did not create expected dialect header")
     module_files = list(py_output.glob("*.py"))
     if len(module_files) != 1:
         fail("Python generator output is ambiguous")
@@ -204,6 +219,11 @@ def check_header(c_output):
         )
         if any(item not in text for item in required):
             fail("generated C metadata mismatch: %s" % name)
+    if XML == PRODUCTION_XML:
+        for name, (identifier, extra) in INHERITED.items():
+            for suffix, value in (("", identifier), ("_CRC", extra)):
+                if not re.search(r"^#define MAVLINK_MSG_ID_%s%s %d$" % (name, suffix, value), text, re.MULTILINE):
+                    fail("inherited C metadata differs from pinned standard definition: " + name)
 
 
 def compiler_flags(arguments):
@@ -218,7 +238,7 @@ def check_offsets(c_output, temp, arguments):
     compiler = shutil.which("g++")
     if compiler is None:
         fail("g++ is mandatory for generated layout validation")
-    assertions = ["#include <research/mavlink.h>", "#include <cstddef>", "#include <type_traits>"]
+    assertions = ["#include <%s/mavlink.h>" % XML.stem, "#include <cstddef>", "#include <type_traits>"]
     for name, fields in FIELDS.items():
         struct_name = "mavlink_%s_t" % name.lower()
         for field_type, field_name, offset in fields:
@@ -234,9 +254,12 @@ def check_offsets(c_output, temp, arguments):
 def compile_fixture(c_output, temp, arguments):
     compiler = shutil.which("g++")
     if compiler is None:
-        fail("g++ is mandatory for C0c conformance")
+        fail("g++ is mandatory for generated-wire conformance")
     executable = temp / "fixture"
-    run([compiler, *compiler_flags(arguments), "-isystem", c_output, FIXTURE, "-o", executable])
+    run([compiler, *compiler_flags(arguments), "-isystem", c_output,
+         "-DGENERATED_MAVLINK_HEADER=<%s/mavlink.h>" % XML.stem,
+         "-DGENERATED_MAVLINK_REQUEST_ID=%d" % IDS["RESEARCH_ACCELERATION_REQUEST"],
+         FIXTURE, "-o", executable])
     return executable
 
 
@@ -248,7 +271,7 @@ def emitted_frames(executable):
 
 
 def load_generated(module_path):
-    specification = importlib.util.spec_from_file_location("generated_research", module_path)
+    specification = importlib.util.spec_from_file_location("generated_" + XML.stem, module_path)
     module = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(module)
     if Path(module.__file__).resolve() != module_path.resolve():
@@ -375,7 +398,10 @@ def exercise(executable, module):
             fail("high message ID unexpectedly packed in MAVLink 1")
     # For a missing ID, the generated C CRC-extra lookup is zero. This is a
     # CRC-correct unknown-ID fixture, not a corrupted-known-message false pass.
-    reject(executable, module, frame_for(200003, PAYLOADS[names[0]][:85], 0))
+    unknown_id = max(IDS.values()) + 1
+    if unknown_id in module.mavlink_map:
+        fail("unknown-ID rejection fixture collides with an included message")
+    reject(executable, module, frame_for(unknown_id, PAYLOADS[names[0]][:85], 0))
     header = bytes((0xfe, 9, 17, 42, 191, 0))
     heartbeat = bytes(9)
     checksum = x25(header[1:] + heartbeat + bytes((50,)))
@@ -420,35 +446,62 @@ def exercise(executable, module):
 
 
 def main():
+    global XML, IDS
     parser = argparse.ArgumentParser()
+    parser.add_argument("--production", action="store_true",
+                        help="check production slaaps.xml and pinned development.xml instead of offline research.xml")
     parser.add_argument("--keep-dir", action="store_true")
     parser.add_argument("--sanitize", action="store_true")
     parser.add_argument("--optimize", action="store_true")
     arguments = parser.parse_args()
+    if arguments.production:
+        XML, IDS = PRODUCTION_XML, PRODUCTION_IDS
     git_clean(MAVLINK, PIN_MAVLINK)
     git_clean(PYMAVLINK, PIN_PYMAVLINK)
+    sources = [XML, FIXTURE, Path(__file__), WIRE / "status_vectors.json", SCHEMA, MAVGEN]
+    if arguments.production:
+        sources.extend(MAVLINK / "message_definitions/v1.0" / name
+                       for name in ("development.xml", "common.xml", "minimal.xml"))
+    source_sha256 = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}
     if x25(b"123456789") != 0x6f91:
         fail("independent X25 known-answer check failed")
-    validate_and_scan()
-    temp = Path(tempfile.mkdtemp(prefix="c0c_mavlink_"))
+    validate_and_scan(arguments.production)
+    temp = Path(tempfile.mkdtemp(prefix="slaaps_mavlink_" if arguments.production else "c0c_mavlink_"))
     try:
-        c_output, _, module_path = generate(temp)
+        c_output, header, module_path = generate(temp)
         check_header(c_output)
         check_offsets(c_output, temp, arguments)
         executable = compile_fixture(c_output, temp, arguments)
-        exercise(executable, load_generated(module_path))
+        module = load_generated(module_path)
+        if arguments.production:
+            for name, expected in INHERITED.items():
+                message = getattr(module, "MAVLink_%s_message" % name.lower())
+                if (message.id, message.crc_extra) != expected:
+                    fail("inherited Python metadata differs from pinned standard definition: " + name)
+        exercise(executable, module)
+        if source_sha256 != {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}:
+            fail("source changed during generated-wire conformance")
         import lxml.etree
         report = {
             "result": "PASS", "pins": [PIN_MAVLINK, PIN_PYMAVLINK],
+            "profile": "production" if arguments.production else "offline",
+            "dialect": str(XML.relative_to(ROOT)), "message_ids": IDS,
+            "includes": [PRODUCTION_INCLUDE] if arguments.production else [],
+            "inherited_message_metadata": {name: {"id": values[0], "crc_extra": values[1]}
+                                           for name, values in INHERITED.items()} if arguments.production else {},
+            "scope": "generated_C_Python_layout_framing_and_payload_conformance_only",
+            "runtime_ingress_verified": False, "authentication_verified": False,
+            "control_verified": False, "physical_outputs": False,
             "git_text_conversion": "command-local core.autocrlf=true",
             "python": sys.version.split()[0], "lxml": lxml.etree.LXML_VERSION,
             "compiler": run(["g++", "--version"]).splitlines()[0],
             "crc_extras": {name: crc_extra(name, FIELDS[name]) for name in IDS},
-            "source_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-                              for path in (XML, FIXTURE, Path(__file__), WIRE / "status_vectors.json", SCHEMA, MAVGEN)},
+            "source_sha256": source_sha256,
             "generated_python_sha256": hashlib.sha256(module_path.read_bytes()).hexdigest(),
+            "generated_c_header_sha256": hashlib.sha256(header.read_bytes()).hexdigest(),
             "counts": COUNTS, "flags": compiler_flags(arguments),
         }
+        (temp / "result.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps(report, sort_keys=True))
     finally:
         if arguments.keep_dir:

@@ -71,6 +71,7 @@ add_subdirectory(pid_design EXCLUDE_FROM_ALL)
 add_subdirectory(pure_pursuit EXCLUDE_FROM_ALL)
 add_subdirectory(rate_control EXCLUDE_FROM_ALL)
 add_subdirectory(rc EXCLUDE_FROM_ALL)
+add_subdirectory(research_acceleration EXCLUDE_FROM_ALL)
 add_subdirectory(research_actuator_command EXCLUDE_FROM_ALL)
 # The private SITL external module may have registered this library already.
 if(NOT TARGET research_stabilized_manual)

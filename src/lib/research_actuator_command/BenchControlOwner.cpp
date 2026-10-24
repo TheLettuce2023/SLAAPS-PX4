@@ -1,4 +1,5 @@
 #include "BenchControlOwner.hpp"
+#include "BenchOutputLease.hpp"
 
 #include <cmath>
 
@@ -19,9 +20,19 @@ bool validConfiguration(const BenchConfiguration &configuration)
 {
 	if (!std::isfinite(configuration.neutral_entry_tolerance)
 	    || configuration.neutral_entry_tolerance < 0.0F || configuration.neutral_entry_tolerance >= 1.0F
+	    || !configuration.maximum_manual_age_us || configuration.maximum_manual_age_us > kBenchSampleAgeUs
 	    || configuration.maximum_cycle_gap_us < kBenchIntervalUs
 	    || configuration.maximum_cycle_gap_us > kBenchSampleAgeUs) {
 		return false;
+	}
+
+	for (std::size_t axis = 0; axis < kBenchAxisCount; ++axis) {
+		if (configuration.stick_axis[axis] >= kBenchAxisCount || !std::isfinite(configuration.stick_sign[axis])
+		    || std::fabs(configuration.stick_sign[axis]) < 1.F || std::fabs(configuration.stick_sign[axis]) > 1.F) { return false; }
+
+		for (std::size_t previous = 0; previous < axis; ++previous) {
+			if (configuration.stick_axis[axis] == configuration.stick_axis[previous]) { return false; }
+		}
 	}
 
 	for (std::size_t i = 0; i < kBenchCanardCount; ++i) {
@@ -35,7 +46,11 @@ bool validConfiguration(const BenchConfiguration &configuration)
 		    || !std::isfinite(servo.rise_deg_per_s) || servo.rise_deg_per_s <= 0.0F
 		    || !std::isfinite(servo.fall_deg_per_s) || servo.fall_deg_per_s <= 0.0F
 		    || !std::isfinite(servo.rise_deg_per_s / servo.maximum_deflection_deg)
-		    || !std::isfinite(servo.fall_deg_per_s / servo.maximum_deflection_deg)) {
+		    || !std::isfinite(servo.fall_deg_per_s / servo.maximum_deflection_deg)
+		    || !std::isfinite(servo.minimum_normalized) || !std::isfinite(servo.maximum_normalized)
+		    || servo.minimum_normalized < -1.0F || servo.maximum_normalized > 1.0F
+		    || servo.minimum_normalized > 0.0F || servo.maximum_normalized < 0.0F
+		    || servo.minimum_normalized >= servo.maximum_normalized) {
 			return false;
 		}
 
@@ -56,37 +71,54 @@ bool validConfiguration(const BenchConfiguration &configuration)
 
 	return true;
 }
-} // namespace
 
-BenchStatus BenchControlOwner::configure(const BenchConfiguration &configuration)
+bool prepareInput(const BenchConfiguration &configuration, unsigned target, float deadzone,
+		  ManualControlConfiguration &input)
 {
-	if (_state != BenchState::Disabled) {
-		return BenchStatus::InvalidState;
+	if (!validConfiguration(configuration) || target > kBenchCanardCount || !std::isfinite(deadzone)
+	    || deadzone < 0.F || deadzone >= 1.F || deadzone > configuration.neutral_entry_tolerance) {
+		return false;
 	}
 
-	if (!validConfiguration(configuration)) {
-		return BenchStatus::InvalidConfiguration;
-	}
-
-	ManualControlConfiguration input{};
 	input.required_axis_mask = kAttitudeManualAxesMask;
-	input.source_policy = ManualSourcePolicy::MavlinkOnly;
-	input.maximum_sample_age_us = kBenchSampleAgeUs;
+	input.source_policy = configuration.source_policy;
+	input.maximum_sample_age_us = configuration.maximum_manual_age_us;
 	input.mavlink_instance = configuration.mavlink_instance;
 	input.mavlink_system_id = configuration.source_system_id;
 	input.mavlink_component_id = configuration.source_component_id;
+
+	for (std::size_t i = 0; i < kBenchCanardCount; ++i) {
+		for (std::size_t axis = 0; axis < kBenchAxisCount; ++axis) {
+			input.command_map[i + 1U][configuration.stick_axis[axis]] = configuration.mix[i][axis] * configuration.stick_sign[axis];
+		}
+	}
+
+	return ManualControlInput::validateConfiguration(input) == ManualControlStatus::Ok;
+}
+} // namespace
+
+BenchStatus BenchControlOwner::validateConfiguration(const BenchConfiguration &configuration, unsigned target, float deadzone)
+{
+	ManualControlConfiguration input{};
+	return prepareInput(configuration, target, deadzone, input) ? BenchStatus::Ok : BenchStatus::InvalidConfiguration;
+}
+
+BenchStatus BenchControlOwner::configure(const BenchConfiguration &configuration, unsigned target, float deadzone)
+{
+	if (_state != BenchState::Disabled) { return BenchStatus::InvalidState; }
+
+	ManualControlConfiguration input{};
+
+	if (!prepareInput(configuration, target, deadzone, input)) { return BenchStatus::InvalidConfiguration; }
+
 	LimiterConfiguration limits{};
 	limits.maximum_dt_s = static_cast<float>(configuration.maximum_cycle_gap_us / kMicrosecondsPerSecond);
 	limits.channels[kEdfChannelIndex] = {0.0F, 0.0F, 0.0F, 0.0F};
 
 	for (std::size_t i = 0; i < kBenchCanardCount; ++i) {
-		for (std::size_t axis = 0; axis < kBenchAxisCount; ++axis) {
-			input.command_map[i + 1U][axis] = configuration.mix[i][axis];
-		}
-
 		const auto &servo = configuration.servos[i];
-		limits.channels[i + 1U] = { -1.0F, 1.0F, servo.rise_deg_per_s / servo.maximum_deflection_deg,
-					    servo.fall_deg_per_s / servo.maximum_deflection_deg
+		limits.channels[i + 1U] = {servo.minimum_normalized, servo.maximum_normalized, servo.rise_deg_per_s / servo.maximum_deflection_deg,
+					   servo.fall_deg_per_s / servo.maximum_deflection_deg
 					  };
 	}
 
@@ -96,6 +128,8 @@ BenchStatus BenchControlOwner::configure(const BenchConfiguration &configuration
 
 	_configuration = configuration;
 	_limits = limits;
+	_deadzone = deadzone;
+	_target = target;
 	_state = BenchState::Ready;
 	_fault = BenchStatus::Ok;
 	_last_report = makeReport(0U, {}, 1.0F, true);
@@ -108,7 +142,7 @@ BenchStatus BenchControlOwner::enable(RuntimeTimeUs now_us, const ManualControlS
 		return BenchStatus::InvalidState;
 	}
 
-	if (now_us == 0U || now_us <= _last_cycle_us) {
+	if (now_us == 0U || now_us <= _last_cycle_us || now_us < _last_observed_us) {
 		return BenchStatus::InvalidTime;
 	}
 
@@ -127,6 +161,7 @@ BenchStatus BenchControlOwner::enable(RuntimeTimeUs now_us, const ManualControlS
 	}
 
 	_last_cycle_us = now_us;
+	_last_observed_us = now_us;
 	_last_report = makeReport(now_us, {}, 1.0F, false);
 	_state = BenchState::Active;
 	return BenchStatus::Ok;
@@ -139,24 +174,21 @@ BenchStatus BenchControlOwner::latch(BenchStatus fault)
 	return fault;
 }
 
-BenchStatus BenchControlOwner::cycle(RuntimeTimeUs now_us, const ManualControlSample &sample, BenchReport &report)
+BenchStatus BenchControlOwner::inspect(RuntimeTimeUs now_us, const ManualControlSample &sample, RuntimeInput &input)
 {
 	if (_state != BenchState::Active) {
 		return BenchStatus::InvalidState;
 	}
 
-	if (now_us <= _last_cycle_us) {
+	if (now_us < _last_observed_us || now_us < _last_cycle_us) {
 		return latch(BenchStatus::InvalidTime);
 	}
 
-	const RuntimeTimeUs elapsed = now_us - _last_cycle_us;
-
-	if (elapsed > _configuration.maximum_cycle_gap_us) {
+	if (now_us - _last_cycle_us > _configuration.maximum_cycle_gap_us) {
 		return latch(BenchStatus::CycleGap);
 	}
 
 	// Validate every observation, even before the next scheduled command cycle.
-	RuntimeInput input{};
 	ManualControlReport input_report{};
 	_input_status = _input.evaluate(now_us, sample, input, input_report);
 
@@ -164,8 +196,51 @@ BenchStatus BenchControlOwner::cycle(RuntimeTimeUs now_us, const ManualControlSa
 		return latch(BenchStatus::InputRejected);
 	}
 
+	_last_observed_us = now_us;
+	return BenchStatus::Ok;
+}
+
+BenchStatus BenchControlOwner::monitor(RuntimeTimeUs now_us, const ManualControlSample &sample)
+{
+	RuntimeInput ignored{};
+	return inspect(now_us, sample, ignored);
+}
+
+BenchStatus BenchControlOwner::cycle(RuntimeTimeUs now_us, const ManualControlSample &sample, BenchReport &report)
+{
+	if (_state != BenchState::Active) { return BenchStatus::InvalidState; }
+
+	if (now_us <= _last_cycle_us) { return latch(BenchStatus::InvalidTime); }
+
+	RuntimeInput input{};
+	const auto input_status = inspect(now_us, sample, input);
+
+	if (input_status != BenchStatus::Ok) { return input_status; }
+
+	const RuntimeTimeUs elapsed = now_us - _last_cycle_us;
+
 	if (elapsed < kBenchIntervalUs) {
 		return BenchStatus::NotDue;
+	}
+
+	// Raw source, identity and exact-held-sample validation above must precede
+	// shaping. Legacy callers already shape their samples and keep deadzone 0.
+	if (_target) {
+		input.desired_command = {};
+		input.desired_command[_target] = benchDeadzone(sample.axes[_configuration.stick_axis[0]], _deadzone)
+						 * _configuration.stick_sign[0];
+
+	} else if (_deadzone > 0.F) {
+		input.desired_command = {};
+		const auto &map = _input.configuration().command_map;
+
+		for (std::size_t axis = 0; axis < kBenchAxisCount; ++axis) {
+			const float value = benchDeadzone(sample.axes[axis], _deadzone);
+
+			for (std::size_t canard = 0; canard < kBenchCanardCount; ++canard) {
+				input.desired_command[canard + 1U] += map[canard + 1U][axis] * value;
+			}
+		}
 	}
 
 	float magnitude = 1.0F;
@@ -240,6 +315,9 @@ void BenchControlOwner::reset()
 	_limits = {};
 	_last_report = {};
 	_last_cycle_us = 0U;
+	_last_observed_us = 0U;
+	_deadzone = 0.F;
+	_target = 0;
 	_input_status = ManualControlStatus::NotConfigured;
 	_fault = BenchStatus::Ok;
 	_state = BenchState::Disabled;

@@ -80,6 +80,15 @@ def stage_repository(root, destination, out, inputs, repositories, prefix=Path()
     base.run(['tar', '-xf', str(archive), '-C', str(destination)], out, 'source-extract.log')
     archive.unlink()
     changed = working_changes(root, head)
+    # The archive contains HEAD files, including paths removed by a working-tree
+    # rename. Omit those paths from both the snapshot and its input manifest.
+    removed = {name for name in changed if not (root / name).exists() and not (root / name).is_symlink()}
+    for name in removed:
+        target = destination / name
+        if target.is_file() or target.is_symlink():
+            target.unlink()
+        elif target.exists():
+            raise RuntimeError('Removed directory/submodule requires explicit handling: ' + name)
     entries = git(root, 'ls-files', '--stage', '-z').split(b'\0')
     for entry in entries:
         if not entry:
@@ -88,6 +97,8 @@ def stage_repository(root, destination, out, inputs, repositories, prefix=Path()
         mode, identity, stage = metadata.decode().split()
         name = relative_path(os.fsdecode(raw_name))
         source, target = root / name, destination / name
+        if name in removed and mode in ('100644', '100755', '120000'):
+            continue
         full_name = (prefix / name).as_posix()
         if stage != '0':
             raise RuntimeError('Unresolved index entry: ' + full_name)

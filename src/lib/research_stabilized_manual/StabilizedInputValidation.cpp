@@ -35,11 +35,12 @@ bool same(const T &left, const T &right, unsigned size)
 }
 
 research_actuator_command::ManualControlStatus configureStabilizedManualInput(const Configuration &configuration,
-		research_actuator_command::ManualControlInput &input)
+		research_actuator_command::ManualControlInput &input, bool include_throttle)
 {
 	research_actuator_command::ManualControlConfiguration mapping{};
-	mapping.required_axis_mask = research_actuator_command::kAttitudeManualAxesMask;
-	mapping.source_policy = research_actuator_command::ManualSourcePolicy::MavlinkOnly;
+	mapping.required_axis_mask = include_throttle ? research_actuator_command::kAllManualAxesMask
+				     : research_actuator_command::kAttitudeManualAxesMask;
+	mapping.source_policy = configuration.source_policy;
 	mapping.maximum_sample_age_us = configuration.maximum_manual_age_us;
 	mapping.mavlink_instance = configuration.mavlink_instance;
 	mapping.mavlink_system_id = configuration.source_system_id;
@@ -48,6 +49,10 @@ research_actuator_command::ManualControlStatus configureStabilizedManualInput(co
 	// Unity maps reuse the existing raw-input validator only. Its mapped output
 	// is discarded; it is not interpreted as a flight wrench or actuator demand.
 	for (unsigned axis = 0; axis < 3; ++axis) { mapping.demand_map[axis][axis] = 1.0F; }
+
+	if (include_throttle) {
+		mapping.demand_map[0][static_cast<unsigned>(research_actuator_command::ManualAxis::Throttle)] = 1.F;
+	}
 
 	return input.configure(mapping);
 }

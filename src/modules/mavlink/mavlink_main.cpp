@@ -170,6 +170,19 @@ mavlink_message_t *Mavlink::get_buffer()
 void Mavlink::lock_send() { if (_instance_id >= 0) { pthread_mutex_lock(&mavlink_channel_send_mutexes[_instance_id]); } }
 void Mavlink::unlock_send() { if (_instance_id >= 0) { pthread_mutex_unlock(&mavlink_channel_send_mutexes[_instance_id]); } }
 
+void Mavlink::check_signing_key_dirty()
+{
+	bool expected = true;
+
+	if (_signing_key_dirty.compare_exchange(&expected, false)) {
+		// Consume only the observed notification. A later update remains set,
+		// and key/timestamp/status changes serialize with both parser and TX.
+		lock_send();
+		_sign_control.reload_key();
+		unlock_send();
+	}
+}
+
 static bool accept_unsigned_callback(const mavlink_status_t *status, uint32_t message_id)
 {
 	// Use link_id to index directly: the callback fires on the instance's own
@@ -1192,7 +1205,11 @@ Mavlink::handle_message(const mavlink_message_t *msg)
 			return;
 		}
 
+		// The sender uses the same key/timestamp/status under this recursive
+		// mutex. Release it before statustext or cross-instance module locking.
+		lock_send();
 		MavlinkSignControl::SetupSigningResult result = _sign_control.check_for_signing(msg);
+		unlock_send();
 
 		switch (result) {
 		case MavlinkSignControl::KEY_ACCEPTED:

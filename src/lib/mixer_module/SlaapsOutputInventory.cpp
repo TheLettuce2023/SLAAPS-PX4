@@ -36,5 +36,7 @@ void MixingOutput::reportSlaapsInventory(unsigned channel_count, uint32_t hardwa
 	}
 
 	_slaaps_bank_pub.publish(report);
+	_slaaps_last_inventory = report;
+	initializeSlaapsPreparation();
 	_slaaps_last_report = report.timestamp;
 }

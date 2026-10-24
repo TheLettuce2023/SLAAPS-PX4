@@ -37,6 +37,7 @@
 
 #include "rate_control.hpp"
 #include <px4_platform_common/defines.h>
+#include <cmath>
 
 using namespace matrix;
 
@@ -45,6 +46,40 @@ void RateControl::setPidGains(const Vector3f &P, const Vector3f &I, const Vector
 	_gain_p = P;
 	_gain_i = I;
 	_gain_d = D;
+}
+
+bool RateControl::setPidGainsBumpless(const Vector3f &P, const Vector3f &I, const Vector3f &D,
+				      const Vector3f &rate_error, const Vector3f &angular_accel)
+{
+	Vector3f integral{};
+
+	for (size_t axis = 0; axis < 3; ++axis) {
+		if (!std::isfinite(P(axis)) || P(axis) < 0.f || !std::isfinite(I(axis)) || I(axis) < 0.f
+		    || !std::isfinite(D(axis)) || D(axis) < 0.f || !std::isfinite(_gain_p(axis)) || _gain_p(axis) < 0.f
+		    || !std::isfinite(_gain_i(axis)) || _gain_i(axis) < 0.f || !std::isfinite(_gain_d(axis)) || _gain_d(axis) < 0.f
+		    || !std::isfinite(_gain_ff(axis)) || !std::isfinite(_rate_int(axis))
+		    || !std::isfinite(_lim_int(axis)) || _lim_int(axis) < 0.f
+		    || _rate_int(axis) < -_lim_int(axis) || _rate_int(axis) > _lim_int(axis)
+		    || !std::isfinite(rate_error(axis)) || !std::isfinite(angular_accel(axis))) { return false; }
+
+		// The state stores the integral output, not an accumulated error. I gain
+		// changes affect future integration; P/D changes need this compensation.
+		const double compensated = static_cast<double>(_rate_int(axis))
+					   + (static_cast<double>(_gain_p(axis)) - static_cast<double>(P(axis))) * static_cast<double>(rate_error(axis))
+					   + (static_cast<double>(D(axis)) - static_cast<double>(_gain_d(axis))) * static_cast<double>(angular_accel(axis));
+		const double limit = static_cast<double>(_lim_int(axis));
+
+		if (!std::isfinite(compensated) || compensated < -limit || compensated > limit) { return false; }
+
+		integral(axis) = static_cast<float>(compensated);
+	}
+
+	// All axes are feasible. No partial gain/integral transition is observable.
+	_gain_p = P;
+	_gain_i = I;
+	_gain_d = D;
+	_rate_int = integral;
+	return true;
 }
 
 void RateControl::setSaturationStatus(const Vector3<bool> &saturation_positive,

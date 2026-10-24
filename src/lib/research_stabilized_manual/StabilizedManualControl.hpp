@@ -12,6 +12,7 @@ using Quaternion = matrix::Quatf; // NED from body FRD.
 using ManualSample = research_actuator_command::ManualControlSample;
 
 struct Configuration {
+	research_actuator_command::ManualSourcePolicy source_policy{research_actuator_command::ManualSourcePolicy::MavlinkOnly};
 	uint8_t mavlink_instance{research_actuator_command::kNoMavlinkManualInstance};
 	uint8_t source_system_id{};
 	uint8_t source_component_id{};
@@ -23,6 +24,7 @@ struct Configuration {
 	float quaternion_norm_tolerance{};
 	float centered_enter{};
 	float centered_exit{};
+	uint8_t stick_axis[3] {0, 1, 2}; // Body roll/pitch/yaw -> selected attitude slot.
 	Vector3f stick_sign{}; // Exactly +/-1: stock forward pitch stick normally needs -1.
 	Vector3f maximum_rate_rad_s{};
 	Vector3f maximum_rate_setpoint_accel_rad_s2{};
@@ -51,10 +53,21 @@ struct StateSample {
 	bool valid{};
 };
 
+// Already selected/interpolated by the caller from an accepted calibrated
+// operating envelope. This point grants no source, timing or flight authority.
+// Moment normalization, trim, limits and servo dynamics remain unchanged.
+struct ScheduledControlPoint {
+	Vector3f rate_p{};
+	Vector3f rate_i{};
+	Vector3f rate_d{};
+	MomentMatrix effectiveness{};
+};
+
 enum class State : uint8_t { Disabled, Ready, Rate, Hold, Fault };
 enum class Status : uint8_t {
 	Ok, InvalidConfiguration, InvalidState, InvalidTime, NotDue, InputRejected,
-	StateRejected, StateChanged, NotCentered, ArithmeticFailure, AllocationFailure
+	StateRejected, StateChanged, NotCentered, ArithmeticFailure, AllocationFailure,
+	InvalidSchedule, GainTransitionRejected
 };
 
 struct Report {
@@ -79,9 +92,16 @@ public:
 	StabilizedManualControl() = default;
 	StabilizedManualControl(const StabilizedManualControl &) = delete;
 	StabilizedManualControl &operator=(const StabilizedManualControl &) = delete;
+	// Stateless counterpart of configure's checks; no controller history/PID allocation.
+	static Status validateConfiguration(const Configuration &configuration);
 	Status configure(const Configuration &configuration);
 	Status enable(TimeUs now, const ManualSample &manual, const StateSample &sample);
 	Status cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report);
+	// Preserve control history and commit both gains/effectiveness only after a
+	// complete successful cycle. An infeasible gain transition latches Fault;
+	// neither the caller report nor the previously accepted gains/matrix change.
+	Status cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report,
+		     const ScheduledControlPoint &scheduled);
 	// Validate live input while output acknowledgment is pending, without
 	// integrating PID, changing hold reference or advancing allocation history.
 	Status monitor(TimeUs now, const ManualSample &manual, const StateSample &sample);
@@ -92,6 +112,8 @@ public:
 	static constexpr bool outputsEnabled() { return false; }
 
 private:
+	Status cycleImpl(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report,
+			 const ScheduledControlPoint *scheduled);
 	Status inspect(TimeUs now, const ManualSample &manual, const StateSample &sample, Quaternion &attitude);
 	Status validateState(TimeUs now, const StateSample &sample, Quaternion &attitude) const;
 	Status reject(Status reason);

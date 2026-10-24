@@ -4,6 +4,7 @@
 #include "ManualOutputBank.hpp"
 #include "ManualBankPreparation.hpp"
 #include "ManualTransport.hpp"
+#include <drivers/drv_hrt.h>
 #include <uORB/Publication.hpp>
 
 namespace slaaps
@@ -11,7 +12,10 @@ namespace slaaps
 
 // Native serialized driver-side endpoint. The driver must call dispatch even
 // without new traffic, and serialize dispatch/write/confirm with permission and
-// routing changes. No message grants admission. No physical write or airborne
+// routing changes. Before prepare/beginPrepared, compare binding.driver[Bank]
+// with the physical driver's own inventory token; never derive that token from
+// the request. This transport cannot independently observe physical identity.
+// No message grants admission. No physical write or airborne
 // recovery policy is implemented here. Preserve the endpoint across sessions.
 template<unsigned Bank>
 class ManualBankTransport
@@ -55,23 +59,64 @@ public:
 
 	bool checkPreparation(uint64_t now, const VehicleConfiguration &configuration, const OutputInventory &inventory)
 	{
+		return checkPreparationImpl(now, configuration, inventory, false);
+	}
+	bool checkPreparationLive(uint64_t &now, const VehicleConfiguration &configuration, const OutputInventory &inventory)
+	{
+		now = hrt_absolute_time();
+		const bool result = checkPreparationImpl(now, configuration, inventory, true);
+		now = hrt_absolute_time();
+		return result;
+	}
+private:
+	bool checkPreparationImpl(uint64_t &now, const VehicleConfiguration &configuration, const OutputInventory &inventory,
+				  bool live)
+	{
 		if (_consumer.active()) { return false; }
 
-		slaaps_manual_command_s ignored{};
+		_read_wire = {};
 
 		if (!_preparation.check(now, configuration, inventory) || !acknowledgmentRevision()
-		    || _command.read(ignored) == BoundRead::Rejected) {
+		    || _command.read(_read_wire) == BoundRead::Rejected) {
 			_preparation.cancel();
 			return false;
 		}
 
+		if (live) {
+			now = hrt_absolute_time();
+
+			if (!_preparation.check(now, configuration, inventory) || !acknowledgmentRevision()) {
+				_preparation.cancel();
+				return false;
+			}
+		}
+
 		return true;
 	}
+public:
 	void cancelPreparation() { _preparation.cancel(); }
 	bool active() const { return _consumer.active(); }
 
 	bool beginPrepared(uint64_t now, const VehicleConfiguration &configuration, const OutputInventory &inventory,
 			   const ManualOutputBinding &binding, const EdfPermission &permission, unsigned command_revision)
+	{
+		return beginPreparedImpl(now, configuration, inventory, binding, permission, command_revision, false);
+	}
+	// Initialization consumes the original preparation/session before copying
+	// the command baseline. Success is not current output permission: the caller
+	// must enforce the original preparation deadline and use activationAckLive
+	// at the propagated time before publishing activation or handling output.
+	bool beginPreparedLive(uint64_t &now, const VehicleConfiguration &configuration, const OutputInventory &inventory,
+			       const ManualOutputBinding &binding, const EdfPermission &permission, unsigned command_revision)
+	{
+		now = hrt_absolute_time();
+		const bool result = beginPreparedImpl(now, configuration, inventory, binding, permission, command_revision, true);
+		now = hrt_absolute_time();
+		return result;
+	}
+private:
+	bool beginPreparedImpl(uint64_t &now, const VehicleConfiguration &configuration, const OutputInventory &inventory,
+			       const ManualOutputBinding &binding, const EdfPermission &permission, unsigned command_revision, bool live)
 	{
 		if (_consumer.active()) { return false; }
 
@@ -80,11 +125,28 @@ public:
 			return false;
 		}
 
-		return begin(now, configuration, inventory, binding, permission, command_revision);
+		return beginImpl(now, configuration, inventory, binding, permission, command_revision, live);
 	}
 
+public:
 	bool begin(uint64_t now, const VehicleConfiguration &configuration, const OutputInventory &inventory,
 		   const ManualOutputBinding &binding, const EdfPermission &permission, unsigned command_revision)
+	{
+		return beginImpl(now, configuration, inventory, binding, permission, command_revision, false);
+	}
+	// Initialization only, as for beginPreparedLive. activationAckLive performs
+	// the final core permission/expiry check after this baseline observation.
+	bool beginLive(uint64_t &now, const VehicleConfiguration &configuration, const OutputInventory &inventory,
+		       const ManualOutputBinding &binding, const EdfPermission &permission, unsigned command_revision)
+	{
+		now = hrt_absolute_time();
+		const bool result = beginImpl(now, configuration, inventory, binding, permission, command_revision, true);
+		now = hrt_absolute_time();
+		return result;
+	}
+private:
+	bool beginImpl(uint64_t &now, const VehicleConfiguration &configuration, const OutputInventory &inventory,
+		       const ManualOutputBinding &binding, const EdfPermission &permission, unsigned command_revision, bool live)
 	{
 		_preparation.cancel();
 		_received = false;
@@ -99,9 +161,14 @@ public:
 
 		_command_revision = command_revision;
 
-		slaaps_manual_command_s wire{};
+		auto &wire = _read_wire;
+		wire = {};
 		const auto read = _command.read(wire);
-		ManualWorkerOutput previous{};
+
+		if (live) { now = hrt_absolute_time(); }
+
+		auto &previous = _decoded_frame;
+		previous = {};
 
 		if (read == BoundRead::Rejected || (read == BoundRead::Data
 						    && (wire.timestamp > now || wire.session >= permission.session
@@ -120,8 +187,21 @@ public:
 		return true;
 	}
 
+public:
 	ManualBankOutput dispatch(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
 				  const ManualOutputBinding &binding)
+	{
+		return dispatchImpl(now, permission, inventory, binding, false);
+	}
+	ManualBankOutput dispatchLive(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+				      const ManualOutputBinding &binding)
+	{
+		now = hrt_absolute_time();
+		return dispatchImpl(now, permission, inventory, binding, true);
+	}
+private:
+	ManualBankOutput dispatchImpl(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+				      const ManualOutputBinding &binding, bool live)
 	{
 		// Poll before reading, including initial silence and duplicate traffic.
 		auto output = _consumer.sample(now, permission, inventory, binding);
@@ -133,13 +213,22 @@ public:
 			return _consumer.sample(now, permission, inventory, binding);
 		}
 
-		slaaps_manual_command_s wire{};
+		auto &wire = _read_wire;
+		wire = {};
 		const auto result = _command.read(wire);
+
+		if (live) {
+			now = hrt_absolute_time();
+			output = _consumer.sample(now, permission, inventory, binding);
+
+			if (_consumer.fault() != ManualBankFault::None) { return output; }
+		}
 
 		if (!_received && (result == BoundRead::Waiting
 				   || (result == BoundRead::Data && _have_baseline && memcmp(&wire, &_last, sizeof(wire)) == 0))) { return output; }
 
-		ManualWorkerOutput frame{};
+		auto &frame = _decoded_frame;
+		frame = {};
 
 		if (result != BoundRead::Data || !decodeManualCommand(now, wire, frame)) {
 			revoke();
@@ -154,15 +243,35 @@ public:
 			_received = true;
 		}
 
+		if (live) { now = hrt_absolute_time(); }
+
 		return _consumer.sample(now, permission, inventory, binding);
 	}
 
+public:
 	bool confirmHandled(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
 			    const ManualOutputBinding &binding, const ManualBankOutput &handled, bool success)
 	{
+		return confirmHandledImpl(now, permission, inventory, binding, handled, success, false);
+	}
+	bool confirmHandledLive(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+				const ManualOutputBinding &binding, const ManualBankOutput &handled, bool success)
+	{
+		now = hrt_absolute_time();
+		const bool result = confirmHandledImpl(now, permission, inventory, binding, handled, success, true);
+		now = hrt_absolute_time();
+		return result;
+	}
+private:
+	bool confirmHandledImpl(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+				const ManualOutputBinding &binding, const ManualBankOutput &handled, bool success, bool live)
+	{
 		// Recheck transport lifetime and any intervening traffic before releasing
 		// the reply. The core checks the exact ticket and current permission.
-		dispatch(now, permission, inventory, binding);
+		dispatchImpl(now, permission, inventory, binding, live);
+
+		if (live) { now = hrt_absolute_time(); }
+
 		ManualOutputAck ack{};
 		slaaps_manual_ack_s wire{};
 
@@ -175,10 +284,28 @@ public:
 		return true;
 	}
 
+public:
 	bool activationAck(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
 			   const ManualOutputBinding &binding, ManualActivationAck &ack)
 	{
-		dispatch(now, permission, inventory, binding);
+		return activationAckImpl(now, permission, inventory, binding, ack, false);
+	}
+	bool activationAckLive(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+			       const ManualOutputBinding &binding, ManualActivationAck &ack)
+	{
+		now = hrt_absolute_time();
+		const bool result = activationAckImpl(now, permission, inventory, binding, ack, true);
+		now = hrt_absolute_time();
+		return result;
+	}
+private:
+	bool activationAckImpl(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+			       const ManualOutputBinding &binding, ManualActivationAck &ack, bool live)
+	{
+		dispatchImpl(now, permission, inventory, binding, live);
+
+		if (live) { now = hrt_absolute_time(); }
+
 		ManualActivationAck candidate{};
 
 		if (!_consumer.activationAck(now, permission, inventory, binding, candidate)) { return false; }
@@ -189,6 +316,7 @@ public:
 		return true;
 	}
 
+public:
 	void revoke() { _preparation.cancel(); _command.revoke(); _consumer.revoke(); }
 	bool awaitingHandling() const { return _consumer.awaitingHandling(); }
 	ManualBankFault fault() const { return _consumer.fault(); }
@@ -202,6 +330,10 @@ private:
 	uORB::ResearchSubscription _ack_lifetime{kAckTopic};
 	unsigned _ack_revision{};
 	unsigned _command_revision{};
+	// Serialized read/decode scratch is dead between calls. Keep it separate
+	// from the retained baseline and the consumer's pending handling ticket.
+	slaaps_manual_command_s _read_wire{};
+	ManualWorkerOutput _decoded_frame{};
 	slaaps_manual_command_s _last{};
 	bool _received{};
 	bool _have_baseline{};

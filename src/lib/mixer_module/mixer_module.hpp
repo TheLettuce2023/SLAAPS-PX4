@@ -70,6 +70,8 @@
 #include <uORB/topics/parameter_update.h>
 #if defined(CONFIG_MODULES_SLAAPS)
 #include <uORB/topics/slaaps_output_bank.h>
+class SlaapsOutputPreparation;
+enum class SlaapsOutputStatus : uint8_t { Inactive, Prepared, Waiting, Command, Inhibited, RecoveryRequired, HandlingRejected };
 #endif
 
 using namespace time_literals;
@@ -153,7 +155,15 @@ public:
 	/**
 	 * Check if a function is configured, i.e. not set to Disabled and initialized
 	 */
-	bool isFunctionSet(int index) const { return _functions[index] != nullptr; }
+	bool isFunctionSet(int index) const
+	{
+#if defined(CONFIG_MODULES_SLAAPS)
+
+		if (_slaaps_writing_mask & (1U << index)) { return true; }
+
+#endif
+		return _functions[index] != nullptr;
+	}
 
 	OutputFunction outputFunction(int index) const { return _function_assignment[index]; }
 
@@ -235,6 +245,9 @@ public:
 	// Driver supplies effective hardware channels/rates on its own serialized
 	// work queue; this report grants no output permission.
 	bool slaapsInventoryDue() const;
+	void invalidateSlaapsInventory() { _slaaps_inventory_invalidated = true; }
+	hrt_abstime slaapsServiceInterval() const { return _slaaps_preparation ? _lowrate_schedule_interval : 20000; }
+	SlaapsOutputStatus slaapsOutputStatus() const { return _slaaps_output_status; }
 	void reportSlaapsInventory(unsigned channel_count, uint32_t hardware_mask, const uint16_t rates[16], bool ready);
 #endif
 
@@ -332,6 +345,15 @@ private:
 	uORB::PublicationMulti<slaaps_output_bank_s> _slaaps_bank_pub {ORB_ID(slaaps_output_bank)};
 	hrt_abstime _slaaps_last_report{};
 	hrt_abstime _slaaps_driver_instance{};
+	slaaps_output_bank_s _slaaps_last_inventory{};
+	SlaapsOutputPreparation *_slaaps_preparation{};
+	void initializeSlaapsPreparation();
+	bool updateSlaapsPreparation();
+	bool slaapsLocallyReady() const;
+	bool _slaaps_inventory_invalidated{};
+	uint16_t _slaaps_writing_mask{};
+	SlaapsOutputStatus _slaaps_output_status{SlaapsOutputStatus::Inactive};
+	void destroySlaapsPreparation();
 #endif
 	ParamHandles _param_handles[MAX_ACTUATORS];
 	param_t _param_handle_rev_range{PARAM_INVALID};

@@ -1,5 +1,12 @@
-// Offline cross-language conformance fixture; no runtime transport or authority.
-#include <research/mavlink.h>
+// Generated-binding cross-language fixture; no runtime transport or authority.
+#ifndef GENERATED_MAVLINK_HEADER
+#define GENERATED_MAVLINK_HEADER <research/mavlink.h>
+#endif
+#include GENERATED_MAVLINK_HEADER
+
+#ifndef GENERATED_MAVLINK_REQUEST_ID
+#define GENERATED_MAVLINK_REQUEST_ID 200000
+#endif
 
 #include <cstdint>
 #include <iostream>
@@ -15,9 +22,9 @@ constexpr uint8_t kFixtureSequence = 17;
 constexpr uint32_t kProtocolVersion = 0x00010000;
 constexpr unsigned kUnsignedFrameOverhead = 12;
 
-static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST == 200000, "request ID");
-static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION == 200001, "session ID");
-static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS == 200002, "status ID");
+static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST == GENERATED_MAVLINK_REQUEST_ID, "request ID");
+static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION == GENERATED_MAVLINK_REQUEST_ID + 1, "session ID");
+static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS == GENERATED_MAVLINK_REQUEST_ID + 2, "status ID");
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST_LEN == 90, "request length");
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION_LEN == 76, "session length");
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_LEN == 106, "status length");

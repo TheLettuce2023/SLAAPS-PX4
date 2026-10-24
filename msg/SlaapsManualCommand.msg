@@ -1,4 +1,4 @@
-# Internal combined manual command. Messages cannot grant output permission.
+# Internal combined command for a mode-bound session. Messages cannot grant permission.
 # Driver lifetime tokens identify the two output devices; this is not sensor data.
 uint64 timestamp # Publication time; never used to renew the original deadline
 uint64 timestamp_sample # Successful control calculation time
@@ -13,5 +13,12 @@ uint64 edf_sequence # Original selected-input request sequence
 uint64 edf_request_timestamp
 uint64 edf_deadline
 float32[4] canards # Normalized logical canard commands
-float32 edf # Normalized forward-only propulsion command
+float32 edf # Normalized forward-only propulsion; inhibited ServoBench requires zero
 uint8 bank_mask
+uint8 MANUAL = 1
+uint8 SERVO_BENCH = 3
+uint8 EDF_BENCH = 4
+uint8 mode # Must match the exact prepared session
+uint8 EDF_INHIBITED = 0
+uint8 EDF_COMMAND = 1
+uint8 edf_disposition # Servo bench requires inhibited and zero EDF

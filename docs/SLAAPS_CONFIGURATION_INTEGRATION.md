@@ -1,8 +1,934 @@
 # SLAAPS configuration and routing implementation
 
+## October 23: companion receipt and preparation integration
+
+The SLAAPS targets now select the repository-owned MAVLink dialect with private
+IDs 200010/200011/200012 and inherited development messages. The actual receiver
+publishes bounded raw payload, receipt time, event sequence, receiver/source IDs,
+signing generation and parser signature-verification evidence on four per-link
+queues. Six native parameters configure the selected link/source and receipt-age
+bound. The supervisor monitors authenticated receipt and latches publisher/key
+replacement or sequence gaps until a new accepted inactive apply. Receipt does
+not admit commands, establish producer-clock validity, grant a session, or enable
+acceleration control. Wire status return is still missing.
+
+Portable configuration evidence `/var/tmp/slaaps-configuration-frcvrnt7` passes
+Debug/Release/ASan-UBSan (3,050 each), including 302 generated parameters.
+The first consumer snapshot `/var/tmp/slaaps-native-bhbg3s6c` links after fixing
+cross-directory generated-header dependencies. Its first configuration failure
+is preserved. Runtime `slaaps-native-runtime-uuzs2dth` failed the pre-existing
+EDF disarm retry assertion before companion cases. Instrumented quiet runtime
+`slaaps-native-runtime-7trm42ns` recorded three requests with WAIT status on the
+same observation as the final request. The supervisor now publishes exhausted
+retry status immediately; actual disarming remains the only stop completion.
+No retry limit, force policy or timing bound was relaxed.
+
+Fix snapshot `/var/tmp/slaaps-native-f07znuwy` links, and runtime
+`/var/tmp/slaaps-native-runtime-f1uftbjf` passes the isolated supervisor (1,821).
+The first companion positive case then exposed a production integration defect:
+`copyBound` deliberately rejects queues larger than one. The new
+`copyQueuedBound` API copies ordered queue data and its publisher revision in
+the same critical section, using a capped current-lifetime sample count to
+exclude earlier advertisers' buffered data. Queue-one behavior is unchanged.
+Derived native snapshot `/var/tmp/slaaps-native-nrgcpc4s` links. Runtime
+`/var/tmp/slaaps-native-runtime-id206wl9` passes the queue/control checks (4,531),
+mixer (2,108), isolated supervisor (1,821), and existing production lifecycle
+cases. The new loopback test then failed at MAVLink startup. Isolated reproduction
+`/var/tmp/slaaps-mavlink-start-qnpku7tl` showed its mission-manager constructor
+waiting one second for absent dataman, beyond MAVLink's startup wait. The harness
+now starts RAM dataman before MAVLink and stops it afterward.
+
+Review also found key setup/reload mutating signing state outside the send mutex
+used by parsing and transmission. Both operations now use that existing recursive
+mutex; dirty-key notifications use atomic compare/exchange so a concurrent later
+notification is retained. Key/timestamp/generation policy is unchanged.
+
+Final native snapshot `/var/tmp/slaaps-native-_r7ah9m7` links; binary SHA256
+`5af84dd5904975d1c5c652c98b4bb53894387b24884d454292f71615bda5cae2`.
+Runtime `/var/tmp/slaaps-native-runtime-phom4snz` passes the full integration,
+including actual MAVLink parsing and actual supervisor receipt monitoring with
+a synthetic signing key over loopback UDP. It verifies signature replay,
+unsigned/wrong-key rejection, header/payload source and target binding, original
+receipt expiry, and same-key reload requiring deliberate inactive reapply.
+All seven lifecycle and seven restart/export-restore scenarios pass. Native
+control/mixer/supervisor checks are 4,531/2,108/1,821 respectively. Harness SHA256
+`b46620e5a29026b4578eb37a1f4b71869b49e7418b179800602732d45f155c84`.
+
+An earlier run of the same binary, `slaaps-native-runtime-6buyl3gj`, rejected an
+isolated EDF preparation before WAIT_ARM, before MAVLink was instantiated. Its
+supervisor and fixture bytes match the preceding passing queue snapshot. The
+failure did not recur in the quiet full run; its root cause is not established.
+Retain it as an unresolved timing/fixture limitation, not evidence of qualified
+real-time behavior. No deadlines or admission protections were relaxed.
+
+The earlier companion board link in
+`build/slaaps_firmware/companion-20261023` predates the disarm and queue fixes.
+Keep it as attempt evidence, not final current-source qualification. A derived
+receipt-specific board check now passes in `companion-20261023/final` for
+`_r7ah9m7`: image 1,899,300 bytes, headroom 66,780; AXI 111,100/SRAM4 2,048.
+Identified static chains are MAIN 2,876/AUX 2,820 of 4,096, supervisor 3,976
+of 6,500, and receiver publication 2,012 of its actual ARM reservation 5,360.
+These sums exclude unmeasured libc/allocator/interrupt/callee contributions.
+Each active companion queue allocates 144 x 8 = 1,152 payload bytes, up to
+4,608 for four links, plus 76-byte nodes. The node lifetime counter adds four
+bytes to each allocated node; receiver objects grow by 56 bytes per link.
+Resource receipt SHA256:
+`d7ab77592b43c95fd04748bed5b1651b75b01cf5e24ab8898f7ee051d2953f40`.
+This receipt predates the following coordinator correction. All native
+output checks capture callbacks only; loopback signing uses a public synthetic
+key and creates no command or physical-output authority.
+
+Read-only follow-up found a concrete preparation interleaving: the coordinator
+publishes its request before a driver calls `listen()`, whose normal cancellation
+publishes a fresh zero-identity readiness tombstone. A supervisor poll between
+that tombstone and the first positive reply previously rejected preparation.
+The coordinator now treats only the exact canonical initial unready shape from
+the already-bound bank as Waiting, before any positive readiness for that bank.
+Fieldwise checks exclude padding; original deadline, routing and lifetime gates
+remain, and revocation after positive readiness still rejects. Deterministic
+native regression follows the actual begin/listen/poll order. This establishes
+a real defect independently; the old intermittent log cannot prove attribution.
+The correction passes native snapshot `/var/tmp/slaaps-native-kywjnp4q`, binary
+SHA256 `b187ef31828a54415acaf26e7af9a0032646ae3a8952b279f99458aee64b679d`.
+Full runtime `/var/tmp/slaaps-native-runtime-k5zzs5a3` passes the deterministic
+production-order regression, original deadline/routing/lifetime/malformed-reply
+and post-positive revocation checks, existing manual/bench/EDF lifecycles, mixer
+capture, and actual signed companion loopback. Native control/mixer/supervisor
+checks are 4,653/2,108/1,821; seven lifecycle and seven persistence cases pass.
+Current-source FMUv6X checkpoint `companion-20261023/readiness-final` passes:
+image 1,899,452 bytes of 1,966,080, headroom 66,628; AXI 111,100/SRAM4 2,048.
+The identified static stack sums and dynamic queue costs above are unchanged.
+Supervisor probes are fresh; 29 unchanged translation-unit probes are reused only
+after equality of actual Ninja include dependencies and compiler commands (1,525
+unique dependency paths). All 49,696 firmware/build manifest entries match native
+`kywjnp4q`, with 222 changed anchors directly rehashed. Metadata472a versus current
+36a dirty content remains explicitly recorded. Earlier failed runs are retained.
+
+Final evidence under `build/slaaps_firmware/companion-20261023/readiness-final`:
+
+- `resource-comparison.json`: `c3f022e09a1e990d63feaaa36868c3bd2c923c18b769ac945c838dd068002473`.
+- `board-result.json`: `3ded059112d7c1304d43df7703379e60ac293ea550fc47d72f14a1233fb9e74e`.
+- `source-closure.json`: `444f597303a41b85f08b553bbfee4c70d7a5c7d05cbc16a2aa658b5bc9a7ac54`.
+- PX4 package: `99a10d247e7cdcc24c1d86f820b232b345b903ad648423adbabfed4f1d4067b4` (1,776,384 bytes).
+
+Staged WSL artifact:
+`/tmp/px4-firmware/px4_fmu-v6x_slaaps_36a17722ef_dirty_companion-20261023_20261024T014539Z.px4`.
+All jobs are terminal. No target boot, physical operation, runtime stack high-water,
+timing or flight qualification is established. Admission/control remains unfinished.
+
+The separate, previously unlinked acceleration-library ARM check exposed absent
+`<limits>` and `<initializer_list>` support. Six production files now use exact
+C limit constants and a fixed-array status helper with unchanged semantics.
+Nine existing focused host tests pass in
+`/var/tmp/slaaps-acceleration-cmake-kJrgun` (`portability-ctest.log` and XML).
+All five production translation units also compile with strict board flags in
+the separate `companion-20261023/final/unlinked-portability-followup` probe;
+result SHA256 `778a97a237783c66146f1c78201f03da475c4efe929566589f3e562d9fec0259`.
+Its first probe-command failure is retained alongside the original header failure.
+The firmware volume was read-only throughout. This proves ARM portability, not
+supervisor use or acceleration control.
+
+## October 23: scheduled manual control
+
+The optional empirical 2x2 table uses selected raw indicated airspeed and the shared
+EDF owner's normalized command. The same bounded, filtered interpolation updates
+PID gains and signed moment effectiveness; no inferred wash law or extrapolation
+is provided. Integral-output compensation preserves P/D output across feasible gain
+transitions; infeasible transitions and invalid interpolated rank reject operation.
+Original sensor expiry caps command expiry, including while bank ACKs are pending.
+Native observation requires positive airspeed confidence and binds publisher,
+selected instance, barometer/calibration, temperature-source and battery identity.
+Upstream fallback temperature is explicitly not measured-density qualification;
+vehicle_air_data does not expose its separate temperature sample clock/device.
+
+The supervisor checks the initial zero-EDF point and controller matrix before
+preparation, without obtaining propulsion permission. WAIT_SCHEDULE gives a
+Commander error for unusable conditions. A nonzero minimum EDF coordinate does
+not authorize running propulsion to reach that range. Ground spool/takeoff policy,
+local flow angles/wash and a measured admissible envelope remain separate gaps.
+
+Portable evidence: `/var/tmp/slaaps-configuration-bsxx03zy/result.json`, SHA256
+`fd464c4bb79f03b25a68ba5c923a2fc8aa18ec674a8d72b3e1c53f64b2c3bc7f`.
+Debug, Release and ASan/UBSan pass the shared configuration, actual PID/controller,
+allocator and worker checks (2,968 each); native parameter generation validates
+296 parameters. This does not compile or verify the native supervisor/adapter.
+The initial reusable Debug run failed a test's Report object-padding comparison:
+case 0 correctly returned InvalidSchedule and revoked eligibility. Replacing the
+memberwise comparison copy with a byte snapshot fixed the test without production
+changes; the full matrix then passed. An initially suspected off-center binding
+bug was ruled out by existing provisional-binding cleanup; no redundant fix remains.
+
+Native build `/var/tmp/slaaps-native-sl0rv9ry` and runtime
+`/var/tmp/slaaps-native-runtime-k9xpcx7h` PASS. Runtime receipt SHA256:
+`58b63654ea82dbc0a61e0ded5c20c92f99321472d45cc1e40fdb2a1a081cb58f`;
+binary SHA256 `ac10af1844f015a86e9619f44924234b5ea63d1fbae220a8b202956780e8fcae`.
+The actual adapter rejects invalid confidence, stale/original clocks and replaced
+publishers while honoring selected nonzero instances. Actual-source supervisor
+checks reject out-of-range IAS and an interior rank loss, then accept centered
+in-range disarmed preparation without any output or flight permission. Scheduled
+commands cross the real worker, transport and mixer to capture-only driver callbacks.
+Input/control/mixer/supervisor checks pass (34/4,287/2,090/1,797), as do seven
+lifecycles and seven restart/export-restore scenarios. Real Commander servo and EDF
+commissioning regressions pass; EDF uses the explicitly recorded internal forced
+arm because normal no-plant health denies arming. Normal vehicle health is unqualified.
+
+The native first attempt failed on a duplicate subscription name in the new test
+fixture. It was renamed without production changes; the same unsealed build resumed.
+`compile-attempt-1-result.json` and manifest revisions retain the failure/correction;
+the retry replaced compile.log, so its full original text remains only in tool output.
+Final fixture SHA256: `00d252546fafac073fd4e7d14381f6b94f82af9a1b1835bccb134b56045928bc`.
+
+FMUv6X target build, package/ELF/source checks, six fresh ARM probe groups, 237 active
+probe dependencies and production test-seam exclusion PASS. Evidence is in
+`build/slaaps_firmware/scheduling-20261023`. Image 1,892,652 bytes (+31,368 from EDF),
+flash headroom 73,428, AXI SRAM 111,100 (+64), SRAM4 2,048. Endpoint objects are
+8,416 bytes each (+1,040); supervisor 12,096 (+2,224). Identified static MAIN/AUX
+chains are 2,860/2,804 of 4,096; supervisor maximum 3,976 of 6,500. The new initial
+schedule/rank prearm chain is 2,240 (2,352 through activation), and scheduled worker
+allocation is 3,568. These sums exclude unmeasured runtime/libc/uORB overhead and
+are not stack high-water or timing qualification. No stack reservation was increased.
+The first board attempt failed because three adapter calls used metadata pointers
+instead of topic IDs; corrected adapter SHA256:
+`1748f374ce77b028c98580e4f713acba28a549376a9f8ce43bf34a636d37cff1`.
+The same unsealed build resumed; build-attempt-1.log and old source bytes are retained.
+
+The staged package is
+`/tmp/px4-firmware/px4_fmu-v6x_slaaps_36a17722ef_dirty_scheduling-20261023_20261023T201832Z.px4`,
+1,770,368 bytes, SHA256 `6c0a0ffe8e35b532ab543fab3e530a02346b978ca162ee5bc503628ba995f446`.
+It retains baseline embedded Git metadata 472a7d6786; the dirty manifest identifies
+its content. Expanded committed-plus-dirty source closure finds no firmware mismatch:
+board 127 existing matches/2 correct deletions, with 42 unused Tools differences;
+native 164 matches/2 deletions, with five unused Tools differences and current build
+runner verified. Differing tools are not referenced by the respective compile commands
+or build.ninja. See source-content-closure.json and
+`build/slaaps_native/scheduling-20261023/native-current-source-comparison-final.json`.
+This is current changed firmware-content evidence, not whole-checkout byte identity.
+
+Current supervisor SHA256:
+`a92555dc2dcf67fe9c8f32173cc9aef663ad3705f8bbb1e3e46d9c67bcac9564`.
+No physical output, QGC GUI acceptance, target boot, measured tuning, manual flight
+admission or vehicle qualification is established. Companion acceleration remains
+incomplete; the initial zero-airflow/zero-EDF authority and ground spool/takeoff policy
+remain unresolved for the actual vehicle.
+
+## October 23: armed EDF commissioning
+
+Production revision `7a8ad9ff` adds explicit armed EDF commissioning to the shared
+Bench path: accepted scope2, target5, zero-default `SLA_EDF_BMAX`, low raw throttle
+entry, first-zero handling, capped slew, parked canards, immutable duration and
+ordinary disarm requests. Partial arming can retain only the original denied
+permission before its first grant. Loss of agreement after a grant terminates
+that session; the latch cannot block a later deliberate disarmed re-entry.
+
+Current board/resource checkpoint
+`build/slaaps_firmware/shared-edf-bench-final-20261023/resource-comparison.json`
+passes (SHA256 `e08dd57228193e6575bc1e1ee7021d04413abbcee0e2821d7e404f70e18d433f`).
+Image 1,861,284 bytes leaves 104,796 bytes flash; AXI SRAM 111,036 and SRAM4 2,048
+are unchanged. Fresh ARM probes identify MAIN/AUX maxima 2,812/2,756 within 4,096
+and supervisor 3,960 within 6,500, before unmeasured overhead. Endpoint objects
+are 7,376 bytes each; supervisor 9,872. All 54 compiled production hashes match;
+later fixture/harness edits are uncompiled board inputs. A canceled slow WSL Git
+scan is recorded separately from the successful unchanged Windows verifier.
+
+Final native build `/var/tmp/slaaps-native-7tlcez9j` and runtime
+`/var/tmp/slaaps-native-runtime-uofe3loo` PASS: 34 input, 3,686 control, 1,780
+mixer and 1,096 isolated supervisor checks, seven lifecycles and seven restart/
+export-restore scenarios. Binary SHA256
+`4de0b27d1aecd6e06e6846419f161d48b15ab18ee9980f6fab984f976ae31b90`.
+Runtime receipt SHA256
+`07a68f27abb4a6b3874e7580081c29fc76b53b2e86b5a2ba8a01993c0425c902`;
+local closure `build/slaaps_native/edf-commissioning-20261023/final-verification.json`
+SHA256 `2c06e11e5fb38ee7cb3fe9cb2d4d96cf03044d0e0198b5795d719f474a3eff4f`
+binds all 63 current relevant source hashes. All owned jobs are terminal.
+The normal production supervisor, real Commander and actual mixer callbacks
+demonstrated disarmed non-actuating preparation, armed initial-zero/capped EDF,
+parked canards, all-bank zero stop, ordinary disarm and no automatic revival.
+Accepted scope2 survives export/restore; saved EN=1 restores to EN=0 without
+arming or output permission. The no-plant environment denied ordinary arming;
+the capture-only test explicitly used stock internal forced arming. It neither
+injected SLAAPS permission nor qualified normal vehicle health or flight admission.
+
+Preserve the earlier failed attempts and their corrections:
+
+- `slaaps-native-38ky2la6`: preceding supervisor `ca688ca2`, link only.
+- `slaaps-native-bitwxwed`: final production link; runtime `db4h18bd` failed a
+  fixture that checked pre-write saved markers. Fixed by recapturing parameters.
+- `slaaps-native-rj25pgu_`: corrected fixture link; runtime `o8y7uvhj` exposed an
+  unsupported 150 ms idle-maintenance reset assumption. Replaced with observed
+  reset, continuous inactive/session checks and unchanged-command verification.
+- Reruns `gcriiz7v` and `h7o9g09c` passed isolated supervisor/mixer and real
+  Commander servo commissioning. The latter demonstrated capped EDF PWM, neutral
+  canards, all-bank zero stop and ordinary disarm. Harness command-name and
+  legitimate mode-exit assumptions were corrected after these retained failures.
+- Final fixture/harness build `slaaps-native-7tlcez9j` and runtime `uofe3loo`
+  close these software verification failures; physical qualification remains open.
+
+Native paths above are under `/var/tmp`, with runtime prefix
+`slaaps-native-runtime-`. All callbacks capture outputs only; no hardware was
+operated. Neither synthetic calibration nor static stack analysis proves flight
+readiness, physical handling, target boot or runtime stack/timing qualification.
+
+## October 22: shared servo-only Bench integration
+
+The production Bench path now uses the shared accepted vehicle profile, logical
+canards, asymmetric travel bounds, mapped PWM banks and exact activation/handled
+ACKs. It requires genuine disarmed/prearmed authority and a fresh, deliberate
+`SLA_BENCH_EN` edge after readiness. `SLA_BENCH_CH` selects combined or individual
+canard operation; `SLA_BENCH_SEC` bounds the session. Stock QGC parameter metadata
+contains these controls (192 parameters total). EDF commands remain explicitly
+inhibited; this is not the requested future armed EDF commissioning capability.
+Dedicated-airframe output ownership also blocks stock actuator-test bypasses while
+inactive/prepared and keeps endpoint servicing scheduled without stock publishers.
+
+Current integrated software evidence:
+
+- Portable `/var/tmp/slaaps-configuration-vplb804w/result.json` passes 2,361 checks
+  each in Debug, Release and ASan/UBSan, plus 192-parameter metadata validation.
+  All 102 recorded inputs match at completion. Receipt SHA256
+  `42b00c57178afd3b623c6cd94206f49ca35320c743b1b42c73ab455774e73081`.
+- Native `/var/tmp/slaaps-native-14eh2_6k` and runtime
+  `/var/tmp/slaaps-native-runtime-6mvmc_9r` pass 34 input, 3,616 control, 1,113 mixer,
+  and 714 isolated actual-source supervisor checks, seven endpoint lifecycles and
+  six restart/BSON scenarios. Binary SHA256
+  `7b8d2388ae3b8a1b5e7dcc06bae66ed877f20e185c96560220fe0d275d9c2835`.
+- The normal production supervisor has no test admission seam. Real Commander
+  selects registered Bench mode 25 and supplies genuine disarmed/prearmed authority.
+  A deliberate enable drives the configured individual canard through both actual
+  mixer callbacks; captured AUX8 exceeds neutral while EDF AUX4 stays zero. Explicit
+  stop produces fresh zero frames in both banks, completed entries cannot revive,
+  and ordinary arming remains denied. Configuration/input publishers are synthetic;
+  the callbacks capture outputs and do not operate hardware. GUI acceptance remains open.
+- The actual-source supervisor fixture also covers combined/individual operation,
+  early disable before full preparation, fixed duration, raw loss, profile retention
+  on unchanged normal stop and deliberate re-entry. Its authority topics are synthetic
+  in a separate process, isolated from the real-Commander production scenario.
+
+The stop-race correction recognizes GUI disable between the two coherent command
+snapshots, rejects simultaneous bound target/duration edits, and rechecks current
+routing/configuration before retaining an active profile. Shared pure validators
+replace disposable owner objects and preserve the original raw-source/mapping checks.
+Commander CLI now exposes exact `ext1..ext8` names through its existing mode-command
+handler, with invalid names returning failure; this does not change admission.
+Final board `build/slaaps_firmware/shared-servo-bench-final-20261022` passes source,
+ELF/package, test-seam exclusion, six fresh ARM groups and active-interface probes.
+All 152 frozen inputs and 54 current production source hashes match. Image 1,856,060
+bytes leaves 110,020 bytes of flash; AXI SRAM 111,036 and SRAM4 2,048 are unchanged.
+The pure-validator extraction reduces Bench activation MAIN/AUX chains by 948 bytes
+each, to 2,692/2,636. Overall identified physical maxima are now Manual activation
+2,812/2,756, leaving 1,284/1,340 in the 4,096-byte queue before unmeasured overhead.
+The new supervisor normal-stop routing check is explicitly included: 3,904 bytes
+against its 6,500-byte stack. Endpoint objects remain 7,344 bytes each; supervisor
+9,808. These are static identified paths, not runtime stack/timing qualification.
+Final `resource-comparison.json` SHA256 is
+`30c1a56880fe4315aba8c3c4925b77096e6a629391507bc50d26b01697266552`.
+The sealed artifact is
+`/tmp/px4-firmware/px4_fmu-v6x_slaaps_36a17722ef_dirty_shared-servo-bench-final-20261022_20261023T014701Z.px4`
+(1,741,387 bytes), SHA256
+`85563aef1045fb2d9f0e2ce6e0ad767431ea72c4c6db53e93a95ceeeb2985dd3`.
+Generated configuration and all 11 linked queue constants confirm 4,096 bytes;
+the global stock default remains 2,800. All build/probe jobs are terminal. No firmware
+was flashed. Earlier evidence is retained below.
+
+Intermediate evidence and failures before those corrections:
+
+- Portable `/var/tmp/slaaps-configuration-c626bqvt`: 2,361 checks each in Debug,
+  Release and ASan/UBSan, plus 192-parameter metadata validation. Later native-only
+  supervisor fixture additions are not covered by that source receipt.
+- Native build `/var/tmp/slaaps-native-rczxflzn` passes. Independent runtime
+  `/var/tmp/slaaps-native-mixer-independent-j3s24s12` passes 34 input, 3,616 control
+  and 1,113 actual mixer checks, including shared Bench handling and stop cases.
+  Binary SHA256 `df12bcd834579cc2af0e75f0889aec0cfa6eeb0c448f330f588cbb55e7a43cd9`.
+- Runtime `/var/tmp/slaaps-native-runtime-etgnus5j` failed using the obsolete
+  sealed-source harness: its Bench fixture omitted required travel bounds.
+  Current harness supplies explicit bounds. Do not treat that run as a pass.
+- Current harness run `/var/tmp/slaaps-native-runtime-4bb02ywx` fails the isolated
+  actual-source supervisor's ordinary GUI-disable case. A disable between two
+  command-parameter snapshots was incorrectly classified as a fault. The corrected
+  current runtime above passes; the original failing run remains unchanged.
+- Board `shared-servo-bench-20261022` build, source/ELF/package verification,
+  test-seam exclusion and six fresh ARM probe groups pass. Image 1,855,892 bytes,
+  headroom 110,188; AXI SRAM 111,036 and SRAM4 2,048. Supervisor object 9,808 bytes
+  (+888), each physical endpoint 7,344 (+64). Activation chains 3,640/3,584 leave
+  only 456/512 bytes in the 4,096-byte queue before unmeasured overhead. This is
+  unresolved; removing disposable validation objects is the next correction.
+  `resource-comparison.json` explicitly records the superseded source snapshot;
+  subsequent stop/fixture/harness changes are not covered by this board result.
+
+All outputs in native tests are capture-only. No hardware was operated. Flight
+admission, measured qualification, armed EDF commissioning, scheduled effectiveness
+and companion acceleration remain incomplete. Prior evidence below is retained
+for its exact source checkpoint, not as acceptance of these later changes.
+
+## October 22: supervisor activation and live observation clocks
+
+The production supervisor now connects prepared banks to activation, the selected
+manual worker, shared EDF ownership and sustained command/handled-ACK processing.
+It reports ACTIVATING, FIRST_COMMAND and RUNNING separately; RUNNING requires the
+first exact command to be handled by every participating bank. Both staggered
+arming orders retain the original preparation bound. Partial activation, input or
+authority loss, configuration/routing changes and output failure cancel ownership
+and require deliberate re-entry. Normal disarm can retain only the unchanged
+accepted profile after both fresh disarmed observations; faults require a real
+disarmed reapply. Four reply callbacks complement the periodic expiry check.
+
+`SLA_STATUS_AGE`, `SLA_ARM_AGE`, `SLA_ACT_ACK_US` and `SLA_FIRST_CMD_US` are typed,
+QGC-editable timing fields. All-zero timing permits inactive profile staging only;
+partial timing is invalid and manual preparation requires complete valid timing.
+The activation timeout and first-command budget must fit the configured cycle
+bound. This adds four parameters, bringing native metadata to 189. Portable host
+`/var/tmp/slaaps-configuration-a5522egg` passed 2,314 checks each in Debug,
+Release and ASan/UBSan, plus metadata validation. Later clock changes are native.
+
+Actual-source testing exposed a startup deadlock: activation-reply lifetimes were
+advertised only after a proposal, while the supervisor required them before its
+proposal. Endpoints now advertise both reply lifetimes at initialization, without
+publishing authority. Partial advertisement and publisher replacement still reject.
+Repeated operation also exposed valid messages being rejected as future-dated
+because callers sampled time before copying concurrently published messages.
+Live routing, permission, preparation, activation, command and ACK readers now use
+post-copy HRT. Existing explicit-time APIs remain strict. Final selected-input,
+configuration, identity and expiry checks remain; original wire/sample times and
+deadlines are never renewed. Supervisor permission expiry is capped by its copied
+Commander/arming freshness, and driver-local permission expiry is further capped
+by copied vehicle, actuator, supervisor and routing-report freshness. Existing
+bank guards enforce that bound after later reads and before handled ACKs.
+
+Intermediate native `/var/tmp/slaaps-native-jox96upl`, runtime
+`/var/tmp/slaaps-native-runtime-ylddtqyj`, passes 3,569 control, 34 input, 626 mixer
+and 357 actual-source supervisor checks, seven lifecycles and six restart/BSON
+scenarios. This includes both arming orders, first-command handling, sustained
+synthetic commands, cancellation, normal disarm and deliberate re-entry. The
+positive supervisor fixture runs in a separate PX4 process with capture-only
+callbacks and a compile-time test seam. The normal module has no seam; real
+Commander ordinary arming remains denied, availability masks remain zero and
+production permission flags remain false. Final native
+`/var/tmp/slaaps-native-ads0tcog`, runtime
+`/var/tmp/slaaps-native-runtime-_hc67oph`, also passes the complete suite with the
+two-file authority-expiry clamp. Binary SHA-256 is
+`3286242615cfc22325ed2ddf285eb0585ada66b638b3dce6ed900d29a5700fac`;
+harness SHA-256 is `0e386a1c1e24eff866a3b6ddc816cc7b0659f78c5ce527d9f107f0d2d2961382`.
+
+Retained failed runs explain the corrections: `eswkm_aq` found the endpoint
+advertisement deadlock; `lfcvyvzx` passed the positive scenario but exposed retained
+synthetic registration contaminating later Commander tests; `tr8v7zc9` exposed an
+inappropriate 100-ms synthetic authority age for real Commander's 2-Hz unchanged
+status publication; `44p5iiue` exposed the live ACK clock race. All are native
+runtime directories under `/var/tmp/slaaps-native-runtime-`. The real-Commander
+fixture now explicitly applies its 1-s synthetic age through parameters; no
+production default or qualification claim was introduced.
+
+Board `manual-supervisor-replies-final-20261022` verified the earlier activation
+and timing baseline: image 1,834,740 bytes, flash headroom 131,340 bytes, AXI SRAM
+111,036 and SRAM4 2,048 bytes. It excludes subsequent live-clock and expiry fixes.
+Expiry-clamp board `manual-live-expiry-final-20261022` passes current source,
+ELF/package/isolation and static resource checks: image 1,841,708 bytes, flash
+headroom 124,372, unchanged static RAM and endpoint/supervisor heap sizes. Fresh
+ARM analysis found MAIN/AUX activation chains of 2,680/2,624 bytes, leaving only
+120/176 on the previous 2,800-byte hp_default stack before unmeasured overhead.
+The dedicated SLAAPS board now uses the existing Kconfig stack setting at 4,096
+bytes, without changing stock targets. Final board
+`manual-hp-stack-final-20261022` verifies that setting in the generated configuration
+and all 11 linked ELF hp_default constants; the global default remains 2,800.
+Image size is 1,841,700 bytes with 124,380 flash headroom; static RAM and heap
+object sizes remain unchanged. The one shared runtime queue requests 1,296 more
+stack bytes. Identified MAIN/AUX margins are 1,416/1,472 before unmeasured overhead;
+the supervisor chain is 3,336 of 6,500. All six ARM groups were freshly compiled
+because generated configuration changed their dependencies. The active-interface
+probe covers 235 compiler dependencies. Current production recheck matches 46
+production sources and the full 150-file freeze, with unchanged fixture and no
+synthetic authority in the board. See
+[`resource-comparison.json`](../build/slaaps_firmware/manual-hp-stack-final-20261022/resource-comparison.json)
+for bound receipts, including queue configuration, independent verification,
+resource summary, stack chains and test isolation. Firmware is staged at
+`/tmp/px4-firmware/px4_fmu-v6x_slaaps_36a17722ef_dirty_manual-hp-stack-final-20261022_20261023T003844Z.px4`,
+1,725,915 bytes, SHA-256
+`85abc45a7a6f26bff31a1867ca59596b31f6cff5638e95be316279386791abc7`.
+Source manifests identify the dirty checkout despite the retained older embedded
+tag. No boot, runtime stack/timing or electrical qualification is claimed.
+No hardware operated. Production
+measured-condition/recovery admission is still absent, so these connected callers
+and synthetic successes are not a completed operational flight mode.
+
+## October 22: prepared-bank first-grant ordering
+
+Prepared physical-bank endpoints now have a bounded non-actuating wait for the
+first permission grant. Commander may report arming before the supervisor grant,
+or vehicle_status and actuator_armed may arrive separately. Both messages must
+remain fresh, with valid selected mode, configuration, routing and publisher
+bindings; both must report armed before grant acceptance. Waiting never produces
+PWM, activation acknowledgment or handled-command acknowledgment. It cannot begin
+from an already-armed unprepared bank and cannot extend the original preparation
+deadline. The previously captured stop frame remains owned during this interval.
+
+The new explicit `awaitGrant` path leaves ordinary strict permission reads intact.
+Only an exact all-denied disarmed decision may remain pending after its lease;
+it is never authority. An armed denial, inhibition, stale positive, identity or
+publisher change, sequence mutation/regression, or original preparation expiry
+rejects. A fresh positive observed before local arming agreement keeps its own
+expiry. After the first accepted grant, disagreement or permission loss remains
+a fault and cannot return to waiting.
+
+The existing activation endpoint may defer a validated ACTIVATE until permission
+arrives. Its exact original publication time and proposal stay fixed; cancellation
+and publisher checks remain live. Substitution with an older-session transition
+after a deferred current ACTIVATE also rejects. No wire message or runtime flight
+admission bypass was added. Production supervisor armed activation remains absent.
+Root and independent review covered the two publication-order races and pending
+mutation/cancellation behavior. Native `/var/tmp/slaaps-native-3vgutxj5`, runtime
+`/var/tmp/slaaps-native-runtime-1t807zj5`, passes 3,386 control, 34 input and
+622 actual-mixer checks. The real mixer is pumped between separate arming,
+permission and ACTIVATE publications; no PWM or activation/handled ACK occurs
+until both arming messages agree and permission is accepted. Existing productive
+worker sessions and seven bounded-wait fault scenarios pass, including post-grant
+disagreement that cannot resume. Real Commander disarmed entry/re-entry, seven
+supervisor lifecycles and six restart/BSON scenarios also pass. Positive flight
+authority remains explicitly synthetic and callbacks capture-only. The portable
+host behavior did not change in this native-only increment; its prior matrix was
+not rerun.
+
+Board `manual-first-grant-final-20261022` passes independent source/ELF/package/
+capacity verification, six current ARM stack groups and the active-interface
+probe (235 compiler dependencies). The image is 1,825,796 bytes (+712), with
+140,284 bytes flash headroom; AXI SRAM remains 111,036 and SRAM4 2,048 bytes.
+Endpoint/supervisor heap sizes remain 7,240/7,576 bytes. MAIN/AUX identified
+chains are 2,520/2,464 of 2,800, leaving 280/336 bytes before unmeasured overhead.
+The final production recheck matches 45 current source hashes and the exact
+fixture, with three production refreshes and no drift. See that stage's
+`resource-summary.json`, `stack-chain-review.json`, `production-recheck.json`
+and `active-interfaces/result.json`. Dirty-labeled firmware is staged under
+`/tmp/px4-firmware/` with suffix
+`manual-first-grant-final-20261022_20261022T222826Z.px4`, SHA-256
+`3ed2bb6a2a60a70a586ebe3a3d825039eb69d6b171d449d7172134d577234fd6`.
+Source manifests identify the dirty checkout despite its retained older embedded
+tag. Static resource evidence does not establish boot, runtime stack/timing,
+electrical behavior or flight qualification. No hardware operated.
+
+## October 22: asynchronous first-command delivery and bank stack reduction
+
+The shared EDF input, owner, worker and output-bank consumer now distinguish the
+immutable preparation/session-entry timestamp from a later permission observation
+and control decision. A fresh post-entry pilot sample may precede permission and
+bank activation. Its raw timestamp and deadline remain unchanged. Samples before
+entry still fail; a calculated actuator frame must still postdate actual bank
+activation. Activation replies retain actual bank activation time. Renewed
+permission cannot extend a held raw sample or the original no-request timeout.
+This fixes a real production integration defect hidden by equal-time fixtures;
+it does not grant production flight admission or choose airborne recovery behavior.
+
+Each serialized bank transport now owns typed read/decode scratch, separate from
+its retained command baseline and the consumer's pending handling ticket. This
+removes automatic wire/frame copies on activation and dispatch paths without
+changing ownership, replay, expiry or successful-driver-handling requirements.
+Root and a second implementation owner reviewed the buffer lifetimes with no
+aliasing findings. ARM measurement shows +256 bytes per endpoint and a 136-byte
+reduction in the largest identified physical-driver chains.
+
+Host `/var/tmp/slaaps-configuration-8liblhst` passes 2,266 checks in each Debug,
+Release and ASan/UBSan configuration; 185 metadata entries validate. New coverage
+uses session < raw sample < permission < decision, checks both banks and handled
+ACKs, original sample expiry, pre-entry rejection, no-request timeout, actual
+activation time, and rejection of frames calculated before bank activation.
+The existing native worker/mixer scenario now captures the first pilot sample
+before permission and bank activation, then delivers it at a later decision.
+Native `/var/tmp/slaaps-native-f4ia3lc_`, runtime
+`/var/tmp/slaaps-native-runtime-hepov45a`, passes 3,194 control, 34 input and
+446 actual-mixer checks. Three actual worker/mixer sessions deliver the earlier
+raw first sample through capture callbacks and true handled acknowledgments,
+retaining partial-failure and callback-time authority-revocation coverage. Real
+Commander disarmed readiness/cancellation/re-entry and six restart/BSON scenarios
+also pass. Active-worker authority remains explicitly synthetic; production
+supervisor activation remains disabled. No physical outputs are exercised.
+
+Board `manual-first-command-final-20261022` passes independent source/ELF/package/
+capacity checks, all six ARM stack groups and the active-interface ARM probe.
+The image is 1,825,084 bytes (+360), with 140,996 bytes flash headroom; AXI SRAM
+is 111,036 and SRAM4 2,048 bytes. Endpoints are 7,240 bytes each, supervisor
+7,576 bytes (+8 for the owner start clock), capture workspace 1,560 and mixer
+1,200 bytes. MAIN/AUX identified maxima are 2,512/2,456 of 2,800, leaving
+288/344 bytes before unmeasured overhead. The supervisor chain is 2,504 of
+6,500. See `resource-summary.json`, `stack-chain-review.json`,
+`production-recheck.json` and `active-interfaces/result.json` in that stage.
+All 45 changed production sources match; the fixture hash also matches. These
+static measurements do not establish runtime high-water, timing, boot or vehicle
+acceptance. `resource-comparison.json` links the final receipts. The dirty-labeled
+firmware is staged under `/tmp/px4-firmware/` with suffix
+`manual-first-command-final-20261022_20261022T220911Z.px4`, SHA-256
+`04386a3f048d3569b9ca343de167c524e7fbf2c5aaffe66f9ccb4e6fed57bfd5`.
+The embedded ancestor tag is retained in receipts; source manifests identify the
+current dirty checkout. No hardware has been operated.
+
+## October 22: deliberate disarmed manual entry
+
+The supervisor now uses fresh Commander `nav_state_user_intention` and disarmed
+state to require an observed departure followed by deliberate SLAAPS Manual
+selection. Applying or restoring configuration alone no longer prepares outputs.
+Startup already selected, stale Commander state, or rejected bound input cannot
+silently establish a new entry. Initial missing configuration, routing, selected
+input, centered sticks, low normalized throttle or valid numerical state produces
+an actionable readiness status. Once bound, input loss, publisher replacement,
+configuration/routing changes and the original preparation deadline cancel the
+session; repaired data or another apply cannot revive it without mode re-entry.
+
+The same selected-input observer binds all seven publisher lifetimes, sensor IDs
+and source epoch. Disarmed observation is explicit and cannot be used through the
+armed guard API. Raw selected throttle is validated alongside attitude axes before
+shared endpoint normalization. Initial input must postdate the entry. No output
+permission is granted: all availability masks remain zero and the production
+supervisor still does not start the manual worker. The 100 ms diagnostic cadence
+and original one-second preparation lifetime do not establish a persistent
+ready-to-arm state or qualified active-control timing.
+
+Commander emits ten specific entry/readiness events through native PX4 event
+metadata, including configuration, routing, selected input, centering, throttle,
+state, cancellation/re-entry and the remaining flight-admission boundary. Generated
+metadata contains every event; actual QGC GUI operation remains unverified.
+
+Host `/var/tmp/slaaps-configuration-r0klcf4k` passes 2,234 checks each in Debug,
+Release and ASan/UBSan, with 185 parameter metadata entries validated. The first
+native run `/var/tmp/slaaps-native-runtime-0xtfdrzp` exposed a fixture defect after
+publisher withdrawal: `Publication::unadvertise()` retains its handle, making
+subsequent `advertise()` a no-op. Production correctly rejected the unavailable
+publisher. The fixture now reconstructs the publication in serialized execution,
+verifies a changed nonzero lifetime and refuses to count unadvertised publishes.
+Corrected native `/var/tmp/slaaps-native-1uyz9w8n`, runtime
+`/var/tmp/slaaps-native-runtime-i8ve5y_t`, passes 3,162 control, 34 input and
+443 actual-mixer checks, seven supervisor lifecycles and six restart/BSON cases.
+The production preparation scenario uses real Commander, supervisor and mixer
+endpoints with six synthetic pilot/estimator topics; the fixture never publishes
+Commander authority. It verifies centered/low-throttle/numerical-state gating,
+input loss, publisher replacement, configuration/routing/expiry cancellation,
+explicit mode re-entry and apply not retrying a rejected entry. Prepared sessions
+remain disarmed with zero admission masks and zero physical outputs. Existing
+active-worker tests use separate explicit synthetic authority and capture-only
+callbacks. The initial failed evidence is retained.
+
+Board `manual-entry-final-20261022` links and passes independent source/package/
+ELF/capacity verification: image 1,824,724 bytes, flash headroom 141,356 bytes,
+AXI SRAM 111,036 bytes and SRAM4 2,048 bytes. Existing five ARM probe groups and
+an additional supervisor probe pass. Endpoint objects are 6,984 bytes each;
+`sizeof(Slaaps)` is 7,568 bytes. Exact supervisor frames are Run 304 bytes,
+updatePreparation 400 bytes and observePrearmInput 160 bytes, on the separate
+6,500-byte supervisor queue. These are static measurements, not runtime stack or
+timing qualification. The conservative identified supervisor chain is 2,496 bytes
+of 6,500; physical MAIN/AUX chains remain 2,648/2,592 of 2,800 before unmeasured
+overhead. See `resource-summary.json`, `stack-chain-review.json` and
+`production-recheck.json` in that board stage: 41 current changed production
+files match, and both old module-path removals remain absent. The board snapshot
+retains the original native-only fixture hash; its correction is explicitly
+recorded separately and does not participate in the board target. The staged
+package SHA-256 is `c42fb41f442f1c23da6287e4675ae1fb11a1e860d8625c7204ee55e42c5ac309`.
+Source manifests identify the dirty checkout; the embedded tag remains older.
+The corrected build also revalidates all ten event definitions in
+`manual-entry-events.json`; actual QGC GUI operation is unverified. No hardware
+has been operated.
+
+## October 22: shared pilot input configuration
+
+The shared profile now explicitly selects RC-only or pinned MAVLink-only with
+`SLA_IN_SOURCE`; no automatic cross-source fallback is introduced. RC requires
+identity -1/0/0, while MAVLink requires the selected instance/system/component.
+`SLA_R_INPUT`, `SLA_P_INPUT` and `SLA_Y_INPUT` select a unique permutation of the
+three PX4-selected attitude axes. Existing body-axis signs, rate limits, deadband
+and centering hysteresis remain in effect. Native metadata exposes source and
+axis selectors as QGC enums; an actual QGC GUI session has not been verified.
+
+`SLA_THR_LOW` and `SLA_THR_HIGH` define the raw selected throttle values for zero
+and full EDF request. Descending endpoints implement reversal. Manual control
+requires finite unequal endpoints in [-1,1] and rejects samples outside their
+calibrated span. Raw source, timestamps, duplicate mutation and freshness are
+checked before conversion; transformed values cannot conceal a changed raw sample.
+Low-throttle entry is evaluated after conversion by the existing shared EDF owner.
+
+The same permutation/signs feed the bench body-axis mix, and `SLA_IN_AGE` now
+controls bench input freshness instead of an ignored parameter with a fixed
+500 ms timeout. Legacy 44-token bench profiles retain their old identity mapping,
+signs, MAVLink policy and 500 ms default. Shared SLAAPS profiles require explicit
+source, axis and sign choices; existing accepted markers cannot silently authorize
+new defaults. Servo-only bench validation does not require EDF throttle endpoints.
+This connects configuration to existing controllers and the worker; it does not
+add production supervisor admission or complete operational commissioning.
+
+Host evidence `/var/tmp/slaaps-configuration-_8wwi952/result.json` passes 2,178
+checks in each Debug, Release and ASan/UBSan build. The real PX4 metadata pipeline
+validates 179 vehicle fields and six apply/acceptance fields, including enum labels.
+Tests cover source/identity rejection, mapping consistency between bench and
+flight, configured bench-age boundaries, reverse throttle and deliberate low entry.
+Existing shared bench/controller CMake suites also pass Debug, Release and
+sanitizers at `/var/tmp/slaaps-input-compat-jidoil3y`; no legacy defaults changed.
+Native `/var/tmp/slaaps-native-3f1_conj`, runtime
+`/var/tmp/slaaps-native-runtime-jlnmav1u`, pass 2,983 control, 34 input and 443
+actual mixer checks, seven supervisor lifecycles and six accepted-profile restart
+scenarios with BSON export/import. The three actual-worker/mixer sessions use
+RC-only input, permutation {2,0,1}, and descending throttle endpoints {.75,-.5}.
+Assertions verify raw yaw produces the expected body-roll canard signs and low
+then raised throttle produces stopped then slewed EDF PWM. All output callbacks
+are capture-only with synthetic authority; production supervisor still grants none.
+
+Current [board verification](../build/slaaps_firmware/input-mapping-final-20261022/independent-verification.json)
+passes source/ELF/package/capacity checks: image 1,820,732 bytes, flash headroom
+145,348 bytes, linked AXI SRAM 111,036 bytes and SRAM4 2,048 bytes. Each bank
+endpoint is 6,976 heap bytes, including the unchanged 1,560-byte capture workspace;
+MixingOutput is 1,200 bytes. All five exact ARM probe groups were rerun. The
+[stack-chain review](../build/slaaps_firmware/input-mapping-final-20261022/stack-chain-review.json)
+identifies MAIN/AUX activation chains of 2,648/2,592 bytes against 2,800, leaving
+152/208 before unmeasured runtime/libc overhead. Runtime stack and timing remain
+unqualified; these figures cannot establish safe flight operation. No hardware
+was operated, and no flight mode availability was enabled.
+
+The next supervisor step can observe deliberate disarmed manual intent without
+weakening availability: UserModeIntention already allows disarmed selection,
+while fresh `vehicle_status.nav_state_user_intention` identifies the requested
+mode. This does not supply measured-condition or recovery admission.
+
+
+Updated 2026-10-22 by Codex toward the [airframe goal](SLAAPS_AIRFRAME_GOAL.md).
+The current milestone is below; earlier dated sections retain their original
+evidence and limitations. Software progress is not vehicle or flight acceptance.
+
+## October 22: production manual output endpoints
+
+Real MAIN/AUX `MixingOutput` endpoints now connect existing preparation,
+activation/cancellation, worker commands and handled acknowledgments at the
+serialized output boundary. The bank checks its physical driver token, complete
+observed routing, exact accepted parameter configuration, selected mode and
+independent current Commander/local guards. A separate manual-permission topic
+binds the supervisor publisher lifetime and original bounded expiry; preparation,
+activation, command and reply identities remain bound to their own publishers.
+Replacement, malformed/stale data, configuration/routing changes and partial
+activation cancel or latch the session; a repaired snapshot cannot resume it.
+The original preparation deadline cannot be renewed by duplicate proposals.
+
+Calibrated PWM microseconds go directly to the existing driver's `updateOutputs`
+callback. A claimed SLAAPS bank suppresses ordinary output processing. The
+endpoint validates authority immediately before the callback and again afterward,
+including elapsed time, current configuration/inventory and the exact saved ticket.
+A true callback plus successful final validation is required before a handled ACK
+is published. A false callback is rejected; callback success is software handling,
+not electrical feedback. Already handled retained commands produce no repeated
+write or ACK, while their original expiry continues to be checked.
+
+Fresh explicit disarm, kill, lockdown or termination uses the stop frame retained
+from the accepted preparation: configured disarmed PWM, or failsafe PWM on
+termination. Armed configuration corruption cannot replace that frame. A failed
+stop callback remains pending and can retry only under a later fresh explicit
+inhibition. Kill release while still armed cannot resume the cancelled session;
+a new deliberate preparation is required. Missing or denied permission while
+still armed remains `RecoveryRequired`, without synthesizing disarm or inventing
+a cutoff/held-thrust policy. Worker ownership, expiry and all-bank handling remain
+independent requirements.
+
+The production supervisor owns/advertises this permission lifecycle but publishes
+denied permission only. It still does not admit or start the manual worker. All
+three registered mode availability masks remain zero. Its actual disarmed
+preparation path remains connected to both real mixer endpoints after accepted
+manual apply or unchanged accepted-profile restore. Positive permission,
+selected-input entry and deliberate mode/arm activation are the next production
+boundary; the output endpoint implementation does not complete stabilized manual
+flight. Measured condition/recovery policy and broader acceleration/commissioning
+requirements remain unresolved.
+
+Recorded host package `/var/tmp/slaaps-configuration-gjk_4u_e` passes 2,075 checks
+each in Debug, Release and ASan/UBSan, with native metadata for 179 parameters.
+It predates later native endpoint/subscription edits and is not a fresh rerun of
+all final sources. The current native build `/var/tmp/slaaps-native-q82yxwli`,
+runtime `/var/tmp/slaaps-native-runtime-7uoaroz6`, passes 2,880 control checks,
+34 selected-input checks, 419 actual-mixer-output checks, seven supervisor
+lifecycles and six accepted-profile restart/BSON export-import scenarios.
+Native ELF SHA256:
+`aa67d92288f826cb6cea75f5bdc9de6aa94380079a9edd8670a69e94a4dde4e8`.
+
+The native output scenarios use the actual worker and actual MAIN/AUX
+`MixingOutput` with labeled synthetic authority and capture-only callbacks.
+They cover both-bank activation/handling, exact calibrated frames, rejected
+handling, final-write faults, expiry/replacement, retained-command suppression,
+accepted stop-frame retention, failed-stop retry and deliberate re-entry.
+The actual production supervisor preparation scenarios remain non-actuating and
+observe no output callbacks. Native PWM metadata comes from actual driver YAML;
+this fixture does not compile the physical PX4IO driver or exercise IO registers.
+The later IO-only correction therefore does not supersede its native-compiled evidence.
+
+The PX4IO correction independently forces configured or pending SLAAPS EDF
+DISARMED and FAILSAFE register writes to zero, including the high DIS=MIN case.
+Readiness additionally reads each EDF channel's actual DISARMED/FAILSAFE register
+and requires both to be zero alongside mixer disarmed/actual failsafe values.
+PX4IO firmware ignores zero FAILSAFE writes: an old nonzero register can persist,
+and readiness now rejects that state. Read failures and mismatches also reject it;
+the raw FAIL=65535 sentinel remains invalid. This changes neither the IO protocol
+nor airborne recovery policy. Added register-read timing is unqualified.
+
+Focused source-extracted PX4IO evidence
+`/var/tmp/slaaps-px4io-disabled-final-uk6akqrd/manifest.json` passes 658 checks each
+Debug/Release/ASan-UBSan using the actual update methods and exact Run inventory
+block with injected IO semantics. Eight-channel fixtures cover current/pending
+EDF assignment, high DIS=MIN, ordinary output preservation, ignored zero FAILSAFE
+writes, actual readback/parameter mismatches and read failure. The fixture compiles
+with `-Wfloat-equal -Werror`; the tested physical-driver source SHA256 is
+`f04792da673021ad17e5eff24ae566d3c814e70375d95fdc0162ac69160a870e`.
+An initial board compile rejected a float equality; its retained
+[failed attempt](../build/slaaps_firmware/production-manual-output-io-guard-final-20261022/failed-attempt-1.json)
+predates the exact-zero range comparison and this final fixture, which supersedes
+the earlier 642-check fixture. No physical IO or PWM operation is claimed.
+
+Final board stage
+[production-manual-output-io-guard-final-20261022](../build/slaaps_firmware/production-manual-output-io-guard-final-20261022/independent-verification.json)
+passes independent current-source, ELF/package and capacity checks, including the
+physical PX4IO driver: image 1,818,740 bytes, flash headroom 147,340 bytes, linked
+AXI SRAM 111,036 bytes and SRAM4 2,048 bytes. This adds 120 bytes flash versus the
+[retained predecessor](../build/slaaps_firmware/production-manual-output-final-20261022/independent-verification.json).
+Board receipt SHA256:
+`d8a61bcd2543a4531c49ef0975aa46564c78437d766bef4a6251da5df537e4b4`.
+Each heap bank endpoint is 6,920 bytes, including its 1,560-byte capture workspace;
+`MixingOutput` is 1,200 bytes. Dynamic allocations are additional to linked SRAM.
+The final [stack review](../build/slaaps_firmware/production-manual-output-io-guard-final-20261022/stack-chain-review.json)
+records identified MAIN/AUX activation chains of 2,632/2,576 bytes against the
+2,800-byte `hp_default` stack, leaving 168/224 bytes before unmeasured
+runtime/libc/uORB overhead. The fresh physical-driver probe finds PX4IO Run at
+144 bytes, 24 more than its predecessor; known workqueue runner frames remain
+included. Resolve or qualify this pressure before enabling production outputs;
+these sums are not runtime high-water or timing qualification.
+
+The dedicated board variant disables unused stock FW/MC controllers and the
+hover-thrust estimator, which SLAAPS startup does not start. Control allocator
+remains compiled to supply stock QGC actuator metadata, without being started as
+an output owner. The first manual-output build failed because removing it omitted
+the metadata mixer section; the next compile caught a shadowed local. Both
+[attempt logs](../build/slaaps_firmware/production-manual-output-20261022/) and the
+intermediate stack/final stages remain retained. Earlier preparation and board
+failures below remain evidence of their original revisions, not current passes.
+Dirty source manifests and independent verification identify the overlay; the
+retained older embedded Git tag alone does not identify current firmware sources.
+No hardware was flashed, energized or operated; no boot, electrical, QGC GUI or
+flight acceptance is claimed. Changes remain uncommitted pending user DCO review.
+
+## Historical record
+
 2026-10-20, Codex. First software increment toward the
 [airframe goal](SLAAPS_AIRFRAME_GOAL.md); no native mode or physical output
 integration is claimed by the host evidence below.
+
+## October 22 previous checkpoint: production supervisor and mixer preparation
+
+Recorded scope at this checkpoint; the current milestone above supersedes its integration boundary.
+
+The production supervisor now discovers real MAIN/AUX preparation-ready and
+handled-ack publisher lifetimes, binds the observed physical driver tokens and
+routing, and submits one all-bank preparation transaction after an accepted
+manual configuration apply or disarmed restore. `MixingOutput` owns a bank
+endpoint on each supported PWM bank; the endpoint checks its physical token,
+fresh disarmed Commander state, local kill/lockdown/termination guards, current
+routing and the exact accepted parameter snapshot before replying ready.
+The parameter capture/acceptance adapter moved from `src/modules/slaaps` into
+`src/lib/slaaps` so supervisor and driver use the same typed configuration.
+
+Preparation polls even without ordinary output-function traffic. Duplicate
+proposals cannot renew their one-second deadline. Expiry, configuration or routing
+changes, arming, publisher replacement and supervisor shutdown cancel readiness;
+a rejected transaction requires deliberate new apply. Status reports the exact
+session, deadline, bank mask and preparation state. The existing one-second
+non-actuating transaction bound is not qualified controller/output timing.
+Aligning preparation with deliberate mode/arm entry remains necessary; this
+diagnostic transaction is not persistent ready-to-arm permission.
+
+This connects production supervisor and mixer preparation, not activation or
+actuator operation. Neither registered modes, accepted markers nor ready replies
+grant output authority. All mode availability masks remain zero. The next boundary
+is a lifetime-bound trusted permission snapshot between queues, existing bank
+activation/cancellation, selected-worker entry, and exact handling acknowledgment
+around `MixingOutput`'s physical write. `RecoveryRequired` must not silently become
+cutoff or held thrust. Measured-condition admission and recovery policy remain
+unresolved, alongside the broader manual/acceleration/commissioning requirements.
+
+Current host `/var/tmp/slaaps-configuration-cq5n5q_f` passes 2,066 checks each in
+Debug, Release and ASan/UBSan, including native metadata for 179 parameters.
+Native `/var/tmp/slaaps-native-45pspsnu`, runtime
+`/var/tmp/slaaps-native-runtime-x96410g0`, pass 2,803 control checks, 34 input
+checks and seven supervisor lifecycles. The real supervisor and both actual
+`MixingOutput` instances complete preparation, reject configuration/routing
+changes and expiry, and re-enter after deliberate apply. Capture-only driver
+interfaces observe zero outputs throughout; the fixture cannot exercise physical
+PWM. It uses synthetic vehicle data and native PWM parameter metadata generated
+from the actual physical-driver YAML. The initial native attempt failed because
+the native target lacked those PWM parameters; the metadata fixture repaired that
+missing test dependency, and the final run above passes.
+
+Final board stage [production-preparation-final-20261022](../build/slaaps_firmware/production-preparation-final-20261022/independent-verification.json)
+independently passes current-source, ELF/package and capacity checks: image
+1,960,040 bytes, flash headroom 6,040 bytes, linked AXI SRAM 111,356 bytes and
+`SRAM4` 2,048 bytes. Each bank endpoint allocates 5,568 bytes on the heap, including
+its 1,560-byte capture workspace; these dynamic allocations are not included in
+the static SRAM figures. Driver-queue scratch reuse reduces the bank poll frame
+from 440 to 176 bytes; direct control-configuration validation reduces its frame
+from 1,272 to 848 bytes. The [stack-chain review](../build/slaaps_firmware/production-preparation-final-20261022/stack-chain-review.json)
+includes the retained 160-byte workqueue runner frame: known deepest MAIN/AUX
+call chains total 2,664/2,632 bytes against the 2,800-byte `hp_default` stack,
+leaving only 136/168 bytes before unmeasured runtime/libc overhead. This is tight;
+resolve and qualify the stack pressure before enabling outputs. These are static
+estimates, not measured runtime high-water marks or timing qualification.
+Final source manifests account for the shared adapter move and
+deleted module-local files; the older embedded Git tag alone is not the source
+identity. No board boot, electrical acceptance or hardware operation is claimed.
+
+## October 22 previous checkpoint: activation transaction and accepted-profile persistence
+
+The preparation coordinator now sends activation/cancellation over the separate
+`slaaps_manual_transition` topic using the existing preparation identity schema.
+Bank endpoints bind its advertisement lifetime, require independently supplied
+trusted permission, publish exact activation replies, and revoke on exact-session
+cancellation or publisher replacement. Partial activation cannot complete; timeout
+or a rejected peer cancels every participating bank. Preparation readiness is
+consumed before activation so the first bank's withdrawn ready reply cannot
+invalidate the other bank's activation. Historical activation deadlines are not
+ongoing output leases after consumption; live worker/bank dispatch still owns
+health, command expiry and handling acknowledgments.
+
+The supervisor now restores an unchanged accepted configuration on fresh disarmed
+startup. Four native parameters retain fingerprint words, validation scope and
+accepted apply counter. Restoration revalidates the whole typed configuration;
+unapplied edits and incomplete markers fail closed. Armed startup cannot defer
+restoration until later disarm. Explicit apply is still required for later edits.
+These markers record accepted software configuration, not calibration or vehicle
+qualification. Ordinary PX4 autosave supplies durability; the marker write is not
+an immediate media flush. Export/restore must include all SLAAPS parameters.
+Native metadata now contains 179 parameters (173 vehicle fields, two apply/scope
+controls, four acceptance markers). Stock QGC parameter support is implemented;
+a custom graphical configuration editor and actual GUI acceptance are not.
+
+Fresh native build `/var/tmp/slaaps-native-4y_gqklw`, runtime
+`/var/tmp/slaaps-native-runtime-w29p1az1`: 2,803 control checks, 34 selected-input
+checks and seven supervisor lifecycles pass. Six new activation scenarios cover
+both-bank completion, partial cancellation, missing reply timeout, transition
+publisher replacement, cancellation after proposal expiry, and independent AUX
+permission denial after MAIN activation. Profile checks cover three accepted
+restarts, persisted unapplied edits, incomplete acceptance markers and actual
+PX4 parameter BSON save/load. This is module restart plus storage export/import,
+not electrical power-loss qualification. Native ELF SHA256:
+`6e4358702ef08f07f52f12e2e718f71dcc93600fcf8cc7640a00674efe2c1309`.
+The first native compile caught mismatched generated topic names; its unsealed
+snapshot was explicitly refreshed and the incremental build/runtime pass is final.
+
+Final host package `/var/tmp/slaaps-configuration-z4au8guu` passes 2,066 checks
+each in Debug, Release and ASan/UBSan, with all input hashes checked after the run.
+Current board stage [activation-profile-final-20261022](../build/slaaps_firmware/activation-profile-final-20261022/independent-verification.json)
+passes ELF/package/source/capacity verification: 1,944,928-byte image, 21,152 bytes
+flash headroom, 111,356 bytes linked AXI SRAM (runtime heap/stack not qualified).
+This is +1,560 bytes flash versus the prior active-loop-headroom image.
+Package SHA256 `fcb9d84117804e14e11120c9a604d55c2ad18d5143733976ea07a1bb068e812d`.
+The incremental source manifest derives from the retained `472a7d6786` build
+and explicitly overlays current files; the embedded tag retains that parent
+identity. The dirty build manifest, not that old tag alone, identifies sources.
+Volume `px4-slaaps-activation-profile-final-20261022` and preliminary stage are
+retained. Transaction endpoint headers are not yet instantiated by production
+drivers; this resource result does not predict their eventual integrated cost.
+All validation jobs are terminal; no board boot or hardware acceptance is claimed.
+
+Production admission and physical driver attachment remain absent. The native
+transaction scenarios use synthetic permission and memory-backed uORB, not
+physical drivers. Final handling must attach at MixingOutput's serialized write
+boundary, with coherent configuration/inventory, independent trusted permission,
+physical driver token comparison and actual completion acknowledgment. No mode
+availability flag was enabled. Manual flight, acceleration, scheduled airflow
+control and the expanded EDF commissioning path remain incomplete. No hardware
+was flashed, energized or operated.
 
 ## Manual propulsion request adapter
 
@@ -1265,3 +2191,27 @@ publisher binding, cancellation transport, current health/observation checks and
 physical driver execution remain integration work. The fixture's 5,000 us budget
 is not a qualified vehicle default. No new flight availability is enabled;
 current board resource evidence must be refreshed before deployment claims.
+
+## Activation reply wire contract (2026-10-20)
+
+`SlaapsManualActivation.msg` defines separate `slaaps_manual_active_main` and
+`slaaps_manual_active_aux` topics. `ManualActivationTransport.hpp` encodes and
+validates exact transaction metadata and original activation/first-command expiry.
+Publication time cannot renew either timestamp. Codec rejection preserves the
+caller's output. Receiving bank role is supplied independently, and the payload's
+command/handled-reply revisions do not authenticate this activation publisher.
+The existing bound subscription must check the actual activation-topic lifetime;
+the activation barrier must separately check transaction identity and time budget.
+
+Host `/var/tmp/slaaps-configuration-i5fq2ify` passes 2,066 checks per build and
+175 parameters; all 97 input hashes match. Native `/var/tmp/slaaps-native-lxes_0o5`,
+runtime `/var/tmp/slaaps-native-runtime-q2m41or6`, passes 2,751 control checks,
+34 input checks and four supervisor lifecycles. Four changed native inputs match
+the sealed snapshot. Twenty shared checks cover wire faults and original expiry;
+ten native checks cover generated topic delivery, wrong-bank interpretation and
+latched publisher-replacement rejection for both banks.
+
+These topics/codecs are not yet published by production bank endpoints or consumed
+by production supervisor admission. Request/cancellation transport, lifetime-bound
+completion collection and driver attachment remain. No flight availability or
+physical outputs were enabled, and full-board resource evidence is still older.

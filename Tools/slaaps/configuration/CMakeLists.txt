@@ -12,6 +12,8 @@ execute_process(
 		"${PX4_ROOT}/msg/SlaapsManualCommand.msg"
 		"${PX4_ROOT}/msg/SlaapsManualAck.msg"
 		"${PX4_ROOT}/msg/SlaapsManualPreparation.msg"
+		"${PX4_ROOT}/msg/SlaapsManualActivation.msg"
+		"${PX4_ROOT}/msg/SlaapsManualPermission.msg"
 		-e "${PX4_ROOT}/Tools/msg/templates/uorb"
 		-o "${CMAKE_CURRENT_BINARY_DIR}/generated/uORB/topics"
 	RESULT_VARIABLE GENERATION_RESULT

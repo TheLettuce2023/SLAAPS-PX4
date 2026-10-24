@@ -198,6 +198,9 @@ uORB::DeviceNode::write(cdev::file_t *filp, const char *buffer, size_t buflen)
 
 #if defined(CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL) || defined(CONFIG_MODULES_SLAAPS)
 	_research_data_revision = _research_revision;
+
+	if (_research_revision && _research_lifetime_samples < _meta->o_queue) { ++_research_lifetime_samples; }
+
 #endif
 
 	// callbacks

@@ -126,6 +126,47 @@ MavlinkReceiver::MavlinkReceiver(Mavlink &parent) :
 #endif // CONFIG_MODULES_VISION_TARGET_ESTIMATOR
 }
 
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+#if defined(MAVLINK_NO_SIGNATURE_CHECK)
+#error "SLAAPS companion ingress requires the MAVLink signature verifier"
+#endif
+void MavlinkReceiver::publish_slaaps_companion(const mavlink_message_t *msg, bool verified,
+		bool signing_active, uint32_t generation)
+{
+	const int instance = _mavlink.get_instance_id();
+
+	if (instance < 0 || instance >= 4 || _slaaps_packet_sequence == UINT64_MAX) { return; }
+
+	slaaps_companion_packet_s packet{};
+	packet.timestamp = hrt_absolute_time();
+	packet.sequence = ++_slaaps_packet_sequence;
+	packet.signing_generation = generation;
+	packet.mavlink_instance = static_cast<uint8_t>(instance);
+	packet.signing_active = signing_active;
+	packet.receiver_system = _mavlink.get_system_id();
+	packet.receiver_component = _mavlink.get_component_id();
+	packet.event = msg ? slaaps_companion_packet_s::EVENT_FRAME : slaaps_companion_packet_s::EVENT_LINK_STATE;
+
+	if (msg) {
+		packet.message_id = msg->msgid;
+		packet.source_system = msg->sysid;
+		packet.source_component = msg->compid;
+		packet.payload_length = msg->len;
+		packet.mavlink2 = msg->magic == MAVLINK_STX;
+		packet.signature_verified = verified && generation != 0;
+		// Retain the actual length even for a malformed overlong frame. The
+		// supervisor must reject that length before decoding the bounded copy.
+		const size_t copied = msg->len < sizeof(packet.payload) ? msg->len : sizeof(packet.payload);
+		memcpy(packet.payload, _MAV_PAYLOAD(msg), copied);
+	}
+
+	if (_slaaps_packet_pub[instance].publish(packet) && !msg) {
+		_slaaps_signing_generation = generation;
+		_slaaps_signing_active = signing_active;
+	}
+}
+#endif
+
 void
 MavlinkReceiver::acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result, uint8_t progress)
 {
@@ -3838,6 +3879,19 @@ MavlinkReceiver::run()
 
 		// Reload signing key if another instance updated it
 		_mavlink.check_signing_key_dirty();
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+		// The receiver owns key changes. Observe them before blocking for input,
+		// so disabling/reloading a key cannot leave a prior ingress lifetime live.
+		_mavlink.lock_send();
+		const bool signing_active = _mavlink.get_status()->signing != nullptr;
+		const uint32_t signing_generation = _mavlink.signing_generation();
+		_mavlink.unlock_send();
+
+		if (signing_generation != _slaaps_signing_generation || signing_active != _slaaps_signing_active) {
+			publish_slaaps_companion(nullptr, false, signing_active, signing_generation);
+		}
+
+#endif
 
 		int ret = poll(&fds[0], 1, timeout);
 
@@ -3921,9 +3975,31 @@ MavlinkReceiver::run()
 					// that actually send take lock_send() locally.
 					_mavlink.lock_send();
 					const uint8_t parsed = mavlink_parse_char(_mavlink.get_channel(), buf[i], &msg, &_status);
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+					const auto *signing = _mavlink.get_status()->signing;
+					const uint32_t frame_signing_generation = _mavlink.signing_generation();
+					const bool frame_signing_active = signing != nullptr;
+					// parse_char may accept unsigned packets, no-key signed packets,
+					// or an application override. None proves signature verification.
+					const bool frame_verified = parsed == MAVLINK_FRAMING_OK && msg.magic == MAVLINK_STX
+								    && (msg.incompat_flags & MAVLINK_IFLAG_SIGNED) && signing
+								    && signing->last_status == MAVLINK_SIGNING_STATUS_OK;
+#endif
 					_mavlink.unlock_send();
 
 					if (parsed) {
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+
+						if (msg.msgid == MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST
+						    || msg.msgid == MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION) {
+							if (frame_signing_generation != _slaaps_signing_generation || frame_signing_active != _slaaps_signing_active) {
+								publish_slaaps_companion(nullptr, false, frame_signing_active, frame_signing_generation);
+							}
+
+							publish_slaaps_companion(&msg, frame_verified, frame_signing_active, frame_signing_generation);
+						}
+
+#endif
 
 						// If we receive a complete MAVLink 2 packet, also switch the outgoing protocol version.
 						// Read flags from the receiver-local _status (mavlink_parse_char copies flags from the

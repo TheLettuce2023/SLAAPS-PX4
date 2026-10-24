@@ -120,6 +120,7 @@ public:
 	ManualControlInput &operator=(ManualControlInput &&) = delete;
 
 	ManualControlStatus configure(const ManualControlConfiguration &configuration);
+	static ManualControlStatus validateConfiguration(const ManualControlConfiguration &configuration);
 	ManualControlStatus evaluate(RuntimeTimeUs now_us,
 				     const ManualControlSample &sample,
 				     RuntimeInput &input,

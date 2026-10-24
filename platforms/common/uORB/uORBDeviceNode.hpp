@@ -224,6 +224,40 @@ public:
 		ATOMIC_LEAVE;
 		return true;
 	}
+	bool copy_research_queued_revision(void *destination, unsigned &generation, unsigned &revision)
+	{
+		revision = 0;
+
+		if (!destination) { return false; }
+
+		ATOMIC_ENTER;
+
+		if (!_advertised.load() || !_data_valid || !_data || !_research_revision || !_research_lifetime_samples
+		    || _research_data_revision != _research_revision) {
+			ATOMIC_LEAVE;
+			return false;
+		}
+
+		const unsigned current_generation = _generation.load();
+		unsigned available = current_generation - generation;
+
+		if (!available) {
+			ATOMIC_LEAVE;
+			return false;
+		}
+
+		// Unsigned generation arithmetic matches ordinary queued copy. The
+		// saturating lifetime count excludes overwritten and older-advertiser
+		// slots without retaining a generation floor that ages across wrap.
+		if (available > _research_lifetime_samples) { available = _research_lifetime_samples; }
+
+		const unsigned selected_generation = current_generation - available;
+		memcpy(destination, _data + (_meta->o_size * (selected_generation % _meta->o_queue)), _meta->o_size);
+		generation = selected_generation + 1;
+		revision = _research_data_revision;
+		ATOMIC_LEAVE;
+		return true;
+	}
 #else
 	void mark_as_advertised() { _advertised.store(true); }
 #endif
@@ -342,7 +376,13 @@ private:
 	// Research/SLAAPS lifecycle provision; zero stays invalid after exhaustion.
 	unsigned _research_revision{1};
 	unsigned _research_data_revision{};
-	void advance_research_revision() { if (_research_revision != 0) { ++_research_revision; } }
+	unsigned _research_lifetime_samples{}; // Bounded by o_queue; reset on every lifetime transition.
+	void advance_research_revision()
+	{
+		_research_lifetime_samples = 0;
+
+		if (_research_revision != 0) { ++_research_revision; }
+	}
 #endif
 	List<uORB::SubscriptionCallback *>	_callbacks;
 

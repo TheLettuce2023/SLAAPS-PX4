@@ -97,6 +97,9 @@ public:
 
 	bool is_signing_active() const { return _is_signing_initialized; }
 
+	// Receiver-thread lifecycle witness; zero means exhausted and cannot revive.
+	uint32_t signing_generation() const { return _signing_generation; }
+
 	static bool is_array_all_zeros(uint8_t arr[], size_t size);
 
 private:
@@ -104,6 +107,7 @@ private:
 	mavlink_status_t *_mavlink_status{nullptr};
 
 	bool _is_signing_initialized{false};
+	uint32_t _signing_generation{1};
 
 	/**
 	 * Wire or unwire the signing struct into the mavlink status based on key state.

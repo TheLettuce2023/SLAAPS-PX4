@@ -90,6 +90,9 @@
 #include <uORB/topics/log_message.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/mavlink_tunnel.h>
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+#include <uORB/topics/slaaps_companion_packet.h>
+#endif
 #include <uORB/topics/obstacle_distance.h>
 #include <uORB/topics/offboard_control_mode.h>
 #include <uORB/topics/onboard_computer_status.h>
@@ -180,6 +183,9 @@ private:
 					       float param4 = 0.0f, float param5 = 0.0f, float param6 = 0.0f, float param7 = 0.0f);
 
 	void handle_message(mavlink_message_t *msg);
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+	void publish_slaaps_companion(const mavlink_message_t *msg, bool verified, bool signing_active, uint32_t generation);
+#endif
 	void handle_messages_in_gimbal_mode(mavlink_message_t &msg);
 
 	void handle_message_adsb_vehicle(mavlink_message_t *msg);
@@ -300,6 +306,16 @@ private:
 	MavlinkParametersManager	_parameters_manager;
 	MavlinkTimesync			_mavlink_timesync;
 	MavlinkStatustextHandler	_mavlink_statustext_handler;
+
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+	uORB::Publication<slaaps_companion_packet_s> _slaaps_packet_pub[4] {
+		{ORB_ID(slaaps_companion_packet_0)}, {ORB_ID(slaaps_companion_packet_1)},
+		{ORB_ID(slaaps_companion_packet_2)}, {ORB_ID(slaaps_companion_packet_3)}
+	};
+	uint64_t _slaaps_packet_sequence{};
+	uint32_t _slaaps_signing_generation{};
+	bool _slaaps_signing_active{};
+#endif
 
 	mavlink_status_t		_status{}; ///< receiver status, used for mavlink_parse_char()
 

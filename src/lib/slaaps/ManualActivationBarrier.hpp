@@ -27,12 +27,15 @@ public:
 		_banks = 0;
 
 		if (!ManualBankPreparation::validRequest(now, request)
-		    || !validate(configuration, ConfigurationUse::StabilizedManual).valid()
+		    || !ManualBankPreparation::validConfiguration(configuration, request.mode)
 		    || request.configuration != fingerprint(configuration)
-		    || first_command_budget_us <= static_cast<uint64_t>(configuration.cycle_min_us)
-		    || first_command_budget_us >= static_cast<uint64_t>(configuration.cycle_max_us)
+		    || first_command_budget_us <= ManualBankPreparation::cycleMinimumUs(configuration, request.mode)
+		    || first_command_budget_us >= ManualBankPreparation::cycleMaximumUs(configuration, request.mode)
 		    || activation_deadline_us <= now || activation_deadline_us > request.deadline_us
-		    || activation_deadline_us - now >= static_cast<uint64_t>(configuration.cycle_max_us) - first_command_budget_us) { return rejectBegin(); }
+		    || activation_deadline_us - now >= ManualBankPreparation::cycleMaximumUs(configuration, request.mode) - first_command_budget_us
+		    || (ManualBankPreparation::commissioningMode(request.mode)
+			&& (first_command_budget_us != static_cast<uint64_t>(configuration.first_command_budget_us)
+			    || activation_deadline_us - now > static_cast<uint64_t>(configuration.activation_ack_timeout_us)))) { return rejectBegin(); }
 
 		_request = request;
 		_banks = request.binding.banks;
@@ -40,7 +43,7 @@ public:
 		_started = now;
 		_deadline = activation_deadline_us;
 		_budget = first_command_budget_us;
-		_cycle_max = configuration.cycle_max_us;
+		_cycle_max = ManualBankPreparation::cycleMaximumUs(configuration, request.mode);
 		_status = ActivationStatus::Waiting;
 		return true;
 	}

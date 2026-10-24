@@ -5,7 +5,7 @@
 namespace slaaps
 {
 
-enum class ControlMode : uint8_t { None, Manual, Acceleration, ServoBench };
+enum class ControlMode : uint8_t { None, Manual, Acceleration, ServoBench, EdfBench = 4 };
 enum class EdfUnits : uint8_t { Normalized, Newtons };
 enum class EdfFault : uint8_t {
 	None, InvalidGrant, InvalidConfiguration, PermissionLost, InvalidTime,
@@ -14,7 +14,8 @@ enum class EdfFault : uint8_t {
 enum class EdfDisposition : uint8_t { Inhibited, Command, RecoveryRequired };
 
 // Supplied by the selected-input/controller adapter; never an actuator topic.
-// Tokens identify boot-lifetime owner instances, not MAVLink component IDs.
+// Session is the immutable monotonic HRT entry timestamp shared with permission;
+// source identifies the boot-lifetime owner, not a MAVLink component ID.
 struct EdfRequest {
 	uint64_t session{};
 	uint64_t source{};
@@ -30,6 +31,9 @@ struct EdfRequest {
 // A fresh snapshot from the supervisor, independently checked at every sample.
 // flight_admitted requires a validated transition/loss policy and vehicle data;
 // neither a parameter value nor successful configuration validation grants it.
+// Session is minted at deliberate preparation/entry and bounds request sample
+// times. It is not the current arming time or renewable permission publication
+// time; a valid post-entry sample may precede timestamp_us.
 struct EdfPermission {
 	uint64_t timestamp_us{};
 	uint64_t deadline_us{};
@@ -44,6 +48,8 @@ struct EdfPermission {
 	bool kill{};
 	bool lockdown{};
 	bool termination{};
+	bool prearmed{}; // Actual actuator_armed prearm state; never propulsion permission.
+	bool commissioning_admitted{}; // Explicit ground commissioning, never flight admission.
 };
 
 struct EdfCommand {
@@ -81,6 +87,7 @@ private:
 	uint64_t _last_session{};
 	uint64_t _clock{};
 	uint64_t _last_sample{};
+	uint64_t _started_us{};
 	uint64_t _lease_us{};
 	float _target{};
 	float _output{};

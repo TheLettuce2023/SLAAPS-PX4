@@ -15,15 +15,20 @@ namespace slaaps
 inline bool validManualFrame(uint64_t now, const ManualWorkerOutput &frame)
 {
 	const auto &edf = frame.edf;
+	const bool manual = frame.mode == ControlMode::Manual;
+	const bool bench = frame.mode == ControlMode::ServoBench;
+	const bool edf_bench = frame.mode == ControlMode::EdfBench;
 
 	if (!frame.timestamp_us || frame.timestamp_us > now || frame.deadline_us <= now || !frame.sequence
-	    || !validManualOutputBinding(frame.binding) || edf.disposition != EdfDisposition::Command
+	    || !validManualOutputBinding(frame.binding) || (!manual && !bench && !edf_bench)
+	    || (!bench ? edf.disposition != EdfDisposition::Command :
+		(edf.disposition != EdfDisposition::Inhibited || !(edf.normalized >= 0.F && edf.normalized <= 0.F)))
 	    || !edf.session || !edf.source || !edf.configuration || !edf.sequence || !edf.request_timestamp_us
 	    || edf.request_timestamp_us > frame.timestamp_us || frame.deadline_us > edf.deadline_us
 	    || !std::isfinite(edf.normalized) || edf.normalized < 0.F || edf.normalized > 1.F) { return false; }
 
 	for (float value : frame.canards) {
-		if (!std::isfinite(value) || value < -1.F || value > 1.F) { return false; }
+		if (!std::isfinite(value) || value < -1.F || value > 1.F || (edf_bench && !(value >= 0.F && value <= 0.F))) { return false; }
 	}
 
 	return true;
@@ -31,6 +36,12 @@ inline bool validManualFrame(uint64_t now, const ManualWorkerOutput &frame)
 
 inline bool encodeManualCommand(uint64_t now, const ManualWorkerOutput &frame, slaaps_manual_command_s &message)
 {
+	static_assert(static_cast<unsigned>(ControlMode::Manual) == slaaps_manual_command_s::MANUAL, "manual command mode");
+	static_assert(static_cast<unsigned>(ControlMode::ServoBench) == slaaps_manual_command_s::SERVO_BENCH, "bench command mode");
+	static_assert(static_cast<unsigned>(ControlMode::EdfBench) == slaaps_manual_command_s::EDF_BENCH, "EDF bench command mode");
+	static_assert(static_cast<unsigned>(EdfDisposition::Inhibited) == slaaps_manual_command_s::EDF_INHIBITED, "inhibited EDF wire state");
+	static_assert(static_cast<unsigned>(EdfDisposition::Command) == slaaps_manual_command_s::EDF_COMMAND, "command EDF wire state");
+
 	if (!validManualFrame(now, frame)) { return false; }
 
 	slaaps_manual_command_s candidate{};
@@ -50,6 +61,8 @@ inline bool encodeManualCommand(uint64_t now, const ManualWorkerOutput &frame, s
 	candidate.edf_deadline = frame.edf.deadline_us;
 	candidate.edf = frame.edf.normalized;
 	candidate.bank_mask = frame.binding.banks;
+	candidate.mode = static_cast<uint8_t>(frame.mode);
+	candidate.edf_disposition = static_cast<uint8_t>(frame.edf.disposition);
 
 	for (unsigned i = 0; i < kCanards; ++i) { candidate.canards[i] = frame.canards[i]; }
 
@@ -65,7 +78,8 @@ inline bool decodeManualCommand(uint64_t now, const slaaps_manual_command_s &mes
 	candidate.timestamp_us = message.timestamp_sample;
 	candidate.deadline_us = message.deadline;
 	candidate.sequence = message.sequence;
-	candidate.edf.disposition = EdfDisposition::Command;
+	candidate.mode = static_cast<ControlMode>(message.mode);
+	candidate.edf.disposition = static_cast<EdfDisposition>(message.edf_disposition);
 	candidate.edf.session = message.session;
 	candidate.edf.source = message.source;
 	candidate.edf.configuration = message.configuration;

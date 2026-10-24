@@ -27,6 +27,14 @@ public:
 		return subscribe()
 		       && static_cast<DeviceNode *>(get_node())->copy_research_revision(destination, _last_generation, revision);
 	}
+	// Consume one unread queued sample from the current advertised lifetime.
+	// No new data returns false; unlike copyBound, this never repeats a sample.
+	bool copyQueuedBound(void *destination, unsigned &revision)
+	{
+		revision = 0;
+		return subscribe()
+		       && static_cast<DeviceNode *>(get_node())->copy_research_queued_revision(destination, _last_generation, revision);
+	}
 	unsigned revision()
 	{
 		return subscribe() ? static_cast<DeviceNode *>(get_node())->research_revision() : 0;

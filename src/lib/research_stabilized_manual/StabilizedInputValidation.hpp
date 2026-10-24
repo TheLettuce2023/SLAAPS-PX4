@@ -6,8 +6,9 @@ namespace research_stabilized_manual
 {
 
 // Same raw manual-input policy used by the controller and independent consumer.
+// Readiness may additionally validate throttle without granting propulsion.
 research_actuator_command::ManualControlStatus configureStabilizedManualInput(const Configuration &configuration,
-		research_actuator_command::ManualControlInput &input);
+		research_actuator_command::ManualControlInput &input, bool include_throttle = false);
 
 // Requires a validated, immutable Configuration. Checks numerical state,
 // freshness and optional previous-sample continuity without integration or

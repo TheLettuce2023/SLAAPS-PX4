@@ -27,6 +27,8 @@ def main():
         ROOT / "msg/SlaapsManualCommand.msg",
         ROOT / "msg/SlaapsManualAck.msg",
         ROOT / "msg/SlaapsManualPreparation.msg",
+        ROOT / "msg/SlaapsManualActivation.msg",
+        ROOT / "msg/SlaapsManualPermission.msg",
         ROOT / "src/lib/mixer_module/output_functions.yaml",
         ROOT / "src/lib/mixer_module/generate_function_header.py",
         *sorted((ROOT / "src/lib/research_stabilized_manual").glob("*pp")),
@@ -63,10 +65,36 @@ def main():
     expected = {p["name"]: p for p in definitions()}
     vehicle_parameter_count = len(expected)
     expected.update(SLA_CFG_APPLY={"default": 0}, SLA_CFG_KIND={"default": 0})
+    expected.update({name: {"default": 0} for name in
+                     ("SLA_CFG_SAVED", "SLA_CFG_SCOPE", "SLA_CFG_ID_LO", "SLA_CFG_ID_HI")})
+    expected.update({name: {"default": 0} for name in
+                     ("SLA_BENCH_EN", "SLA_BENCH_CH", "SLA_BENCH_SEC")})
     actual = {p.attrib["name"]: p for p in ET.parse(out / "parameters.xml").iter("parameter")}
     assert set(actual) == set(expected), (set(expected) - set(actual), set(actual) - set(expected))
     for name, item in expected.items():
         assert float(actual[name].attrib["default"]) == item["default"], name
+    selector_values = {
+        "SLA_IN_SOURCE": {"0": "Unconfigured", "1": "RC only", "2": "Pinned MAVLink only"},
+        "SLA_CFG_KIND": {"0": "Servo bench", "1": "Stabilized manual", "2": "EDF commissioning"},
+        "SLA_BENCH_EN": {"0": "Stop / disabled", "1": "Enable commissioning session"},
+        "SLA_BENCH_CH": {"0": "Combined response", "1": "Canard 1", "2": "Canard 2",
+                         "3": "Canard 3", "4": "Canard 4", "5": "EDF (deliberately armed)"},
+        "SLA_SCH_EN": {"0": "Disabled", "1": "Empirical 2x2 table"},
+        **{name: {"-1": "Unconfigured", **{str(i): f"Instance {i}" for i in range(4)}}
+           for name in ("SLA_SCH_AS_INST", "SLA_SCH_AD_INST", "SLA_SCH_BAT_INST")},
+        **{name: {"-1": "Unconfigured", "0": "Roll", "1": "Pitch", "2": "Yaw"}
+           for name in ("SLA_R_INPUT", "SLA_P_INPUT", "SLA_Y_INPUT")},
+    }
+    for name, labels in selector_values.items():
+        values = {value.attrib["code"]: value.text for value in actual[name].findall("values/value")}
+        assert values == labels, (name, values)
+    assert actual["SLA_BENCH_SEC"].findtext("min") == "0"
+    assert actual["SLA_BENCH_SEC"].findtext("max") == "60"
+    assert actual["SLA_SCH_AGE"].findtext("min") == "0"
+    assert actual["SLA_SCH_AGE"].findtext("max") == "1000000"
+    for name in ("SLA_SCH_EDF_LO", "SLA_SCH_EDF_HI"):
+        assert float(actual[name].findtext("min")) == 0
+        assert float(actual[name].findtext("max")) == 1
     check_counts = {}
     for name, build_type, sanitizers in (("debug", "Debug", "OFF"), ("release", "Release", "OFF"),
                                          ("sanitized", "Debug", "ON")):

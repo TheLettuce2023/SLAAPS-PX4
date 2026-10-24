@@ -56,6 +56,7 @@ struct ManualWorkerOutput {
 	research_stabilized_manual::CanardVector canards{};
 	EdfCommand edf{};
 	ManualOutputBinding binding{};
+	ControlMode mode{ControlMode::Manual};
 };
 
 inline bool validManualOutputBinding(const ManualOutputBinding &binding)

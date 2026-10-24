@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<mavlink>
+  <!-- Repository-private IDs, not a global MAVLink allocation. No flight authority is implied. -->
+  <include>mavlink/message_definitions/v1.0/development.xml</include>
+  <version>3</version>
+  <dialect>0</dialect>
+  <messages>
+    <message id="200010" name="RESEARCH_ACCELERATION_REQUEST">
+      <description>SLAAPS private v1 contract. Requires verified link, configured source, session and clock admission; payload alone grants no control.</description>
+      <field type="uint64_t" name="source_id"/>
+      <field type="uint64_t" name="session_id"/>
+      <field type="uint64_t" name="sequence"/>
+      <field type="uint64_t" name="producer_monotonic_us"/>
+      <field type="uint64_t" name="producer_expiry_monotonic_us"/>
+      <field type="uint64_t" name="controller_instance_id"/>
+      <field type="uint64_t" name="transition_epoch"/>
+      <field type="uint64_t" name="clock_mapping_epoch"/>
+      <field type="float" name="acceleration_x_frd_m_s2"/>
+      <field type="float" name="acceleration_y_frd_m_s2"/>
+      <field type="float" name="acceleration_z_frd_m_s2"/>
+      <field type="uint32_t" name="protocol_version"/>
+      <field type="uint8_t" name="target_system"/>
+      <field type="uint8_t" name="target_component"/>
+      <field type="uint8_t" name="frame"/>
+      <field type="uint8_t" name="quantity"/>
+      <field type="uint8_t" name="reference_point"/>
+      <field type="uint8_t" name="flags"/>
+      <field type="uint8_t[4]" name="reserved"/>
+    </message>
+    <message id="200011" name="RESEARCH_ACCELERATION_SESSION">
+      <description>SLAAPS private v1 session administration. Requires independent supervisor authorization; a received packet cannot establish its own authority.</description>
+      <field type="uint64_t" name="controller_instance_id"/>
+      <field type="uint64_t" name="transition_epoch"/>
+      <field type="uint64_t" name="clock_mapping_epoch"/>
+      <field type="uint64_t" name="source_id"/>
+      <field type="uint64_t" name="session_id"/>
+      <field type="uint64_t" name="operation_sequence"/>
+      <field type="uint64_t" name="producer_acknowledgement_monotonic_us"/>
+      <field type="uint64_t" name="acknowledged_status_sequence"/>
+      <field type="uint32_t" name="protocol_version"/>
+      <field type="uint8_t" name="target_system"/>
+      <field type="uint8_t" name="target_component"/>
+      <field type="uint8_t" name="operation"/>
+      <field type="uint8_t" name="flags"/>
+      <field type="uint8_t[4]" name="reserved"/>
+    </message>
+    <message id="200012" name="RESEARCH_ACCELERATION_STATUS">
+      <description>SLAAPS private v1 contract status. Reports historical admission evidence, never an actuator command or implicit permission.</description>
+      <field type="uint64_t" name="controller_instance_id"/>
+      <field type="uint64_t" name="transition_epoch"/>
+      <field type="uint64_t" name="clock_mapping_epoch"/>
+      <field type="uint64_t" name="source_id"/>
+      <field type="uint64_t" name="session_id"/>
+      <field type="uint64_t" name="correlation_sequence"/>
+      <field type="uint64_t" name="last_accepted_sequence"/>
+      <field type="uint64_t" name="validator_time_us"/>
+      <field type="uint64_t" name="status_sequence"/>
+      <field type="uint64_t" name="rejection_count"/>
+      <field type="uint64_t" name="conservative_age_us"/>
+      <field type="uint32_t" name="protocol_version"/>
+      <field type="uint16_t" name="decision_code"/>
+      <field type="uint16_t" name="first_latched_code"/>
+      <field type="uint16_t" name="status_flags"/>
+      <field type="uint8_t" name="target_system"/>
+      <field type="uint8_t" name="target_component"/>
+      <field type="uint8_t" name="status_class"/>
+      <field type="uint8_t" name="arm_state"/>
+      <field type="uint8_t" name="research_mode_state"/>
+      <field type="uint8_t" name="session_state"/>
+      <field type="uint8_t" name="transport_state"/>
+      <field type="uint8_t" name="clock_mapping_state"/>
+    </message>
+  </messages>
+</mavlink>
