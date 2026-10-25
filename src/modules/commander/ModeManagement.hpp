@@ -38,6 +38,7 @@
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/register_ext_component_request.h>
+#include <uORB/topics/external_mode_registry.h>
 #include <uORB/topics/register_ext_component_reply.h>
 #include <uORB/topics/setpoint_config.h>
 #include <uORB/topics/setpoint_config_reply.h>
@@ -98,6 +99,7 @@ public:
 		int arming_check_registration_id{-1};
 		int mode_executor_registration_id{-1};
 		bool request_offboard_setpoints{false};
+		bool not_user_selectable{false};
 		config_overrides_s overrides{};
 		mode_util::SetpointType current_setpoint_type{kDefaultSetpointType};
 	};
@@ -115,6 +117,9 @@ public:
 	bool removeExternalMode(uint8_t nav_state, const char *name);
 
 private:
+	void publishRegistry();
+
+	uORB::Publication<external_mode_registry_s> _registry_pub{ORB_ID(external_mode_registry)};
 	Mode _modes[MAX_NUM] {};
 	param_t _mode_hash_handles[MAX_NUM];
 };

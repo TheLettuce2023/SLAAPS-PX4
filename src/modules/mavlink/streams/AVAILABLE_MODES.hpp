@@ -35,17 +35,14 @@
 #define AVAILABLE_MODES_HPP
 
 #include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/register_ext_component_reply.h>
+#include <uORB/topics/external_mode_registry.h>
 #include <lib/modes/standard_modes.hpp>
 #include <lib/modes/ui.hpp>
-#include <limits.h>
 
 class MavlinkStreamAvailableModes : public MavlinkStream
 {
 public:
 	static MavlinkStream *new_instance(Mavlink *mavlink) { return new MavlinkStreamAvailableModes(mavlink); }
-
-	~MavlinkStreamAvailableModes() { delete[] _external_mode_names; }
 
 	static constexpr const char *get_name_static() { return "AVAILABLE_MODES"; }
 	static constexpr uint16_t get_id_static() { return MAVLINK_MSG_ID_AVAILABLE_MODES; }
@@ -68,15 +65,11 @@ private:
 
 	explicit MavlinkStreamAvailableModes(Mavlink *mavlink) : MavlinkStream(mavlink) {}
 
-	struct ExternalModeName {
-		char name[sizeof(register_ext_component_reply_s::name)] {};
-	};
-	ExternalModeName *_external_mode_names{nullptr};
-	uint8_t _not_user_selectable_mask{0};
-	static_assert(MAX_NUM_EXTERNAL_MODES <= (sizeof(_not_user_selectable_mask) * CHAR_BIT), "Mask too small");
+	external_mode_registry_s _external_mode_registry{};
+	static_assert(MAX_NUM_EXTERNAL_MODES == external_mode_registry_s::NUM_MODES, "Registry slot count mismatch");
 
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
-	uORB::Subscription _register_ext_component_reply_sub{ORB_ID(register_ext_component_reply)};
+	uORB::Subscription _external_mode_registry_sub{ORB_ID(external_mode_registry)};
 
 	bool _had_dynamic_update{false};
 	uint8_t _dynamic_update_seq{0};
@@ -107,21 +100,23 @@ private:
 		}
 
 		if (available_modes.standard_mode == MAV_STANDARD_MODE_NON_STANDARD) {
-			static_assert(sizeof(available_modes.mode_name) >= sizeof(ExternalModeName::name), "mode name too short");
+			static_assert(sizeof(available_modes.mode_name) >= external_mode_registry_s::NAME_LENGTH, "mode name too short");
 
 			// Is it an external mode?
 			unsigned external_mode_index = nav_state - vehicle_status_s::NAVIGATION_STATE_EXTERNAL1;
 
 			if (nav_state >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1 && external_mode_index < MAX_NUM_EXTERNAL_MODES) {
-				if (cannot_be_selected) {
-					// If not selectable, it's not registered
+				if (cannot_be_selected || (_external_mode_registry.valid_mask & (1u << external_mode_index)) == 0) {
+					// The current registry may have removed this mode before vehicle_status updates.
 					strcpy(available_modes.mode_name, "(Mode not available)");
 
-				} else if (_external_mode_names) {
-					strncpy(available_modes.mode_name, _external_mode_names[external_mode_index].name, sizeof(available_modes.mode_name));
-					available_modes.mode_name[sizeof(available_modes.mode_name) - 1] = '\0';
+				} else {
+					memcpy(available_modes.mode_name,
+					       &_external_mode_registry.names[external_mode_index * external_mode_registry_s::NAME_LENGTH],
+					       external_mode_registry_s::NAME_LENGTH);
+					available_modes.mode_name[external_mode_registry_s::NAME_LENGTH - 1] = '\0';
 
-					if ((_not_user_selectable_mask & (1 << external_mode_index)) > 0) {
+					if ((_external_mode_registry.not_user_selectable_mask & (1u << external_mode_index)) > 0) {
 						available_modes.properties |= MAV_MODE_PROPERTY_NOT_USER_SELECTABLE;
 					}
 				}
@@ -147,6 +142,9 @@ private:
 		bool ret = false;
 		int mode_index = roundf(param2);
 		PX4_DEBUG("AVAILABLE_MODES request (%i)", mode_index);
+
+		// A one-shot request can arrive before this stream's first scheduled update.
+		update_data();
 
 		vehicle_status_s vehicle_status;
 
@@ -199,31 +197,16 @@ private:
 
 	void update_data() override
 	{
-		// Keep track of externally registered modes
-		register_ext_component_reply_s reply;
+		// Registration replies are transient. Keep the complete current registry
+		// so links created after registration recover all names and properties.
+		external_mode_registry_s registry{};
 		bool dynamic_update = false;
 
-		if (_register_ext_component_reply_sub.update(&reply)) {
-			if (reply.success && reply.mode_id != -1) {
-				if (!_external_mode_names) {
-					_external_mode_names = new ExternalModeName[MAX_NUM_EXTERNAL_MODES];
-				}
-
-				unsigned mode_index = reply.mode_id - vehicle_status_s::NAVIGATION_STATE_EXTERNAL1;
-
-				if (_external_mode_names && mode_index < MAX_NUM_EXTERNAL_MODES) {
-					memcpy(_external_mode_names[mode_index].name, reply.name, sizeof(ExternalModeName::name));
-
-					if (reply.not_user_selectable) {
-						_not_user_selectable_mask |= (1 << mode_index);
-
-					} else {
-						_not_user_selectable_mask &= ~(1 << mode_index);
-					}
-				}
-
-				dynamic_update = true;
-			}
+		if (_external_mode_registry_sub.update(&registry)) {
+			dynamic_update = registry.valid_mask != _external_mode_registry.valid_mask
+					 || registry.not_user_selectable_mask != _external_mode_registry.not_user_selectable_mask
+					 || memcmp(registry.names, _external_mode_registry.names, sizeof(registry.names)) != 0;
+			_external_mode_registry = registry;
 		}
 
 		vehicle_status_s vehicle_status;

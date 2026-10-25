@@ -90,6 +90,34 @@ Modes::Modes()
 		snprintf(hash_param_name, sizeof(hash_param_name), "COM_MODE%d_HASH", i);
 		_mode_hash_handles[i] = param_find(hash_param_name);
 	}
+
+	// Clear any retained registry from an earlier Commander lifetime.
+	publishRegistry();
+}
+
+void Modes::publishRegistry()
+{
+	external_mode_registry_s registry{};
+	static_assert(MAX_NUM == external_mode_registry_s::NUM_MODES, "Registry slot count mismatch");
+	static_assert(sizeof(Mode::name) == external_mode_registry_s::NAME_LENGTH, "Registry name length mismatch");
+	static_assert(sizeof(registry.names) == MAX_NUM * sizeof(Mode::name), "Registry storage mismatch");
+
+	for (unsigned i = 0; i < MAX_NUM; ++i) {
+		if (_modes[i].valid) {
+			registry.valid_mask |= 1u << i;
+
+			if (_modes[i].not_user_selectable) {
+				registry.not_user_selectable_mask |= 1u << i;
+			}
+
+			char *name = &registry.names[i * external_mode_registry_s::NAME_LENGTH];
+			memcpy(name, _modes[i].name, sizeof(Mode::name));
+			name[external_mode_registry_s::NAME_LENGTH - 1] = '\0';
+		}
+	}
+
+	registry.timestamp = hrt_absolute_time();
+	_registry_pub.publish(registry);
 }
 
 bool Modes::hasFreeExternalModes() const
@@ -182,6 +210,7 @@ uint8_t Modes::addExternalMode(const Modes::Mode &mode)
 
 		_modes[new_mode_idx] = mode;
 		_modes[new_mode_idx].valid = true;
+		publishRegistry();
 		return new_mode_idx + FIRST_EXTERNAL_NAV_STATE;
 	}
 
@@ -193,6 +222,7 @@ bool Modes::removeExternalMode(uint8_t nav_state, const char *name)
 {
 	if (valid(nav_state) && strncmp(name, _modes[nav_state - FIRST_EXTERNAL_NAV_STATE].name, sizeof(Mode::name)) == 0) {
 		_modes[nav_state - FIRST_EXTERNAL_NAV_STATE].valid = false;
+		publishRegistry();
 		return true;
 	}
 
@@ -342,6 +372,7 @@ void ModeManagement::checkNewRegistrations(UpdateRequest &update_request)
 					}
 
 					mode.request_offboard_setpoints = request.request_offboard_setpoints;
+					mode.not_user_selectable = request.not_user_selectable;
 
 					nav_mode_id = _modes.addExternalMode(mode);
 					reply.mode_id = nav_mode_id;
