@@ -1,11 +1,145 @@
 {
     "schema_version":  1,
-    "as_of":  "2026-10-23",
+    "as_of":  "2026-10-24",
     "px4_head":  "36a17722eff48e4317bdc0888fc541b935e51b7a",
     "px4_head_scope": "verification snapshot base; subsequent commits preserve the recorded dirty implementation content",
     "kind":  "curated component dependency graph; not exhaustive or an AST call graph",
     "freshness":  "sha256 fingerprints exact anchor bytes, including untracked files; revalidate changed nodes and adjacent edges, never use HEAD alone",
     "nodes":  [
+{"id":"slaaps_full_command_native_runtime","path":"/var/tmp/slaaps-native-runtime-6zy3maol/result.json","scope":"actual_signed_v2_quaternion_ingress_manual_EDF_feedback_and_isolated_entry_PASS_capture_only_no_acceleration_controller","sha256":"a980fc9804fb78d574e628115486dcda45f9fe7a9ef955ecbb81cbe5a4a3423e"},
+{"id":"slaaps_companion_entry_runtime","path":"/var/tmp/slaaps-native-runtime-sj5pldwz/supervisor/result.json","scope":"actual_owner_expected_entry_epoch_ACK_request_and_rejection_PASS_isolated_synthetic_authority_no_output","sha256":"321bff1d0f250c5c5bac45816801db5f56da015d84d9f1f2d6d2c5b9647c18c5"},
+{"id":"slaaps_full_command_wire_tests","path":"/var/tmp/slaaps-full-command-desabkj7/result.json","scope":"explicit_v2_quaternion_core_generated_C_Python_and_legacy_v1_compatibility_PASS_no_native_controller","sha256":"c06f5fdaf872aa97aa4e7dd5781c2ce0caac589b86506804d3551f308255edfc"},
+{"id":"slaaps_companion_reapply_board","path":"build/slaaps_firmware/companion-reapply-20261024/resource-comparison.json","scope":"reapply_lifetime_fix_board_resource_PASS_12_fresh_40_literal_parent_bound_no_boot_or_hardware","sha256":"45a0b3d252c54ab62408dede22d2e73c3eb09a18e563f03a3fc549fabd33bed2"},
+{"id":"slaaps_feedback_integrated_runtime","path":"/var/tmp/slaaps-native-runtime-xadpehnk/result.json","scope":"manual_EDF_capture_only_lifecycle_signed_feedback_expiry_replacement_reentry_PASS_no_acceleration_control_no_hardware","sha256":"5a65063a4c13893090bb7be4fdb834f8747cea46fe0b6a21341e710b7a30af7e"},
+{"id":"slaaps_routing_retry_board","path":"build/slaaps_firmware/routing-capture-retry-20261024/resource-comparison.json","scope":"bounded_generation_retry_LINK_52_fresh_ARM_resource_units_PASS_native_input_rejection_unresolved","sha256":"6514d483fc8d08b0b270df92025976f9506c0cada892fcc7f1c4b4bb8a237481"},
+{"id":"slaaps_acceleration_feedback_board","path":"build/slaaps_firmware/acceleration-feedback-20261024/resource-comparison.json","scope":"production_feedback_LINK_resource_package_RNG_PASS_before_native_only_diagnostic_extension_runtime_failure_unresolved","sha256":"11d27058369d2813a1b19c8380c7dc2ff0d0f4e97a75e7e087d9dbc6edf0baf9"},
+{"id":"slaaps_acceleration_feedback_native_link","path":"/var/tmp/slaaps-native-6vqnso5n/result.json","scope":"current_feedback_producer_consumer_and_fixtures_LINK_PASS_runtime_pending","sha256":"24ab76281204a2c5b748f159a1dca6cd15e7d0648d3eafe4ecc40cbc6770414c"},
+{"id":"slaaps_acceleration_feedback_api","path":"src/lib/slaaps/AccelerationFeedback.hpp","scope":"selected_CG_acceleration_feedback_no_flight_authority_native_and_board_verification_pending","sha256":"c33754158618f5c23ca9bea7bf310d7c3945de2dee3b2484c21713e8e50486d1"},
+{"id":"slaaps_acceleration_feedback","path":"src/lib/slaaps/AccelerationFeedback.cpp","scope":"selected_CG_acceleration_feedback_no_flight_authority_native_and_board_verification_pending","sha256":"a03e2abfd4d27b4110a3e12cd7092374d52adee5dad6393e14274d930abfa21d"},
+{"id":"slaaps_acceleration_feedback_tests","path":"Tools/slaaps/configuration/AccelerationFeedbackTest.cpp","scope":"selected_CG_acceleration_feedback_no_flight_authority_native_and_board_verification_pending","sha256":"5334627f36df4756ddfbf067785384ce53121967512edb210cd476cad35a6cfa"},
+{"id":"slaaps_acceleration_provenance","path":"src/modules/sensors/vehicle_acceleration/VehicleAcceleration.cpp","scope":"selected_CG_acceleration_feedback_no_flight_authority_native_and_board_verification_pending","sha256":"179023c82e4b07632eaa0604afa1308f4ed90ec909857a6b3dd1234f9c615fb8"},
+{"id":"slaaps_acceleration_provenance_api","path":"src/modules/sensors/vehicle_acceleration/VehicleAcceleration.hpp","scope":"selected_CG_acceleration_feedback_no_flight_authority_native_and_board_verification_pending","sha256":"b0532ce9aa9d44b08c2cfd660f14c07355b3accc7a751de841a0df1180b1be57"},
+{"id":"slaaps_acceleration_provenance_topic","path":"msg/VehicleAcceleration.msg","scope":"selected_CG_acceleration_feedback_no_flight_authority_native_and_board_verification_pending","sha256":"fa7030637156c128a0cce0d24299635b52e918622db2e2b6648e881005ac160c"},
+{"id":"slaaps_acceleration_feedback_host","path":"/var/tmp/slaaps-configuration-e698qyuo/result.json","scope":"Debug_Release_sanitizers_PASS_feedback_configuration_and_math_no_native_or_hardware_claim","sha256":"1f730105b94c9e5c5fc9b7dbf0d431256e1627e5395f33dba4ae7b29be2612e8"},
+{"scope":"current_coherent_capture_manual_bench_companion_and_mode_regressions_capture_only_no_acceleration_controller","path":"/var/tmp/slaaps-native-runtime-ozhqrixm/result.json","sha256":"38de1f08071eebf5e39ccb30f55584b3cb0efa4ad7cbe19305c5e73fc76dd45c","id":"slaaps_wrench_native"},
+{"scope":"preserved_failed_CLI_stack_fit_build_pass_not_usable_firmware_qualification","path":"build/slaaps_firmware/shared-wrench-allocation-20261024/resource-comparison.json","sha256":"e52a760c2ee6094691ad89237b76b56c69d80c14684d49ef9481a04529b1434c","id":"slaaps_wrench_failed_stack_board"},
+{"scope":"current_board_fit_71124_free_caller_workspace_CLI_fix_not_runtime_stack_qualification","path":"build/slaaps_firmware/shared-wrench-stack-20261024/resource-comparison.json","sha256":"6f403e48d84444957601a45193511f9757342dbff294341641fbefa45e7380df","id":"slaaps_wrench_stack_board"},
+{"scope":"3963_each_Debug_Release_ASanUBSan_458_parameters_not_acceleration_controller","path":"/var/tmp/slaaps-configuration-elt74aq9/result.json","sha256":"2a2beee3a1c19e7b085b550f1ce075a103f8b418ca2db295f628c554b53d12a2","id":"slaaps_wrench_host"},
+{"scope":"shared_profile_servo_limits_actual_EDF_history_nonlinear_slew_envelope_representable_target_residuals","path":"src/lib/slaaps/VehicleWrenchAllocation.cpp","sha256":"f0bc580dbd9a631f8a0cf15d479a3aaed442291768ff7676e0c28698a554a580","id":"slaaps_vehicle_wrench_allocation"},
+{"scope":"243_active_sets_six_residual_gates_float_bounds_failure_preservation_unqualified_runtime","path":"src/lib/slaaps/WrenchAllocator.cpp","sha256":"44117bfd48c3c5fa1e1384631ce5c77dd0f2515ca3807924e98499c2ce42097a","id":"slaaps_wrench_allocator"},
+{"scope":"bounded_coupled_physical_wrench_allocation_no_output_authority","path":"src/lib/slaaps/WrenchAllocator.hpp","sha256":"fb44223dd0c84ff87692c6ad518467cf3ad8d4629fcba9f6702ef2a1fd5191e1","id":"slaaps_wrench_allocator_api"},
+{"scope":"current_FMUv6X_image1864884_free101196_seven_fresh_41_bound_ARM_units_no_hardware_qualification","path":"build/slaaps_firmware/slaaps-forced-mode-20261024/resource-comparison.json","sha256":"8fe8ddc9e067c900e2e71118e29e26017d5d38e49a59ae64394855d4f0d216b1","id":"slaaps_forced_mode_board"},
+{"scope":"three_unsigned_LAND_rejections_fresh_post_ACK_Bench_session_preserved_existing_regressions_capture_only","path":"/var/tmp/slaaps-native-runtime-5ezkuzs_/result.json","sha256":"a479f1a87ee70a5426f869e5c08243b19db1c744c2844a925dd8ecd834584fb1","id":"slaaps_forced_mode_native"},
+{"scope":"readonly_airframe_identity_accessor","path":"src/modules/commander/HealthAndArmingChecks/checks/slaapsCheck.hpp","sha256":"4e56c0185812f9e0f86454b019757e2bb904c0d43e8bb9ea6abd2a27c152e4c7","id":"slaaps_forced_mode_check_identity"},
+{"scope":"read_existing_boot_latched_SLAAPS_identity","path":"src/modules/commander/HealthAndArmingChecks/HealthAndArmingChecks.hpp","sha256":"71340949ae50a6947fe56e6b0682ebc46e9def3b395dcedacb141dc692bfab67","id":"slaaps_forced_mode_health_identity"},
+{"scope":"armed_SLAAPS_force_obeys_canRun_preserves_termination_stock_and_disarmed_behavior","path":"src/modules/commander/UserModeIntention.cpp","sha256":"79ef975f72c4f1c87da4329c44e50462f021745ce3f622fbb8136b2c9163c4b2","id":"slaaps_forced_mode_intention"},
+{"scope":"dedicated_Navigator_exclusion_canonical_metadata_image1864876_free101204_no_hardware_qualification","path":"build/slaaps_firmware/slaaps-navigation-ownership-20261024/resource-comparison.json","sha256":"22e04ee48ab9de2714d645e2c640e93337f7e7346fd258933d2421e9c45653d6","id":"slaaps_navigation_ownership_board"},
+{"scope":"3350_checks_each_Debug_Release_sanitizers_331_parameters_original_entry_window_no_authority","path":"/var/tmp/slaaps-configuration-dod5pe0x/result.json","sha256":"cf07803b7d78af4591522f2ea7d37d76c32f9cc8dcb2a0e14ea8f63d582f4ac5","id":"slaaps_manual_wait_host"},
+{"scope":"actual_Commander_bounded_disarmed_wait_without_renewal_expiry_reentry_and_existing_regressions_capture_only","path":"/var/tmp/slaaps-native-runtime-7e8f_ssi/result.json","sha256":"655e5fcdcf85d0a8b7f469dc98be792ddf18b4a4ffc7df682e4e69103a2f32bc","id":"slaaps_manual_wait_native"},
+{"scope":"current_FMUv6X_image1950900_free15180_47_ARM_units_linked_RNG_no_runtime_stack_or_hardware_qualification","path":"build/slaaps_firmware/manual-operator-wait-20261024/resource-comparison.json","sha256":"3dfa8779246e97c8b6f00b377e13f86e22532c75a4b10c4299bbd437ce660a51","id":"slaaps_manual_wait_board"},
+
+{
+    "id": "external_mode_registry_runtime",
+    "path": "/var/tmp/slaaps-native-runtime-ajojy07i/result.json",
+    "scope": "full_native_regression_2034_supervisor_4987_control_2189_mixer_34_input_nine_lifecycles_restores_capture_only",
+    "sha256": "c46ddabd313bf68b88dcce388da6cc94d8ed5bd738a0ca9d61e652ac09f7e303"
+},
+{
+    "id": "external_mode_registry_board",
+    "path": "build/slaaps_firmware/durable-mode-registry-20261024/resource-comparison.json",
+    "scope": "frozen_FMUv6X_image1949636_headroom16444_47_current_ARM_units_plus2_parent_baselines_no_runtime_high_water_or_hardware",
+    "sha256": "1d5598fcbd16d4d4e40982094af90ec424d317e4e969e569f6608a4885aba36e"
+},
+{
+    "id": "external_mode_registry_message",
+    "path": "msg/ExternalModeRegistry.msg",
+    "scope": "Commander_owned_queue_one_external_slot_names_and_selectability_not_readiness_or_authority",
+    "sha256": "4f1cfa6ee4204de4010414992523f9839d2ebef9ac2a3412e3e7c95c2c6f740b"
+},
+{
+    "id": "commander_external_mode_registry_api",
+    "path": "src/modules/commander/ModeManagement.hpp",
+    "scope": "existing_mode_manager_registry_publication_and_mutation_tracking",
+    "sha256": "9488642ad7ac407549507e77e4d3de0e405242ea5a036297553e5e1e3c1fef3e"
+},
+{
+    "id": "commander_external_mode_registry",
+    "path": "src/modules/commander/ModeManagement.cpp",
+    "scope": "publishes_complete_current_external_registry_on_registration_removal_without_changing_admission",
+    "sha256": "0f71d1e1412857f11e5e0c92359ac6ada9c1cdf61ee8ab7328979467551c37c3"
+},
+{
+    "id": "mavlink_available_modes_registry",
+    "path": "src/modules/mavlink/streams/AVAILABLE_MODES.hpp",
+    "scope": "late_link_and_one_shot_recovery_from_current_Commander_registry_monitor_and_stale_name_clearing",
+    "sha256": "69931e1a396bf8457e65b2209e36e7a84b9fa8215689262c0224c1f23bdf6ea3"
+},
+{
+    "id": "external_mode_registry_native_evidence",
+    "path": "/var/tmp/slaaps-native-runtime-ajojy07i/mode-protocol-evidence.json",
+    "scope": "actual_MAVLink_late_link_names_custom_ids_SET_MODE_CURRENT_MODE_DO_SET_MODE_ACK_removal_restore_no_readiness_or_output_no_GUI",
+    "sha256": "0628ae92f088d6780233ab87184aa61d8e59b9c0e804862db088049dbc86a9fa"
+},
+{
+    "id": "slaaps_profile_provenance_host",
+    "path": "/var/tmp/slaaps-configuration-z4peb795/result.json",
+    "scope": "3327_each_Debug_Release_sanitizers_330_parameters_operator_declared_schema_record_assessment_no_authority",
+    "sha256": "3d3afc9746d2cd3e3300309548defbf418c27bd13e7f0862379ab6353757e27b"
+},
+{
+    "id": "slaaps_profile_provenance_board",
+    "path": "build/slaaps_firmware/companion-provenance-20261024/resource-comparison.json",
+    "scope": "frozen_40459_supervisor_FMUv6X_image1949348_headroom16732_46_ARM_units_CLI2048_static_paths_not_runtime_qualification",
+    "sha256": "ead14553614670ec13ac5d401baf41c4780c05b810f512fbbe6c80706da803a9"
+},
+{
+    "id": "slaaps_companion_protocol_owner",
+    "path": "src/modules/slaaps/CompanionProtocol.cpp",
+    "scope": "signed_control_capture_stop_only_disarm_isolated_exact_barrier_publication_native_scenario_pass_final_harness_acceptance_pending",
+    "sha256": "5f3681d1130cae2571454e7f23b42ebff215af3fb30899b1a03573a114f87774"
+},
+{
+    "id": "slaaps_companion_reserve_board",
+    "path": "build/slaaps_firmware/companion-reserve-emission-20261023/resource-comparison.json",
+    "scope": "current_reserve_expiry_and_actual_emission_rate_limit_FMUv6X_image1948180_headroom17900_linked_RNG_no_physical_qualification",
+    "sha256": "d0cf90e2bf0141ac0f681f72c125e1f90f5dfd3e887ced3f563ce64ca7e2af11"
+},
+{
+    "id": "slaaps_companion_reserve_sources",
+    "path": "build/slaaps_firmware/companion-reserve-emission-20261023/source-closure.json",
+    "scope": "52334_firmware_entries_exact_current_overlays_355_changed_paths_unused_Tools_and_retained_metadata_distinguished",
+    "sha256": "fd42f7bc7be50fb6833977781a1d9f149a88927af04a5935d8d7b500443931f2"
+},
+{
+    "id": "slaaps_companion_reserve_stack",
+    "path": "build/slaaps_firmware/companion-reserve-emission-20261023/companion-resource-review-final.json",
+    "scope": "ten_fresh_ARM_groups_43_TUs_MAIN2884_AUX2828_supervisor4404_RX2824_sender1296_Commander1212_no_runtime_high_water",
+    "sha256": "e2d79895afa108180915635532c2f761ac1d704696a2e00690d8530f5151e50a"
+},
+{
+    "id": "slaaps_companion_admission_clean_board",
+    "path": "build/slaaps_firmware/companion-admission-clean-20261023/resource-comparison.json",
+    "scope": "clean_FMUv6X_image1947700_headroom18380_linked_hardware_RNG_static_resources_no_runtime_or_physical_qualification",
+    "sha256": "c59eec10b7b2c3d9088bbf1858a705c2c56539f48288efa053ca3e048407defc"
+},
+{
+    "id": "slaaps_companion_admission_clean_sources",
+    "path": "build/slaaps_firmware/companion-admission-clean-20261023/source-closure.json",
+    "scope": "49708_firmware_entries_four_explicit_overlays_current_compiled_content_at_freeze_unused_host_tools_and_retained_metadata_distinguished",
+    "sha256": "39adcabd9b69e2d419326a3752353bd64d5aa0cf65653c33fae42b92529ccd68"
+},
+{
+    "id": "slaaps_companion_admission_clean_stack",
+    "path": "build/slaaps_firmware/companion-admission-clean-20261023/companion-resource-review-final.json",
+    "scope": "ten_fresh_ARM_groups_43_TUs_companion4404_of6500_RX2824_of5360_sender1296_of3246_no_runtime_high_water",
+    "sha256": "25ea68dd1cf4b49e5f9fe542c46bb37bcac81129e8c35685a389cb62c1ba9b67"
+},
+{
+    "id": "slaaps_rng_linkage_guard_regression",
+    "path": "build/slaaps_firmware/companion-admission-clean-20261023/rng-verifier-regression.json",
+    "scope": "actual_stale_software_provider_ELF_rejected_clean_hardware_driver_accepted_generated_config_hash_and_truncated_ELF_guards",
+    "sha256": "941937482dd6d1d3d1b477a8538eda05d4173ee589a51c412203c4a37c583bfa"
+},
 {
     "id": "slaaps_diagnostics_content_closure",
     "path": "build/slaaps_firmware/diagnostics-20261023/source-closure.json",
@@ -81,20 +215,20 @@
 {
     "id": "slaaps_companion_signing_serialization",
     "path": "src/modules/mavlink/mavlink_main.cpp",
-    "scope": "key_setup_and_reload_serialized_with_parser_and_TX_dirty_notifications_preserved",
-    "sha256": "81d2ac297c5d3a5e1cbe24d3a7e840fe01d56b68d8bd4e773cc729cdedf92e36"
+    "scope": "serialized_signing_priority_barrier_cache_original_expiry_pinned_publisher_eight_attempt_budget_native_scenario_pass_harness_pending",
+    "sha256": "b4d1e460bdbd5d2dbc943eec670b54debfa1a73029f9783bf144c4d2da63c82a"
 },
 {
     "id": "slaaps_companion_native_evidence",
-    "path": "/var/tmp/slaaps-native-runtime-phom4snz/result.json",
-    "scope": "actual_parser_and_supervisor_signature_replay_source_target_expiry_reload_capture_only",
-    "sha256": "115f28e3b39921962f420365e90be534edd91b6dc56f8e28b9106eb9816a42a0"
+    "path": "/var/tmp/slaaps-native-runtime-wpmehoao/result.json",
+    "scope": "accepted_only_profile_provenance_restore_no_authority_and_signed_Commander_session_cycles_ModeNotSelected_capture_only_before_external_mode_registry_increment",
+    "sha256": "370d765eed286a72db330549c54734e98b98e0894a2fc95120038ce534fcf00e"
 },
 {
     "id": "slaaps_companion_dialect",
     "path": "src/modules/mavlink/slaaps.xml",
     "scope": "production_private_dialect_native_board_verified_no_acceleration_admission",
-    "sha256": "3618389fb784caa8b541e63b06991ca2b4b346c3d94d6679fdd31d0ee7bcda0b"
+    "sha256": "43bbe9298102e7fb6b69900ffa3b2c5e976c98d47d16d6247a5fa73419ae144b"
 },
 {
     "id": "slaaps_companion_packet",
@@ -105,8 +239,8 @@
 {
     "id": "slaaps_control_schedule",
     "path": "src/lib/slaaps/ControlSchedule.hpp",
-    "scope": "optional_calibrated_IAS_owned_EDF_bilinear_PID_effectiveness_bounded_filter_no_wash_law_or_admission",
-    "sha256": "802c2cb0eccff29c3d65527b38e05e84a358b2b1878de7bc836dd0e55608fe57"
+    "scope": "calibrated_IAS_owned_EDF_schedule_encoded_reachable_rate_endpoints_host_and_native_capture_verified_no_admission",
+    "sha256": "3d370bdc6cb3efe14d37659f81dc49d76fb361d53dd9e4959d0acd02ced73d8f"
 },
 {
     "id": "slaaps_operating_condition",
@@ -297,8 +431,8 @@
 {
     "id": "slaaps_production_mixer_preparation",
     "path": "src/lib/mixer_module/SlaapsOutputPreparation.cpp",
-    "scope": "shared_manual_servo_and_armed_EDF_commissioning_exact_ACK_retained_ground_stop",
-    "sha256": "ae5161999fb1c288f0de572b595fdd2a9dd638feab1abee4f07671e55af4fe4e"
+    "scope": "shared_flight_bench_exact_ACK_and_session_bound_partial_disarm_off_retry_native_capture_verified",
+    "sha256": "845771e670217be003efa8d2ead5c7f7a5f2ec055b5abe2eb63ce9b7303c10a4"
 },
 {
     "id": "slaaps_native_pwm_metadata",
@@ -357,8 +491,8 @@
 {
     "id": "slaaps_output_routing_observation",
     "path": "src/lib/slaaps/OutputRoutingObservation.hpp",
-    "scope": "two_pass_generation_lifetime_capture_live_postcopy_freshness_no_permission",
-    "sha256": "9028e07afcf630dc0c16d1a2ef2bc6523ca6cbd5fb18a3c08f782092876c8ef9"
+    "scope": "three_attempt_live_generation_only_retry_pinned_whole_call_lifetimes_strict_fixed_time_no_permission",
+    "sha256": "2cf6efd158d1dbc2f45aae7898f9d0f3ffa8ebaff36d2d6dffd9177d3fc87f98"
 },
 {
     "id": "slaaps_preparation_coordinator",
@@ -387,8 +521,8 @@
 {
     "id": "slaaps_manual_bank_preparation",
     "path": "src/lib/slaaps/ManualBankPreparation.hpp",
-    "scope": "non_actuating_one_use_proposal_exact_routing_and_command_reply_lifetimes_no_wire_admission",
-    "sha256": "b2a8d087b2ab0dd9ca91073edf0cdef50d7698f528867c6877531091b1f848cf"
+    "scope": "non_actuating_configured_entry_window_bank_validation_exact_routing_and_reply_lifetimes_no_wire_admission",
+    "sha256": "cb9cf4e2542358e2c1d0be034c23ef6289c9ac8de40bc92d6c43573bbc66da04"
 },
 {
     "id": "slaaps_active_board_verification",
@@ -405,8 +539,8 @@
 {
     "id": "slaaps_manual_execution",
     "path": "src/lib/slaaps/ManualExecution.hpp",
-    "scope": "serialized_execution_gate_and_requested_schedule_no_flight_admission",
-    "sha256": "022a1b53a4eb9fef2ee186eba3e3098c213138aeaf1b11a7d1063f72beb1a77e"
+    "scope": "serialized_execution_companion_renewal_cadence_native_capture_verified_uint32_portability_overlay_board_pending",
+    "sha256": "3419810250884de541735bd8999f1936b5d93d40fdca43c6024e9c465ca18c44"
 },
 {
     "id": "slaaps_selected_manual_input",
@@ -423,8 +557,8 @@
 {
     "id": "stabilized_shared_observation",
     "path": "src/lib/research_stabilized_manual/SelectedStateObservation.hpp",
-    "scope": "single_estimator_metadata_and_separate_permission_observation_no_flight_admission",
-    "sha256": "3a36710e7944ebb03c157ba2567b701c01352ae68603e3edecf50e8240aa7ebd"
+    "scope": "single_estimator_manual_or_state_only_capture_with_required_publisher_mask_no_flight_admission",
+    "sha256": "6ae24ab318f53dec2dc5b91be5cc3a5c0608a53a710b24df7ba19f1df63b0410"
 },
 {
     "id": "slaaps_active_target_probe",
@@ -441,14 +575,14 @@
 {
     "id": "slaaps_manual_worker_transport",
     "path": "src/lib/slaaps/ManualWorkerTransport.hpp",
-    "scope": "selected_worker_live_ACKs_optional_condition_deadline_and_original_first_handled_bound",
-    "sha256": "f3bb25560065e99bcd180018b575ce22aa4c4fc3c51b7dba176d9adf009521af"
+    "scope": "selected_worker_original_expiry_and_retained_acceleration_diagnostics_signed_lifecycle_verified_diagnostic_acceptance_pending",
+    "sha256": "ff939e1a81ea7e44716cc43974cd18a2e8a6f04b2b90be1ab43d81b86ec3710c"
 },
 {
     "id": "slaaps_board_verifier",
     "path": "Tools/slaaps/verify_board.py",
-    "scope": "package_ELF_binary_version_linker_capacity_and_current_production_hashes_no_hardware",
-    "sha256": "205c4808e26ffd23aeee0e9dbc2f7f3bd5f63fe2952e1c17f7e717bedbcacd89"
+    "scope": "package_ELF_capacity_current_sources_actual_executable_RNG_functions_and_generated_kernel_config_no_entropy_quality_claim",
+    "sha256": "8eb52a69bb9740234a4c5e3a64806b6ecf9bc334d47dc6d4e89d60dab5883b19"
 },
 {
     "id": "slaaps_pwm_handling_test",
@@ -543,14 +677,14 @@
 {
     "id": "slaaps_manual_worker",
     "path": "src/lib/slaaps/ManualWorker.hpp",
-    "scope": "shared_EDF_exact_bank_ACKs_atomic_scheduled_PID_effectiveness_condition_monitor_and_original_expiry",
-    "sha256": "64b3c770fb43cd3fdab7444d810d18dd46c112e7313750fec4df7c3cd7ccc796"
+    "scope": "shared_EDF_scheduled_transfer_exact_ACK_history_calculated_vs_handled_diagnostics_signed_lifecycle_verified_diagnostic_acceptance_pending",
+    "sha256": "ac9868d8d1b99df6f92d80bc86d8825ae0c5ec8cb59adac7198a338ba7e3bf14"
 },
 {
     "id": "slaaps_manual_edf_input",
     "path": "src/lib/slaaps/ManualEdfInput.hpp",
-    "scope": "raw_source_duplicate_freshness_checks_before_calibrated_reversible_throttle_conversion",
-    "sha256": "abb30e5074ebd7661e51b08f68ae4d31fbb3d8b30ecd8911804fe1dbefbe550e"
+    "scope": "raw_source_freshness_calibrated_throttle_and_explicit_post_transition_sequence_continuity",
+    "sha256": "20d591ed9a4c9c01a2eea315830482b47ab79a5a41b22f4547fb5e4cc2ce3238"
 },
                   {
                       "id": "bench_es3059md_wide_r09",
@@ -693,8 +827,8 @@
 {
     "id": "slaaps_board_builder",
     "path": "Tools/slaaps/build_board_snapshot.py",
-    "scope": "sealed_board_build_explicit_new_source_refresh_and_embedded_version_gate",
-    "sha256": "95b75161c6eb763eaeec4ec8f7a4f57d2ca4e705b17a2ebbc9ba337223e96d81"
+    "scope": "sealed_board_build_exact_refresh_embedded_version_and_actual_generated_kernel_config_export",
+    "sha256": "e50fea67653e071033ef30ec57ddb51c86aad8a3ece3b6d0b951661938173995"
 },
 {
     "id": "slaaps_edf_api",
@@ -711,20 +845,20 @@
 {
     "id": "slaaps_acceleration_port",
     "path": "src/lib/slaaps/AccelerationControllerPort.hpp",
-    "scope": "unavailable_future_controller_boundary_existing_request_types",
-    "sha256": "2408e98c27ae7c59fac8f0bac76393cc30bb6b98a8b14b4561797c27b7d66c1d"
+    "scope": "scheduled_PID_coupled_wrench_exact_handled_commit_retained_fault_stage_result_and_modeled_masks",
+    "sha256": "e0d79daf92baef5f6bf1bef459ecdf1683f35caad63aef1f45869a535e55f419"
 },
 {
     "id": "slaaps_native_anchor_0",
     "path": "src/lib/slaaps/Px4ConfigurationSource.hpp",
     "scope": "native_supervisor_integration_no_active_outputs",
-    "sha256": "a6df7f9003d7e729e153cf2f65f868bd1819ec29936a84ac6d586ccc0b6ee24f"
+    "sha256": "27962d2f71f00668fd95dc5bf8b29cb8e8d0ff3b8e21510e4918842b71383f20"
 },
 {
     "id": "slaaps_native_anchor_1",
     "path": "src/modules/slaaps/CMakeLists.txt",
     "scope": "native_supervisor_integration_no_active_outputs",
-    "sha256": "11d2ed15eb0c94c8814cf390d26c4d60f10588983b9b1f96549ac44e1141f78c"
+    "sha256": "b7de9146279c273a183c0d37f562cdad2e3dd529c8ac26060630e56ffcbe3737"
 },
 {
     "id": "slaaps_native_anchor_2",
@@ -742,7 +876,7 @@
     "id": "slaaps_native_anchor_4",
     "path": "msg/SlaapsStatus.msg",
     "scope": "commissioning_manual_schedule_and_companion_receipt_status_no_flight_admission",
-    "sha256": "b2c68fada63efee541a926ec0f87e8491f6a4c949561c09b055a1e691ea164ab"
+    "sha256": "e8d443403dcdac5a990698050aeea63c1fc0fc9c28818ec1696523a6c15937e4"
 },
 {
     "id": "slaaps_native_anchor_5",
@@ -760,7 +894,7 @@
     "id": "slaaps_native_anchor_7",
     "path": "boards/px4/fmu-v6x/slaaps.px4board",
     "scope": "dedicated_fmu_v6x_controller_ownership_QGC_metadata_and_4096_hp_default_stack",
-    "sha256": "0b8c0c3e767172e719c7ccb0780e0b345d64ec96c7703acc72971639bee0bd9e"
+    "sha256": "3c8b9d65f15268dd70cd3ef39dd06cfca40724898af6fa2e9550ecb9dca483c3"
 },
 {
     "id": "slaaps_native_anchor_8",
@@ -771,14 +905,14 @@
 {
     "id": "slaaps_native_supervisor",
     "path": "src/modules/slaaps/Slaaps.cpp",
-    "scope": "session_bound_power_health_original_expiry_manual_EDF_permission_and_existing_companion_receipt_no_flight_admission",
-    "sha256": "d24661d4c4ac136865fe4fe87f94400fee51fe8adb684380061461b9c1f53713"
+    "scope": "signed_parser_handoff_capture_disarm_verified_local_authority_diagnostics_compiled_acceptance_pending_no_flight_admission",
+    "sha256": "08d9403f8db27e9812ddcb204330c17c8a80ed155936a327c0cfcbb043dab840"
 },
 {
     "id": "slaaps_parameter_capture",
     "path": "src/lib/slaaps/Px4ConfigurationSource.cpp",
     "scope": "shared_native_parameter_capture_and_disarmed_accepted_profile_restore",
-    "sha256": "ffe566a1d19df0d77067e428401ee16a28a1584e3b4f256108480743ea5f730e"
+    "sha256": "85b263eae0822dd7dfdb5bdc7c24690a1789d1ea4c7a7fe0db195c10819c55ee"
 },
 {
     "id": "slaaps_native_gate",
@@ -807,44 +941,44 @@
 {
     "id": "slaaps_native_test",
     "path": "Tools/slaaps/verify_native.py",
-    "scope": "actual_parser_signed_loopback_and_supervisor_mixer_lifecycles_synthetic_no_flight_acceptance",
-    "sha256": "dfb63bf04562b9b1319bb54a2feb032e47ebecf5c0caa1e6e91093eda63a9d17"
+    "scope": "signed_UDP_parser_active_handoff_captured_banks_disarm_and_operator_checks_no_GUI_or_physical_qualification",
+      "sha256": "8af009d65d034eeba9cc403c4e659e33d9ea524445238227457b0c21dd84f8e8"
 },
 {
     "id": "slaaps_configuration_record",
     "path": "docs/SLAAPS_CONFIGURATION_INTEGRATION.md",
     "scope": "configuration_routing_native_and_board_evidence_no_flight_acceptance",
-    "sha256": "8d9f7edf3a6ef19f6f2fba531f20a834e9914343e98071996dbcaf3eac105a22"
+    "sha256": "4acb107ef360278ac1d4707d5bdaf9c716082db3e4a984989d946ba33fcadd87"
 },
 {
     "id": "slaaps_configuration_api",
     "path": "src/lib/slaaps/VehicleConfiguration.hpp",
-    "scope": "shared_profile_power_source_health_band_schedule_and_companion_config_no_flight_qualification",
-    "sha256": "0ce5bb8c07afa986e398e1a5ce6873a80dac6135c94d9b103500c9a1e34520c0"
+    "scope": "shared_463_field_profile_with_acceleration_control_and_scheduled_wrench_validation_no_flight_authority",
+    "sha256": "b595af7715f0b9c20a1379523847a02b8b8655587e2e2265edd2be8ca7b995dc"
 },
 {
     "id": "slaaps_configuration_core",
     "path": "src/lib/slaaps/VehicleConfiguration.cpp",
-    "scope": "manual_servo_EDF_scopes_and_explicit_schedule_corner_validation_no_invented_calibration",
-    "sha256": "9b360c00df49674df0c23a0a1b962110c44d2143b91209bed9102d3d27f7b466"
+    "scope": "operator_provenance_reference_validation_and_immutable_identity_preserving_existing_mode_reserve_guards_no_qualification_grant",
+    "sha256": "1dfa74df6db16c7ba292120f5d7fd983dd23179231675598cef34d374ac4dc00"
 },
 {
     "id": "slaaps_parameter_schema",
     "path": "src/lib/slaaps/VehicleParameters.def",
-    "scope": "canonical_299_vehicle_fields_including_explicit_selected_propulsion_power",
-    "sha256": "b21205e10dec7a766b87afac4e813788bfb4290e630bc8f14d17ac7f013b47f7"
+    "scope": "canonical_320_profile_fields_including_schema_record_assessment_and_explicit_companion_assumptions",
+    "sha256": "2b3002497a241bd56f9520734ffd8319c99ba1f0caecff0bd4ed5ce95b023cd7"
 },
 {
     "id": "slaaps_parameter_metadata",
     "path": "src/modules/slaaps/module.yaml",
-    "scope": "generated_308_native_PX4_parameters_power_schedule_companion_commissioning",
-    "sha256": "1e7e6065f56d27aaaf29327e53e8c21b84b5d804cf931d871c98f08073912b0c"
+    "scope": "generated_330_native_PX4_parameters_operator_declared_assessment_enum_no_external_authenticity_or_authority",
+    "sha256": "31925dcb62042bb7d2a74508d314062686353ca87b18090752c7b8c14fca936a"
 },
 {
     "id": "slaaps_parameter_generator",
     "path": "Tools/slaaps/generate_parameters.py",
     "scope": "canonical_schema_to_px4_qgc_metadata",
-    "sha256": "f9632376afc16ee91013d545cd7b0adbe2e4230de9c63823be0c905a701044b5"
+    "sha256": "2956d29e5ba9e58dead027b9631c7f2aedd8d39eae1afa21cab5b96ff1fa4056"
 },
 {
     "id": "slaaps_routing_api",
@@ -862,25 +996,25 @@
     "id": "slaaps_configuration_build",
     "path": "src/lib/slaaps/CMakeLists.txt",
     "scope": "excluded_by_default_px4_library",
-    "sha256": "dd7acb01d1d4ba801fb6cdfdfe58d4d303c29c077c5360db6ab5c9a31a273977"
+    "sha256": "11353e9c638a8107496f703a89692277f9c5c68744600b2284bfe940608a50bb"
 },
 {
     "id": "slaaps_configuration_test_build",
     "path": "Tools/slaaps/configuration/CMakeLists.txt",
     "scope": "actual_controller_and_generated_header_host_test_build",
-    "sha256": "b3efed194d9d05aea43eae035bcc6fb68b47f40f661970bb818f6441e27f7923"
+    "sha256": "4392b2248c55deb7eaa359230491215bde55410374bcfde3a9a4ec3c4ea3713b"
 },
 {
     "id": "slaaps_configuration_tests",
     "path": "Tools/slaaps/configuration/VehicleConfigurationTest.cpp",
-    "scope": "host_scheduled_control_native_sensor_adapter_disarmed_readiness_scheduled_worker_mixer_capture_no_hardware",
-    "sha256": "4ab5a38a93ce61dfeec585ad66015bb9730f74aaf7f6ff8252e7249cd9b93502"
+    "scope": "host_provenance_bounds_identity_and_native_apply_accepted_only_claim_revocation_Qualified_no_authority_capture_only",
+      "sha256": "2240c013523279a1cb2c59c99faba336164a0639efac88ebcbf1200021635ddc"
 },
 {
     "id": "slaaps_configuration_verifier",
     "path": "Tools/slaaps/verify_configuration.py",
-    "scope": "debug_release_sanitizers_and_actual_metadata_pipeline",
-    "sha256": "95527c245932c5205eab1012acd558317fbda2cf556385a95f2e8025c1e4428f"
+    "scope": "debug_release_sanitizers_and_actual_330_parameter_metadata_with_assessment_enum_schema_bounds",
+    "sha256": "3ee87a2738fd1e2877486334244b8f347beef09e90134df433d8ba1127bbe413"
 },
 {
     "id": "slaaps_airframe_goal",
@@ -2061,8 +2195,8 @@
                   {
                       "id":  "stabilized_manual_core",
                       "path":  "src/lib/research_stabilized_manual/StabilizedManualControl.cpp",
-                      "scope":  "host_verified_atomic_scheduled_gains_allocator_hold_slew_history_and_fault_latch",
-                      "sha256":  "f0eb02297a0e01d90a86f014bfe55ddfa8699ab792802eb88960719807145125"
+                      "scope":  "host_verified_scheduled_gains_hold_slew_and_explicit_handled_command_rate_history_entry",
+                      "sha256":  "5c9b0b540b08bb6b6360051126b546ef7cad0634607ee48653273f2a61243144"
                   },
                   {
                       "id":  "stabilized_manual_allocator_api",
@@ -2224,7 +2358,7 @@
                       "id":  "project_context",
                       "path":  "docs/PROJECT_CONTEXT.md",
                       "scope":  "compact_current_handoff",
-                      "sha256":  "0efaa7e2380ff3cacd6c7b1e4605e1499e24c06a855a81a13a82a0a2e6b819ac"
+                      "sha256":  "c2df0bd5a773032a48527011f04427c4a227ae644a2691a86020588644eb57c2"
                   },
                   {
                       "id":  "phase_gate_status",
@@ -2283,8 +2417,8 @@
                   {
                       "id":  "bench_msg_build",
                       "path":  "msg/CMakeLists.txt",
-                      "scope":  "bench_topic_generation",
-                      "sha256":  "b287bc17769541ef975307eac32d89d1e41cb247f62bf136318b18e733fe7ce4"
+                      "scope":  "PX4_topic_generation_including_Commander_external_mode_registry_and_SLAAPS_topics",
+                      "sha256":  "a89d9a8a6887d70a32ee6f0388f9d5d97defd532aae4638ff4c30e313738d907"
                   },
                   {
                       "id":  "bench_output_provider",
@@ -2422,31 +2556,31 @@
                       "id":  "adapter",
                       "path":  "src/lib/research_acceleration/WireAdapter.cpp",
                       "scope":  "portable",
-                      "sha256":  "04c159ae8b593cd10a98b35205b6c3207f1fb79bb048793a9d0b0e28863205c9"
+                      "sha256":  "248434c279ce060a21164fed326f860cc50f41c144dea8977a29131be7294103"
                   },
                   {
                       "id":  "guard",
                       "path":  "src/lib/research_acceleration/RequestGuard.cpp",
                       "scope":  "portable",
-                      "sha256":  "82bf499cd09a17527c7cfdcfde59d93873470d626d9a5fe2782828536eaf432a"
+                      "sha256":  "b8b831e8add2a04a53807c8904c2ec13b0d504e2f0d5c9f3596dbabd398415f3"
                   },
                   {
                       "id":  "clock",
                       "path":  "src/lib/research_acceleration/TrustedTimeMap.cpp",
                       "scope":  "portable",
-                      "sha256":  "92e8490e76ffde10ea0189f98302594b28510ec725ec8df3c607120fce5709a9"
+                      "sha256":  "67c70a7fb73d92419a62eeb5e551a94ebce7bbad3e478110a17b43e040ea4658"
                   },
                   {
                       "id":  "frames",
                       "path":  "src/lib/research_acceleration/FrameMath.cpp",
                       "scope":  "portable",
-                      "sha256":  "3825d39953710cf3bfc34428fb9f223d5fc30306f93ad684433e8e5ebe70f224"
+                      "sha256":  "4f4043205c8a3b45af938512eb69f988cc7395a16382715c4d0a8b009fadc560"
                   },
                   {
                       "id":  "status",
                       "path":  "src/lib/research_acceleration/WireStatus.cpp",
                       "scope":  "host_loopback",
-                      "sha256":  "a8511792a79dd705102f1e29e02fe667b7949ef84398d1d8cf47047de195651b"
+                      "sha256":  "6f937ae04902d36c63ea3540f62c20be0d07e230b1ddf13e39da4bc80b3ded21"
                   },
                   {
                       "id":  "diagnostic_owner",
@@ -2908,13 +3042,13 @@
                       "id":  "diagnostic_adapter_api",
                       "path":  "src/lib/research_acceleration/WireAdapter.hpp",
                       "scope":  "portable_diagnostic_api",
-                      "sha256":  "a45b26842604a3f77e8c78dfe049a441ee55c199872472977d354f7fac276541"
+                      "sha256":  "a1be6bfea5e253dbd02b60ff0d1976e21652979289aa5245cb648093733390f0"
                   },
                   {
                       "id":  "trusted_map_api",
                       "path":  "src/lib/research_acceleration/TrustedTimeMap.hpp",
                       "scope":  "portable",
-                      "sha256":  "e2bd822f38f3c7df7ea038c040d811569293cf0ae06e9a6998852daf5de11202"
+                      "sha256":  "bfbefc40f14a11d85f08e02db45b46791228c64e7928ab8c78a355ee05e37ef7"
                   },
                   {
                       "id":  "geometry_intake_checker",
@@ -4953,9 +5087,152 @@
                       "path":  "build/stabilized_output_runtime/20261019/check_arm.py",
                       "scope":  "read_only_working_observer_NuttX11_build_context_one_object_full_header_snapshot",
                       "sha256":  "443b570a8abb8458eefe854d1b6de1e4bb0ff91520441ebda9dbcad04d93f26b"
-                  }
+                  },
+        {"id": "slaaps_acceleration_controller", "path": "src/lib/slaaps/AccelerationControllerPort.cpp", "scope": "scheduled_current_and_future_EDF_feasibility_retained_allocation_diagnostics_signed_lifecycle_verified_no_cold_start_authority", "sha256": "39ad35d14187977ccbb58b7d75492f5c226eb703b2dd92492c25271a0e2edd0d"},
+        {"id": "slaaps_acceleration_diagnostics", "path": "msg/SlaapsAccelerationStatus.msg", "scope": "local_historical_request_calculated_and_exact_all_bank_handled_model_diagnostics_metadata_verified_runtime_acceptance_pending", "sha256": "7f9e7e66e4e85e33d441a4334aa81276ed4b5b68e1d4950c301e9cd28404c232"},
+        {"id": "slaaps_acceleration_controller_test", "path": "Tools/slaaps/configuration/AccelerationControllerTest.cpp", "scope": "synthetic_numerical_control_schedule_EDF_encoded_endpoints_and_ack_commit_regressions", "sha256": "f447d5f2d7c97dd33b1b5d34a4f25165a61d700cdb144820b9e6fd16a0d1bf69"},
+        {"id": "slaaps_flight_transfer_test", "path": "Tools/slaaps/configuration/FlightTransferTest.cpp", "scope": "shared_worker_manual_acceleration_bidirectional_transfer_exact_history_and_partial_ACK_regressions", "sha256": "820cc9e00495a43b94d27fbe9a5d8a876a6c7236b80760262efa66b71b848303"}
               ],
     "edges":  [
+{"from":"slaaps_companion_entry_runtime","to":"slaaps_companion_protocol_owner","relation":"verifies_frozen_d3766bf2_expected_entry_before_v2_decoder_and_renewal_changes"},
+{"from":"slaaps_companion_reapply_board","to":"slaaps_companion_protocol_owner","relation":"verifies_frozen_3d5aca3b_before_entry_transition_changes"},
+{"from":"slaaps_feedback_integrated_runtime","to":"slaaps_companion_protocol_owner","relation":"verifies_reapply_grant_feedback_expiry_publisher_replacement_and_deliberate_reentry_capture_only"},
+{"from":"slaaps_feedback_integrated_runtime","to":"slaaps_acceleration_feedback","relation":"exercises_selected_feedback_through_production_owner_no_acceleration_controller"},
+{"from":"slaaps_companion_protocol_owner","to":"slaaps_acceleration_feedback","relation":"requires_Ready_when_enabled_caps_original_expiry_revokes_session_on_loss"},
+{"from":"slaaps_acceleration_feedback","to":"slaaps_configuration_api","relation":"uses_shared_feedback_policy_and_native_CG_to_IMU_offset"},
+{"from":"stabilized_shared_observation","to":"slaaps_acceleration_provenance_topic","relation":"optional_capture_independently_checks_raw_and_bias_publisher_lifetimes"},
+{"from":"slaaps_acceleration_provenance","to":"slaaps_acceleration_provenance_topic","relation":"publishes_actual_applied_sources_and_original_sample_timestamps"},
+{"from":"slaaps_acceleration_feedback_host","to":"slaaps_acceleration_feedback_tests","relation":"frozen_Debug_Release_sanitizer_execution_no_hardware_claim"},
+{"from":"slaaps_wrench_native","to":"slaaps_native_supervisor","relation":"verifies_current_capture_and_existing_operational_paths_no_flight_admission"},
+{"from":"slaaps_wrench_stack_board","to":"slaaps_parameter_capture","relation":"verifies_caller_workspace_static_stack_fix_current_board_sources"},
+{"from":"slaaps_wrench_host","to":"slaaps_vehicle_wrench_allocation","relation":"verifies_synthetic_physical_residuals_envelope_and_rounding_no_flight_authority"},
+{"from":"slaaps_control_schedule","to":"slaaps_configuration_core","relation":"interpolates_physical_affine_models_at_same_filtered_gain_coordinates"},
+{"from":"slaaps_vehicle_wrench_allocation","to":"slaaps_wrench_allocator","relation":"constrains_coupled_solution_with_shared_profile_and_EDF_command_history"},
+{"from":"slaaps_forced_mode_native","to":"slaaps_forced_mode_intention","relation":"verifies_armed_command_rejection_not_automatic_recovery"},
+{"from":"slaaps_manual_wait_host","to":"slaaps_configuration_tests","relation":"verifies_configured_window_and_delayed_proposal_bounds"},
+{"from":"slaaps_manual_wait_native","to":"slaaps_native_supervisor","relation":"verifies_wait_expiry_and_reentry_with_actual_Commander_capture_only"},
+{"from":"slaaps_manual_wait_board","to":"slaaps_native_supervisor","relation":"binds_current_board_source_resource_and_linked_rng_evidence"},
+
+{
+    "from": "slaaps_configuration_record",
+    "to": "external_mode_registry_native_evidence",
+    "relation": "records_late_link_wire_names_selection_monitor_removal_and_restore_without_permission"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "external_mode_registry_runtime",
+    "relation": "records_terminal_full_native_regression_and_nine_lifecycles_restores"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "external_mode_registry_board",
+    "relation": "records_sealed_target_capacity_current_source_and_static_registry_stack_heap_cost"
+},
+{
+    "from": "commander_external_mode_registry",
+    "to": "commander_external_mode_registry_api",
+    "relation": "implements_current_registry_publication_in_existing_mode_manager"
+},
+{
+    "from": "commander_external_mode_registry",
+    "to": "external_mode_registry_message",
+    "relation": "publishes_complete_queue_one_snapshot_on_registration_and_removal"
+},
+{
+    "from": "bench_msg_build",
+    "to": "external_mode_registry_message",
+    "relation": "generates_registry_topic_for_existing_Commander_and_MAVLink_consumers"
+},
+{
+    "from": "mavlink_available_modes_registry",
+    "to": "external_mode_registry_message",
+    "relation": "consumes_current_names_before_scheduled_or_one_shot_mode_list_response"
+},
+{
+    "from": "slaaps_native_test",
+    "to": "external_mode_registry_native_evidence",
+    "relation": "verifies_actual_MAVLink_requests_after_all_registrations_without_GUI_or_output_authority"
+},
+{
+    "from": "external_mode_registry_board",
+    "to": "mavlink_available_modes_registry",
+    "relation": "binds_exact_compiled_five_file_delta_and_measured_stream_stack_heap_cost"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_profile_provenance_host",
+    "relation": "records_3327_checks_per_host_build_and_330_native_parameter_definitions"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_profile_provenance_board",
+    "relation": "records_frozen_40459_profile_provenance_capacity_and_static_CLI_stack_checkpoint"
+},
+{
+    "from": "slaaps_profile_provenance_host",
+    "to": "slaaps_configuration_core",
+    "relation": "verifies_operator_declared_record_bounds_identity_and_no_authority_promotion"
+},
+{
+    "from": "slaaps_profile_provenance_board",
+    "to": "slaaps_native_supervisor",
+    "relation": "binds_40459_accepted_only_CLI_and_checked_heap_snapshot_before_external_mode_registry_increment"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_companion_reserve_board",
+    "relation": "records_current_reserve_expiry_and_actual_emission_rate_limiter_board_checkpoint"
+},
+{
+    "from": "slaaps_companion_reserve_board",
+    "to": "slaaps_companion_reserve_sources",
+    "relation": "binds_exact_current_production_and_dirty_NuttX_content_without_claiming_commit_identity"
+},
+{
+    "from": "slaaps_companion_reserve_board",
+    "to": "slaaps_companion_reserve_stack",
+    "relation": "uses_fresh_current_ARM_frames_call_edges_heap_sizes_and_linked_topic_metadata"
+},
+{
+    "from": "slaaps_companion_reserve_board",
+    "to": "slaaps_board_verifier",
+    "relation": "verifies_actual_package_ELF_current_sources_and_linked_RNG_with_builder_bound_kernel_config"
+},
+{
+    "from": "slaaps_companion_reserve_board",
+    "to": "slaaps_companion_admission_clean_board",
+    "relation": "preserves_correct_kernel_RNG_parent_and_measures_flash_plus480_RAM_and_identified_stack_unchanged"
+},
+{
+    "from": "slaaps_configuration_record",
+    "to": "slaaps_companion_admission_clean_board",
+    "relation": "records_clean_source_only_rebuild_actual_RNG_linkage_and_bounded_resources_while_native_runtime_remains_open"
+},
+{
+    "from": "slaaps_companion_admission_clean_board",
+    "to": "slaaps_companion_admission_clean_sources",
+    "relation": "binds_frozen_firmware_content_to_explicit_dirty_NuttX_and_owner_portability_overlays"
+},
+{
+    "from": "slaaps_companion_admission_clean_board",
+    "to": "slaaps_companion_admission_clean_stack",
+    "relation": "uses_fresh_current_ARM_frames_emitted_call_edges_and_linked_topic_metadata"
+},
+{
+    "from": "slaaps_companion_admission_clean_board",
+    "to": "slaaps_board_verifier",
+    "relation": "verifies_actual_package_ELF_and_linked_hardware_RNG_with_receipt_bound_generated_config"
+},
+{
+    "from": "slaaps_companion_admission_clean_board",
+    "to": "slaaps_rng_linkage_guard_regression",
+    "relation": "preserves_stale_archive_failure_and_proves_automatic_old_artifact_rejection"
+},
+{
+    "from": "slaaps_rng_linkage_guard_regression",
+    "to": "slaaps_board_builder",
+    "relation": "new_builds_export_actual_kernel_config_while_legacy_receipts_use_explicit_hash_bound_postlink_capture"
+},
 {
     "from": "slaaps_configuration_record",
     "to": "slaaps_diagnostics_content_closure",
@@ -11586,6 +11863,6 @@
                       "scope":  "native_memory_sink_only_no_production_IO"
                   }
               ],
-    "gaps":  [{"from": "slaaps_native_supervisor", "to": "slaaps_production_mixer_preparation", "status": "partially_implemented", "next": "Supervisor preparation, activation, execution and cancellation are connected. Scheduled manual software is verified by current portable, native and board receipts, including live sensor conditions, zero-EDF prearm rank checks and scheduled worker-to-mixer capture. Manual flight permission stays denied: measured flow/wash/voltage envelopes, ground-spool/takeoff behavior, recovery, runtime stack/timing and physical handling remain unqualified. Companion ingress is host-only WireAdapter; AccelerationControllerPort is an unused stub and research_flight_controller is a planned target, not an actual module."}, {"from": "stabilized_manual_goal", "to": "x_canard_allocator", "status": "partially_implemented", "next": "Fresh checkout-built default passes all 31 declared cases freshly over 68813 cycles and actual console controls; source-build/run workflow complete for finite synthetic scope. SM5 still needs accepted CAD mass/CG/full inertia, measured canard geometry/sign/effectiveness and loaded servo/EDF inputs, plus reviewed limits and loss policy. No vehicle-supported allocation or general publisher identity claim."}, {"from": "stabilized_manual_goal", "to": "research_gazebo_plant", "status": "partially_implemented", "next": "Declared restrained rotational fixture with PX4 sensors/estimates passes 31 fresh cases on exact checkout-built artifacts. Prescribed 20m/s flow and fixed 10N EDF do not establish wash, vehicle trim, airflow/gain envelope or static-launch authority. Accepted real CAD and vehicle measurements remain missing."}, {"from": "adapter", "to": "research_flight_controller", "status": "planned", "next": "plant-supported control design and active mode integration"}, {"from": "research_flight_controller", "to": "x_canard_allocator", "status": "planned", "next": "H6 adds a default-off PX4-selected manual mapping option without positive acceleration input or output; still need qualified validated-acceleration-input/status integration, plant-validated coefficients, operational maps and timing, priority/thresholds, conditioning requirements, allocator ownership, signs, normalization and EDF authority"}, {"from": "x_canard_allocator", "to": "research_gazebo_plant", "status": "planned", "next": "Derivative package exists with six mesh URIs resolved; original CAD component mass/CG/inertia, valid physics and force/sensor validation still required"}, {"from": "pi_translator", "to": "native_owner", "status": "planned", "next": "hardware-representative link, timing, identity and clock qualification"}, {"from": "c1e_owner", "to": "research_flight_controller", "status": "planned", "next": "P2J binds two actual EKF/IMU/publisher paths and observes one stock timeout handoff with exact selected payload and reset barriers. Duplicated data from one recorded sensor cannot qualify deployment diversity or failover. Complete mutation/deployment-sensor evidence and an admissible health policy remain open with authority false. Qualify those plus provider and legacy sample-clock handling, operator/transport authority and a distinct positive protocol. Physical control remains separately gated."}, {"from": "baseline_checkpoint_checker", "to": "second_operator_reproduction", "status": "deferred_by_user", "next": "another operator reproduces the serialized baseline before full Phase 1 closure"}, {"from": "positive_admission_design", "to": "closed_provenance_collector", "status": "partially_implemented", "next": "P2A/P2B observations, P2C bounded merge, P2D typed native lifetime, P2E commit/output/reset/recorded-sensor provenance, P2F direct publisher/status-change provenance, P2G selector-enabled acceleration provenance, P2H output-disposition provenance, P2I source-derived valid selected-attitude provenance and P2J actual two-EKF timeout-handoff observation are accepted. Need complete mutation/deployment-sensor coverage, sensor-diverse qualified failover, an admissible health predicate, immutable budgets and qualified readiness; provider/operator/transport gates remain separate."}],
+    "gaps":  [{"from": "slaaps_native_supervisor", "to": "slaaps_production_mixer_preparation", "status": "partially_implemented", "next": "Supervisor preparation, activation, execution and cancellation are connected. Scheduled manual software is verified by current portable, native and board receipts, including live sensor conditions, zero-EDF prearm rank checks and scheduled worker-to-mixer capture. Manual flight permission stays denied: measured flow/wash/voltage envelopes, ground-spool/takeoff behavior, recovery, runtime stack/timing and physical handling remain unqualified. Production companion ingress now connects signed UDP/parser, bounded clock mapping, exact barrier acknowledgement and active numerical control through both captured driver banks. Native signed Manual-to-Acceleration-to-Manual and disarm lifecycles pass with synthetic authority. New authority diagnostics compile and the existing signed lifecycle passes; diagnostic-specific acceptance and current board resources remain pending. Cold acceleration entry, ordinary flight admission and physical qualification remain incomplete."}, {"from": "stabilized_manual_goal", "to": "x_canard_allocator", "status": "partially_implemented", "next": "Fresh checkout-built default passes all 31 declared cases freshly over 68813 cycles and actual console controls; source-build/run workflow complete for finite synthetic scope. SM5 still needs accepted CAD mass/CG/full inertia, measured canard geometry/sign/effectiveness and loaded servo/EDF inputs, plus reviewed limits and loss policy. No vehicle-supported allocation or general publisher identity claim."}, {"from": "stabilized_manual_goal", "to": "research_gazebo_plant", "status": "partially_implemented", "next": "Declared restrained rotational fixture with PX4 sensors/estimates passes 31 fresh cases on exact checkout-built artifacts. Prescribed 20m/s flow and fixed 10N EDF do not establish wash, vehicle trim, airflow/gain envelope or static-launch authority. Accepted real CAD and vehicle measurements remain missing."}, {"from": "adapter", "to": "research_flight_controller", "status": "planned", "next": "plant-supported control design and active mode integration"}, {"from": "research_flight_controller", "to": "x_canard_allocator", "status": "planned", "next": "H6 adds a default-off PX4-selected manual mapping option without positive acceleration input or output; still need qualified validated-acceleration-input/status integration, plant-validated coefficients, operational maps and timing, priority/thresholds, conditioning requirements, allocator ownership, signs, normalization and EDF authority"}, {"from": "x_canard_allocator", "to": "research_gazebo_plant", "status": "planned", "next": "Derivative package exists with six mesh URIs resolved; original CAD component mass/CG/inertia, valid physics and force/sensor validation still required"}, {"from": "pi_translator", "to": "native_owner", "status": "planned", "next": "hardware-representative link, timing, identity and clock qualification"}, {"from": "c1e_owner", "to": "research_flight_controller", "status": "planned", "next": "P2J binds two actual EKF/IMU/publisher paths and observes one stock timeout handoff with exact selected payload and reset barriers. Duplicated data from one recorded sensor cannot qualify deployment diversity or failover. Complete mutation/deployment-sensor evidence and an admissible health policy remain open with authority false. Qualify those plus provider and legacy sample-clock handling, operator/transport authority and a distinct positive protocol. Physical control remains separately gated."}, {"from": "baseline_checkpoint_checker", "to": "second_operator_reproduction", "status": "deferred_by_user", "next": "another operator reproduces the serialized baseline before full Phase 1 closure"}, {"from": "positive_admission_design", "to": "closed_provenance_collector", "status": "partially_implemented", "next": "P2A/P2B observations, P2C bounded merge, P2D typed native lifetime, P2E commit/output/reset/recorded-sensor provenance, P2F direct publisher/status-change provenance, P2G selector-enabled acceleration provenance, P2H output-disposition provenance, P2I source-derived valid selected-attitude provenance and P2J actual two-EKF timeout-handoff observation are accepted. Need complete mutation/deployment-sensor coverage, sensor-diverse qualified failover, an admissible health predicate, immutable budgets and qualified readiness; provider/operator/transport gates remain separate."}],
     "notes":  ["2026-10-19 uncommitted G9 scheduled-output increment after 472a7d6786: reusable driver-handled ack completion check and confirmed-disarm revoke barrier; private POSIX producer/consumer work queues, uORB, actual mixer and memory sink. Eight scenarios twice PASS,626 assertions329 acks; every case verifies blocked rejected-disarm handoff and successor rate/hold. Host Debug Release ASan/UBSan126064 each, output2788; existing observer9007 on same binary. Native evidence research-stabilized-output-native-20261019 manifest68ad5e5afe5d76837579b676b55e10afaa249c975ebcd0c23140227e49db1984;275 files112 ARM dependencies independently rehashed0 mismatch. New unlinked ARM wrapper570text0data0bss; no new firmware link, production IO, electrical feedback or hardware operation. Consumer-own stall expires only on resumption; physical hold-time bound remains open. Next production supervisor/sink, selected health/identity, exclusive ownership and linked/runtime resource checks.", "2026-10-19 source commit checkpoint prepared on slaaps-sitl: October 19 bench diagnostics and rollback tooling, observer, portable output contract, tests and handoff. px4_head identifies the parent checkpoint bde4aea321; use git HEAD for the new commit identity. All 11 changed C/C++ files pass repository make format without changes; 16 bootloader protocol fixtures pass. Local build/WSL evidence and the unrelated empty timestamp file are excluded. No push, flash or hardware action.", "2026-10-19 G9 portable stabilized output boundary: explicit non-message session grants, calibrated asymmetric/reversed four-servo mapping, one outstanding command with matching software acceptance ack, independent consumer expiry, stale/replay/future/clock faults and latched permission inhibition. Debug Release ASan/UBSan each pass 126013 checks (2737 new output); host lx60q8nq manifest f2cdfaa6aaec3f2646791e19e3889bbc43038d61d72305dcad9913b635a19155. ARM GCC13.2.1/NuttX11 unlinked object 2068 text, zero static data/BSS, max individual compiler stack frame88 not runtime high-water. Rehashed234 host files111 ARM dependencies3 prior observer artifacts zero mismatch. No new firmware link, PX4 driver/transport integration, physical operation or commissioning acceptance. Next runtime supervisor, exclusive ownership, driver application/revoke acknowledgments, production health and scheduled fault verification.", "2026-10-19 authorized stabilized hardware development: output-disabled observer built on working e8ea98b404/NuttX11, default off, explicit 86-token profile and diagnostic publication only. Zero simulated thrust permitted; C math portability fixed without changing allocation algorithm. Debug/Release/ASan-UBSan each pass123083+193 checks; final native module9015 checks no actuator publications, receipt c7eaf8171b937254c1047df9a6719d3ed6177b27e7c98b1bea35754d8cc51a66,156 artifacts independently rehashed. ARM .px4 4b3e706ab4130461e1085134d1dca4813ec168c5948c9209caec9f5d36362226,1961704 image bytes,4376 headroom, bench/test modules excluded;3 ARM artifacts rehashed. No flash or physical operation. Bench and original31-case SITL evidence preserved; G9 active output/health/ownership transitions and G8/G10 measurements remain open. Root library guard preserves earlier external SITL registration.", "2026-10-19 subsequent requested cold-check response: saved MAIN_FAIL1..4 zero and actual IO first4 failsafe/disarmed zeros, expected MAIN config, IO data OK, owner stopped, actual armedfalse/prearmedtrue with fault flags clear. Current table mismatch cleared; zero-write-ignore source semantics unchanged and no physical waveform acceptance. Scope unavailable. Next thirteen-command console recipe creates five-line44-token USB2/255:190 fixture, cats, starts Ready/status/permission/IO then stops without enable. Local echo reconstruction equals exact staged bytes; board installation/hash and Ready execution still pending. Prior records/firmware preserved.", "2026-10-19 user applied signal setup: FMU routing/rates/centers/limits and disarmed/failsafe0 match, AUX1..9 zero, owner stopped, actual armedfalse/prearmedtrue and IO data OK. Actual IO pwm_failsafe first4 remains1000. Baseline register code ignores zero failsafe writes and initializes table0; console reboot confirmed, complete IO power reset unmeasured. No measurement instrument now, scope possible later. Next all-source power removal then actual IO first4 table readback; zero is not assumed, enable/physical tests held. No firmware changes or Codex hardware commands.", "2026-10-19 G3 output readback: actual MAIN timers0..2=400, MAIN functions1..8=0, AUX4=101/Motor1, other AUX1..9=0, prearm0. Exact staged setup has30 parameter writes plus AUX4 readback gate: AUX4 off first, MAIN1..4 MIN500/MAX2500/CENT1500/DIS0/FAIL0, REV0, timers50, dedicated functions10000..10003 and safety-button prearm1. No hardware write by Codex; user application/autosave/reboot/readback remain pending. AUX9 is verified off beyond the module eight-AUX guard. Owner remains stopped; all physical gates open.", "2026-10-19 latest user correction supersedes the prior roll-reversal interpretation: final pair was right then left, verified left=-1/right=+1, leave calibration unchanged. USB type3 telemetry spans60.062797s: +1570 received, +15045 sequence misses; RX parser/overrun/drop indicators zero and TXoverruns391 unchanged. Sequence cause/worst gaps remain open. Exact 44-token USB2/255:190 synthetic profile staged; same native binary parses, reports Ready and stops without enable/hardware. Two mounted-path argument failures retained, whitespace-free copy passes. Next actual MAIN timer/output and AUX/prearm readbacks; no physical-output gate advanced.", "2026-10-19 user confirms left-stick up/down/left/right then right in same order: roll is reversed (right-stick left +1, right -1), yaw/manual-pitch signs match; actual armed/prearmed false and all nine button masks zero. Two USB statuses add 1015 received/9435 missed. Source computes missed/received then prints a percent sign; displayed 8.1% is not packet-loss percentage. Counter cause unlocalized. Next correct QGC roll calibration and compare USB type3 telemetry_status parser/buffer counters; no output/physical gate advanced.", "2026-10-19 follow-up console: candidate runtime base/OS/build strings match, USB selected input is instance2 sender255:190 with valid snapshots. IO all-disabled scheduling explains stale PWM-data flag; hardware-enable flag is not vehicle arming. Listener counts require -n and procedure corrected. Axis isolation, bit11/button action, USB sequence-gap trends, timing/routing and physical-output acceptance remain open.", "2026-10-19 step 3: old whole-base bench port freshly qualifies; three20-case3632-check native runs pass. New bench cold boots and stopped module are now user-reported as passed; fresh console/configuration evidence, G3 input/routing and physical-output acceptance remain open.", "2026-10-17 repository backup preparation: all 449 existing hashed anchors initially matched. Required PX4 formatting, EOF whitespace cleanup and LF normalization affect 23 files; seven cleanup anchor fingerprints and the handoff refreshed after review. Cleanup is whitespace-only except splitting the clock harness combined type-trait assertion into four equivalent static_asserts to avoid astyle 3.1 oscillation. Historical WSL/build evidence and acceptance scopes are preserved separately; this backup does not requalify hardware or previously sealed binaries.", "2026-10-06 third consecutive vehicle-input dependency audit: goal status set to blocked. Previous turn was no progress; current 445 anchors unchanged, known allocation inputs contain only synthetic_fixture, accepted CAD/plant/servo/EDF measurements and operating requirements remain absent. Existing supplied-model inertia rejection remains source-bound. No required vehicle-specific implementation can advance without accepted inputs; retain full objective, synthetic default, baseline and bench/acceleration gates. Resume on new accepted evidence.", "2026-10-06 first post-software completion boundary audit: original SM0-SM4 requirements have finite synthetic evidence; SM5 not achieved. Known allocation JSON input directory has one synthetic_fixture profile and zero measured_single_condition profiles. Current source-bound model.sdf a90644454080c2eba006cb29050d28a2e70fde5be33cafeae1185d7d844afa6d read-only intake again rejects physical inertia; mass remains3.291337 vs provisional3.041337; six mesh references resolve only packaging. No admitted vehicle profile, vehicle_supported_tuning=false, general_publisher_identity_qualified=false, no live native fixture. User already reports measurements unavailable/CAD pending. Accepted physical evidence and operating/deployment requirements are needed for next SM5 work; goal remains active, completion not claimed.", "2026-10-06 fresh default qualification milestone: all 31 cases rerun freshly on q90g9o8f checkout-built pair, 68813 control cycles. 0crhkf9n revision-qualification-manifest 899a1ddd82e3226f715e74be1b4a90fa30c714b8759f276978a8cb904f3bfc3a: 1475 artifacts independently Windows rehashed zero mismatches. Worst coupled physical tracking .028645396<.08, final angle .003841353<.02, peak .496934980<.5; eight fresh barriers revoke/recover and consumer off 4ms. Live console __heq56u passes, receipt c65771974a65c8601a520d802e038adab825e82d41227a14a7d9ff1e5207a76c, five check/41 session files rehashed zero mismatches, native exit0. Failed avatikwn observation preserved: entry capture0, latest moving estimate .000208038; fixed verifier samples first transition and separately retained reference, same2e-5 tolerance, capture6.047e-8/retention0/invalid capture0. Default profile now pins fresh pair and is byte-identical to tested candidate; prior profile/package preserved. No shared uORB/owner edits or live fixture. SM5 measured vehicle data and deployment policy remain open; goal active.", "2026-10-06 fresh checkout build milestone: current PX4 plus 46 initialized local submodules, 57547 indexed/research inputs and 438 preparation anchors verified; fresh ELF 67a6bab516dcdf0b9d7df76d548b3931f6c03fcb93b7814242e966690a6a0193 and plugin a5addecdf9ed5378ffba95a1dd0dde62df44d08240c4a26541393edb577fb789. Native 14 uORB checks plus five SITL cases PASS, 14375 control cycles. q90g9o8f checkout-build-manifest 95e129cbcad336fce318bdb47817e9a8e3ea96a464757997be0606e4e3ea493b: 387 artifacts independently Windows rehashed zero mismatches; source-tamper rejected before compilation, exact bytes restored; Micro-CDR 3d1b17703c7cf4f22def2910bc845bdb5152d7b5 source inventory sealed. Full 31-case admission and console verification on fresh pair pending; default og0lfuxu unchanged. Shared checkout uORB/owner unchanged, no live fixture; measurements unavailable/CAD pending, goal active.", "2026-10-06 default isolated stabilized manual console verified: full revision binary campaign PASS 31 cases (23 fresh/8 exact inherited), 68729 cycles; og0lfuxu revision-qualification-manifest e4a97d74ed3fc388e011871abb23af90aae4849f1992d85823b696052ffa57a9, 1163 artifacts independently Windows-rehashed zero failures. Worst coupled physical rate .028230<.08, final angle .006523<.02, peak .497045<.5; all limits unchanged. Hash-pinned default console uses PX4 instance29476/ports19781-19782, starts body-X-up hold, accepts body sticks/hold/disable/explicit restart/quit. Actual stdin test verifies axis signs, capture, NaN-to-hold, targets/thrust off, new sessions5404000->6636000, cleanup; console-check-q4jfno7x manifest e3755715192e281ab7660f17ef81e40100aca59a9b33d8fa49f0820391bb56a7, 5 check/41 session files independently rehashed zero failure. Both native processes exit0; no live test. Existing stock/bench/acceleration gates and old31 artifacts preserved. Next source-only reproducible packaging; measured SM5 data and general source identity/flight health open. Goal active.", "2026-10-06 actual EKF2 lifecycle on exact publisher-revision binary PASS: eight level/body-X-up withdrawal, same-ID stop/start, actual heading-reset and unsupported-profile cases, 3968 audited cycles. Parsed module status reports no instance after stop and instance zero after start despite zero status returncodes in both states. Real restart advances (attitude,rate,estimator,flags) revisions (3,3,3,3)->(6,3,6,6); reset/profile keep tuple unchanged. Withdrawal/restart revokes at attitude ages20-24ms, consumer off4ms, implicit enable rejected and explicit sessions hold. Sealed research-stabilized-sitl-ob5jrceo publisher-lifecycle-manifest 77e36d02abed8ebb6c5268812325f6dda3ba6348c93c291fa88907326a78ffb5; 401 artifacts independently rehashed with Windows, zero mismatch, 432 anchors/110 inherited compiled dependencies. No native process remains. Accepted 31-case scope unchanged; full revision-variant campaign, general publisher identity and real vehicle inputs open; goal active.", "2026-10-06 private publisher-revision variant PASS: native uORB selftest 14 checks; eight same-node advertisement-cycle barriers at level/body-X-up, frozen-clock changed-revision revoke and two mixed-axis regressions, 18384 audited cycles. Barrier attitude age 8ms and consumer off 4ms; implicit enable denied, explicit fresh-session hold recovered. Sealed research-stabilized-sitl-rmk764xm publisher-revision-manifest 9126cd2b2e9e209eb0afadabce5342d15f97fa8940f7cae36f83154dd1729242, binary c85e01a1d346acba95a60491740858251dc90dabf78213d8028a7cb8c3c5cced; 453 artifact hashes independently rechecked with Windows, zero mismatch. Actual EKF process restarts and general publisher-handle identity remain unqualified. Accepted 31-case artifacts and checkout owner/uORB unchanged. No live native test; goal active, vehicle measurements pending.", "2026-10-06 stabilized-manual publisher-epoch audit: source/API counterexample shows same-instance withdrawal/re-advertisement entirely between polls is indistinguishable with current uORB subscription fields and constant owner source_epoch=1. Existing Debug host suite passed 1/1 including supplied-epoch-change rejection; no native campaign or production source changed. General publisher identity remains open, requires observable incarnation token and between-poll restart regression. Vehicle measurements pending; goal active.", "2026-10-06 SM5 private enabled synthetic moment-bias SITL: separate Gazebo plugin adds (+0.010,-0.015,+0.012) N.m body torque only with simulated thrust; unchanged generated-profile PX4 passes two mixed-axis cases, 14 existing checks each, 12931 control cycles. Truth audit confirms 12944 enabled physics rows have declared bias and timestamped PX4 targets, final mean canard moment nearly cancels bias. 133-file receipt 706ff1e6b19cb81d1d29cd74d656bd73c4a9025d07235a380c432dafcdbc893a and 88-file parent independently rehash. Synthetic exploratory only; no accepted-campaign or vehicle/physical claim.", "2026-10-06 SM5 static net-moment extension: exact-rational sufficient one-condition screen includes source-bound trim bias and uncertainty plus physical net demand. Zero-bias synthetic +/-0.04 N.m box passes 3/100 <= 1/4; six tests and 16-file receipt ff487d1ad8ef830a9e456f5df8789d0c0e6e7c1a717ba8e765169e93835fe00d independently rehash. Real bias/demand, local model validity, dynamics, full envelope and physical gates remain open; accepted SITL 31 cases unchanged.", "2026-10-06 SM5 native generated-profile fixture actuator trace: two previously sealed SITL cases, 12953 enabled rows matched timestamped PX4 canard commands and all 15819 truth rows satisfy declared 50 ms lag and surface-angle scale. Audit receipt d4821661c7fdc0ea23960105b58ec1c6c666add1e319c75319c61cd33ccee127 and 88-file parent independently rehashed. Synthetic only; no loaded-servo, vehicle or accepted-campaign expansion.", "2026-10-06 SM5 private compiled allocator command history: eight synthetic corner hold/reversal/release sequences, 288 calls at 10 ms; independently audited command continuity, static and signed slew bounds, achieved moment, residual and objective. All phases reach residual norm <=0.0011 within at most 4/8/4 calls; no actuator lag or physical claim. Final receipt 009e14b45ade7890b67ce429cb7b58d3b34216105ef93a316b1c9058ffcf8f57 independently rehashed. Accepted SITL 31 cases unchanged.", "2026-10-06 SM5 compiled private C++ allocator finite grid: 2662 independent synthetic requests at 1 s and 10 ms from trim; independently audited commands, achieved moments, residuals, objective, bounds and signed slew. Static worst residual 6.93e-6; 10 ms slew-limited worst residual 0.129904. Sealed grid receipt c73cead601efd5fb796393648eca7c9cc1c72b35079107e22903a27cd815f005 independently rehashed. Finite host diagnostic only; accepted SITL 31 cases and vehicle gates unchanged.", "2026-10-05 SM2 and host SM3: output-disabled stabilized manual core reuses actual PX4 RateControl and H6 raw input validation, captures full quaternion hold on stick release, allocates four canards with bounded weighted least squares and feeds saturation back. Debug Release ASan-UBSan each pass 123083 checks including independent KKT and 12 level/nose-up host truth-feedback campaigns. Evidence /var/tmp/research-stabilized-host-0bqkxvm9; manifest a519c5feb3e00456ac5ac58867d2e46cebaa021665bc7f3ff016004673dff808. All 281 earlier anchors preserved; estimated-state PX4/Gazebo and physical acceptance remain open.", "2026-10-05 SM0 new priority: stabilized manual SLAAPS SITL. User confirmed body-rate commands with attitude hold on release, a synthetic rotational fixture at declared airflow and fixed simulated EDF thrust. Goal/input and preliminary software contracts recorded; no stabilized controller, allocator, fixture or acceptance result yet. Synthetic work can proceed while CAD is pending; H10 and negative-only acceleration scopes are preserved.", "2026-10-01 H8 explicit user-authorized default-off bench module and dedicated MAIN1-4 output integration implemented. One H7 owner, explicit profile/start/enable, four-servo topic, caller-configured deadzone/lease, consumer expiry and safety-revoke latch; no automatic startup, arming change, output assignment or EDF command. Strict Debug Release ASan/UBSan each pass 2413 checks; 19 acceptance-audit tests and private disabled-only no-driver SITL smoke pass. Cleaned-native integrated SITL/ARM ELFs contain required module/owner/lease symbols. ARM text/data/BSS 1948680/8044/105596, BIN 1956724 bytes; this is whole-image linked evidence, not runtime resource qualification or isolated H8 cost. A stale copied NuttX archive initially omitted the module at link time; rejected archive retained, generated H8-native products cleaned and rebuilt, exactly one current builtin table verified. Evidence /var/tmp/research-bench-h8 manifest SHA256 0b934dde9c339d08e5fc295ec4087dd41fcf99b80224db785a8fac6695f6ac0f. 1360 unrelated checkpoint files preserved. No flash, powered actuator run, commit or staging; active-path and physical acceptance remain open, C1E-N1 stays negative-only.", "2026-10-01 bench physical-acceptance preflight added: read-only checker validates twelve mandatory review categories and hash-pinned artifacts; 19 Python unittest cases pass in Ubuntu-24.04 WSL. Complete records never grant physical acceptance, flash or output authority. No firmware changed and no builds rerun. H7 remains output-disabled; physical acceptance, integration and installed hardware evidence remain open. Earlier registration/publication prohibition requires a scope decision before a bench module/output publisher is added.", "2026-10-01 H7 documentation-only follow-up records user nominal 5 V, documented MATEKSYS 12S Pro BEC 5 A continuous/9 A peak with manufacturer default 5.2 V, TELEM1/QGC daily, assumed MAVLink instance 0 and GCS 255:190 / vehicle 1:1, ideal direct-link angle and no-load slew model, provisional unimplemented 5% deadzone, and independent hardwired stop design. Wind intent 15 to above 40 m/s has no finite qualified upper bound. No code, runtime settings, build evidence or admission/output gate changed. Prior H7 evidence remains compilation-only for the excluded research library.", "2026-10-01 H7 output-disabled servo-bench candidate/lifecycle foundation verified: user accepted QGC gamepad over SiK, NACA 0012, MAIN1-4 naming, 20 ms schedule, 500 ms age, provisional +/-13 degrees and fault-neutral/re-enable policy. One fixed owner produces coupled calibrated PWM candidates and inhibits EDF, with no module startup arming or output. H6 retains four-axis defaults with an explicit three-axis H7 mask. Debug Release and ASan/UBSan pass 2180 checks each, including 649 H7. Fresh default SITL/Pixhawk and separate ARM GCC 13.2.1 library builds pass. Ten unlinked objects total 7501 text and zero data/BSS; default linked flash 1947412 bytes excludes H1-H7 by absent symbols. Evidence /var/tmp/research-bench-h7 manifest ec260f2d798ef98eccbd9bb3141f1993ac315f8f4a5ca24c667a96ed0a84bc03. Installed calibration signs scales slew source timing and output-neutral qualification remain open; C1E-N1 stays negative-only.", "frames, limiter, effectiveness_model, authority_analysis, control_pipeline, the default-off runtime owner and the selected-manual boundary are isolated foundations, not a demonstrated end-to-end flight path.", "Host loopback uses synthetic vehicle state; native closed owner has no ingress or eligible demand.", "Existing architecture diagrams are design-level context, not current implementation proof.", "C1E-W2 accepted 2026-09-24: offline diagnostic generated C/Python payload/frame conformance; no signing/native integration. C1D-N2 remains latest native acceptance.", "C1E-N1 private parser/owner/endpoint accepted 2026-09-25 at bounded disarmed/output-disabled negative diagnostic scope: corrected-source build, literal zero-ingress native run, two source-bound signed negative runs, live hostile/replay traffic, scripted source/mailbox phases, corruption and sink-failure probes. N06 diagnostic administration and native N09/N10 trusted publisher/map inputs are structurally unavailable in this profile. Positive admission, actual simultaneous scheduler races, physical control and flight remain open. See docs/C1E_N1_IMPLEMENTATION_VERIFICATION.md.", "First-operator stock Cessna checkpoint passes under unchanged approved diagnostic revision 2: fresh GUI/headless runs with matching frozen inputs and live user QGC confirmation. Full Phase 1 remains incomplete for deferred second-operator reproduction. See docs/SITL_BASELINE_FIRST_OPERATOR_CLOSURE.md.", "2026-09-27 P1 provenance/lifecycle/clock design and derivative plant packaging checkpoint: independent design review and all positive-runtime gates remain open. Existing N1 and baseline revision 2 unchanged. Package fixes layout only; original CAD evidence and valid mass/inertia remain required. See docs/C1E_P1_DESIGN_VERIFICATION.md.", "2026-09-27 P2A offline archive collector/checker verified: 60,397 existing real ULog observations and six finite integrity tests. Source-bound audit identifies invalid-attitude nonpublication and delayed health horizon. Not live P2, independent P1 review, qualified publisher/clock proof or positive native admission. Evidence: /var/tmp/c1e-p2a-verified-re2idmzc; docs/C1E_P2A_PROVENANCE_COLLECTOR.md.", "2026-09-27 P1 independent requirements review closed. P2B native output-boundary observation and P3A retained clock deployment observation independently accepted; 1200/1200 source records per process, all attitude-invalid. P3A retains 16 executable/library objects and rejects five targeted corruptions. Full P2/P3/P4/P5 remain open; no clock map installed or positive admission. See docs/C1E_P2B_NATIVE_VERIFICATION.md and docs/C1E_P3A_CLOCK_DEPLOYMENT.md.", "2026-09-27 P2C closed host receipt merge/offline replay accepted: fixed four-lane SPSC/FIFO storage, per-source continuity, cyclic owner order, independent first-fault/terminal evidence, Debug and ASan/UBSan cases including 1000 concurrent handoffs, default-off/profile rejections and exact reconstruction of 1200 P2B observations. Source attribution and build/config evidence findings corrected; four final corruption probes rejected. Evidence /var/tmp/p2c-merge-vvtmfdr0; docs/C1E_P2C_CLOSED_RECEIPT_MERGE.md. No native/positive/clock/publisher qualification or N1 change.", "2026-09-27 P2D native typed observation/merge accepted: normal1200 rows match parallel raw recorder; restart1200 rows retain actual second-constructor rejection. Both processes close normally, source hashes stable. Seven independent corruption probes rejected. Evidence /var/tmp/p2d-native-od002jmn; review /var/tmp/p2d-independent-review-hp9h4jgq; docs/C1E_P2D_NATIVE_TYPED_MERGE.md. No readiness/map/positive authority or N1/baseline change.", "2026-09-27 P3B checked Linux host clock/candidate lifecycle accepted: successful read and representation checks, raw nanosecond regression, finite expiry, exact predecessor replacement and sticky loss. Debug/ASan/UBSan contracts and12real events/2epochs pass. Five final evidence corruptions rejected after source/configured-test binding fixes. Final /var/tmp/p3b-provider-5vpaar72; review /var/tmp/p3b-final-review-uv_rdov5; docs/C1E_P3B_CHECKED_CLOCK_LIFECYCLE.md. No native hrt change, provider/map/positive qualification or N1/baseline change.", "2026-09-27 P3C native checked receipt-clock observation accepted: normal 1200 records match raw observations and checked clock uses; injected source read 26 retains 25-record prefix, sticky failure and real destructor evidence while rejecting raw success. Two normal process closures. Frozen native /var/tmp/p3c-native-8oh4gg31; corrected verifier /var/tmp/p3c-verifier-lbz2xeg4; final independent review /var/tmp/p3c-final-review-an2v_qgt. Ten initial corruption rejections and two corrected terminal-type probes; no native rerun for verifier-only fix. Scheduler/sample hrt, provider continuity, maps and positive authority remain unqualified. See docs/C1E_P3C_NATIVE_CHECKED_RECEIPT_CLOCK.md.", "2026-09-28 H4 output-disabled pipeline and ARM portability verified: configuration composes H1 limiting, H2 normalized evaluation and H3 required structural authority while successful evaluation alone advances owned prior-command state. Strict Debug/Release and ASan/UBSan pass 843 H1, 182 H2, 233 H3 and 68 H4 checks. Fresh PX4 SITL and Pixhawk 6X library targets pass with ARM GCC 13.2.1; complete default firmware also builds, but its resource report excludes this library. No operational matrix/policy, controller, allocator, publisher or output is approved. Evidence /var/tmp/research-authority-h3, including px4-v6x-local-build and px4-sitl-local; independent review and linked runtime cost remain open.", "2026-09-28 H5 default-off runtime owner verified: explicit configure/start/prime/cycle/stop lifecycle owns H4 and advances timestamp, command state and report only on complete success; stop requires reconfiguration. The inert ScheduledWorkItem adapter has injected input and no module, startup, parameter, uORB or output. Strict Debug/Release and ASan/UBSan each pass 1,399 checks: H1 843, H2 182, H3 233, H4 68, H5 73. Fresh full SITL and Pixhawk 6X builds plus separate ARM GCC 13.2.1 library compilation pass. Six unlinked objects contain 3,745 text and zero data/BSS; default ELFs contain zero research symbols, so the 1,947,412-byte flash report excludes H1-H5. Evidence /var/tmp/research-runtime-h5. No positive admission, timing qualification, physical policy, controller, allocator or output is approved.", "2026-09-28 P2E committed estimator provenance accepted at closed observation scope: actual EKF update success is bound to local-position publication presence, optional attitude publication, five reset counters and hash-pinned recorded accel/gyro identities. Debug, Release and ASan/UBSan normal/restart cases each retain 1200 rows/600 commits; restart rejects a second constructor. Final review added a nonblocking destructor writer guard and regenerated every artifact. All attitude predicates are false, so health/admission/control eligibility remain false. Seven checker tests pass. Fixed POSIX observer object is 11538 text/8 data/327909 BSS; not embedded acceptance. Fresh default SITL/Pixhawk builds pass with ARM GCC 13.2.1, but zero research symbols mean the 1947428-byte flash report excludes P2E/H1-H5. Evidence /var/tmp/p2e-committed-zs4snisq and /var/tmp/research-acceleration-p2e; docs/C1E_P2E_COMMITTED_STATE_PROVENANCE.md.", "2026-09-29 P2F direct selected-state provenance accepted at closed observation scope: the non-replay non-multi instance-zero EKF and its attitude local-position and status publisher instances bind as [0,0,0,0]; actual status publication results control/fault change counters and publisher caches are checked against P2E rows. Debug normal/restart retain 1199/1197 rows, Release 1195/1197 and ASan/UBSan 1197/1195; every case observes six status publications, one control transition, zero fault transitions and one initial stale-cache row with all authority false. Eight checker tests pass. Fixed POSIX observer object is 10357 text/8 data/245903 BSS with 320-byte bounded export frame; not embedded acceptance. Fresh default SITL/Pixhawk builds pass with ARM GCC 13.2.1, but zero research symbols mean the 1947412-byte flash report excludes P2F/H1-H5. Evidence /var/tmp/p2f-selected-vl0q1aop and /var/tmp/research-acceleration-p2f; docs/C1E_P2F_SELECTED_STATE_PROVENANCE.md.", "2026-09-29 P2G selector-enabled acceleration provenance accepted at closed observation scope: one actual EKF2Selector and one actual EKF transition 255 to selected instance zero and bind selected attitude/local-position/status/source instances as [0,0,0,0,0]. Debug, Release and ASan/UBSan normal/restart each publish all 1200 source-derived vehicle_imu inputs with no actuator publication and retain respectively 589, 588 and 590 selected local-position acceleration payloads per case; restart rejects a second selector lifecycle. P2H later proves upstream attitude was invalid, no candidate reached the selector and the stock attitude gate was not exercised. One instance cannot exercise failover, and all health/admission/control fields remain false. Eight checker tests and unchanged 1399-check H1-H5 strict suites pass. The fixed observer and feeder objects are host compilation diagnostics only. Fresh default SITL/Pixhawk builds pass with ARM GCC 13.2.1; zero research symbols/compile lines mean the 1947412-byte board BIN excludes P2G/H1-H5. Evidence /var/tmp/p2g-selector-4ek3kb0n, /var/tmp/p2g-selector-5n54u5ds, /var/tmp/p2g-selector-9b5xbf6q and /var/tmp/research-acceleration-p2g; exact hashes are in docs/EDF_CANARD_CONTROL_FOUNDATION.md.", "2026-09-29 P2H upstream-validity and selected-output disposition provenance accepted at closed observation scope: every one of 1200 actual EKF attitude entries per case is invalid with no publication attempt, so no attitude candidate reaches the selector and its 10-ms gate is not exercised. Debug and Release normal/restart bind 589 and 588 local-position checks/candidates/publications per case; ASan/UBSan binds 594/593 checks and 590 candidates/publications with explicit absent calls. Every present candidate is monotonic and fresh under the unchanged stock branches and preserves selected acceleration bits. Restart retains sticky second-selector fault 4; all health/failover/admission/control fields remain false. Nine checker tests and unchanged 1399-check H1-H5 strict suites pass. The 15915-text/8-data/360564-BSS observer is host compilation evidence only. Fresh default SITL/Pixhawk builds pass with ARM GCC 13.2.1; zero research symbols/compile lines mean the 1947428-byte board BIN excludes P2H/P2G/H1-H5. Evidence /var/tmp/p2h-disposition-bv29hkud, /var/tmp/p2h-disposition-gnzmttte, /var/tmp/p2h-disposition-ps2oxj5a and /var/tmp/research-acceleration-p2h; exact hashes are in docs/EDF_CANARD_CONTROL_FOUNDATION.md.", "2026-09-30 H6 default-off PX4-selected manual boundary verified: stock MAVLink MANUAL_CONTROL and RC continue through PX4 manual_control_input selection before the research adapter consumes manual_control_setpoint. Caller policy supplies exact allowed source/identity/freshness and complete four-axis affine maps into normalized demand and EDF-plus-four-canard desired command; no physical mix priority timing fallback startup arming publisher or output is supplied. Strict Debug Release and ASan/UBSan each pass 1531 checks: H1 843 H2 182 H3 233 H4 68 H5 73 H6 132. ARM GCC 13.2.1 compiles eight excluded objects totaling 5197 text and zero data/BSS. Fresh complete SITL and Pixhawk 6X default builds pass after explicitly ordering the existing MAVLink header generator; default ELFs contain zero research_actuator_command symbols, so the 1947428-byte linked flash report excludes H1-H6. Evidence /var/tmp/research-manual-h6; exact hashes are in docs/EDF_CANARD_CONTROL_FOUNDATION.md.", "2026-09-30 P2I source-derived valid selected-attitude provenance accepted at closed observation scope: the exact pinned Cessna ULog supplies 14 complete vehicle_status and six complete vehicle_land_detected records alongside 1200 inherited IMU samples. The unchanged EKF attitude-valid branch transitions; Debug normal/restart publish 1111/1109 selected attitudes, Release 1111/1111 and ASan/UBSan 1111/1111. All 6664 quaternion/reset payloads and every 589 Debug/Release or 590 sanitizer acceleration payload are bit-exact, monotonic and fresh under unchanged stock selector gates. Restart retains sticky second-selector fault 4. Eleven corruption tests and unchanged 1531-check H1-H6 strict suites pass. All health/failover/admission/control/output authority remains false. Five POSIX diagnostic objects total 57899 text/48 data/933763 BSS and are compilation evidence only. Fresh complete default SITL/Pixhawk builds pass with ARM GCC 13.2.1; zero research symbols and build-log compile lines mean the 1947412-byte board BIN excludes P2I/P2H/P2G/H1-H6. Evidence /var/tmp/p2i-attitude-vkyya591, /var/tmp/p2i-attitude-2_co807l, /var/tmp/p2i-attitude-zxtllgub and /var/tmp/research-selected-attitude-p2i; exact hashes are in docs/EDF_CANARD_CONTROL_FOUNDATION.md.", "2026-10-01 P2J actual two-EKF timeout-handoff observation accepted at closed observation scope: two actual EKF2 instances bind to two vehicle_imu and publisher instances and one actual selector performs an unrequested stock timeout handoff from stopped primary zero to instance one in every Debug Release and ASan/UBSan normal/restart case. Each case publishes 2400 messages from 1200 duplicated hash-pinned IMU inputs, preserves selected attitude/local-position payloads and one attitude plus all six local-position reset barriers, and retains complete source-derived system state. Restart rejects a second selector with sticky fault 4. Eleven checker tests and unchanged 1531-check H1-H6 strict suites pass. Duplicated data from one recorded sensor provides no deployment diversity, so health failover mutation deployment-sensor admission control and output qualification remain false. Three POSIX diagnostic objects total 37473 text/48 data/490272 BSS and are compilation evidence only. Fresh default SITL/Pixhawk builds pass with ARM GCC 13.2.1; absent P2J modules compile lines and research_handoff symbols mean the 1947428-byte board BIN excludes P2J. Evidence /var/tmp/p2j-handoff-u4up5z6_, /var/tmp/p2j-handoff-t7z5qo9k, /var/tmp/p2j-handoff-6ziwnuyt and /var/tmp/research-selector-handoff-p2j; exact hashes are in docs/EDF_CANARD_CONTROL_FOUNDATION.md.", "2026-10-05 SM4 full-axis candidate remains incomplete: 3/4 cases, 25869 published cycles, all tracking/saturation/antiwindup pass, nose-up negative-first physical hold 0.026301 rad fails unchanged 0.02 limit while estimate is 0.003065. Sealed research-stabilized-sitl-mm7_zto8 manifest 1da51d0b2c27f71c71a316c8bad2e437cde7c5fdc11ead2f2eaca3ed5c0deeb2. Candidate periodic duplicate guard has zero observed native branch executions; 18/eight-case regressions pending on new binary. All predecessors preserved; fixed-zero-bias diagnostic fails readiness. Measurements explicitly unavailable, CAD pending; goal active, synthetic work can continue.", "2026-10-05 runtime-profile defect: string replace applied only to script suffix, omitting gyro/accel priors in all historical 18/eight-case boot scripts. ULog confirms actual stock 0.1/0.2. Numeric records preserved; matched-prior and causal claims withdrawn. Whole-script replacement and live param comparisons now precede enable; calibrated synthetic gyro prior 0.0003394 passes one exploratory case. New private dispatch seam and all corrected-profile regressions pending. Generic bridge still injects Markov GNSS noise; no noise-free complete GNSS claim.", "2026-10-05 corrected-profile qualification: 31 native cases PASS, 68726 control cycles; actual gyro prior 0.0003394 accel 0.04 magnetic type 0 compared before enable. Worst coupled physical error 0.009438<0.02, tracking 0.028713<0.08; lease expiry 100ms. Sealed rjr0eutz dispatch fc7fe2f45cf093ccb5473d1d3c2e93ad53e96a4b500fcf9f4c8029a64192fd8e, coupled 40753f83d103cfca58cc65f2f2481102185521fa20bf0d3671ac72037a3c2aa2, campaign 447823f2cdb88e22759d58b9365cd0508370053738011aa966fc452b1c050da3; exact-artifact qmf78glt barriers 1536d2f78598e942746b4a9e52e2194eb1a151c705e908aca82450f432698948. All receipts independently rehashed 0 failures. Preserve earlier numeric artifacts with corrected stock-prior interpretation. Goal active; broader robustness/identity and vehicle gates open; no live test/build.", "2026-10-05 bounded robustness probes: two extra Gazebo seeds and three signed 0.0010182 rad/s gyro means, five observed passes/32370 cycles. Three ULogs confirm actual injected bias; narrow minimum 0.000624 rad final-error margin. Exploratory receipt research-stabilized-sitl-probes-6wu2ah41 manifest 9bf864c0f4db9f97dfedc018161abac624e57765d2fe1fce18a410251b58f0de, 219 artifacts independently rehashed. Accepted campaign remains 31 cases; no vehicle qualification.", "2026-10-05 unequal-axis pilot-command probes: four exploratory level/nose-up and both-order cases PASS, 25851 control cycles; max physical tracking 0.015560 rad/s, max final hold error 0.006917 rad. Source-bound mixed receipt research-stabilized-sitl-m2n0a0ev manifest e81ee37b5f1850de9f01f2a6274b3792fe438fd6d10d19d4b867b694eb48a937, 114 artifacts independently rehashed. Accepted campaign remains 31 cases; vehicle and delay/identity gates open."]
 }

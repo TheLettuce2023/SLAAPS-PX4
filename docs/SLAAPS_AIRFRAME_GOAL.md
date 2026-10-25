@@ -1,13 +1,15 @@
 # SLAAPS airframe and flight-mode integration goal
 
-Updated 2026-10-23, Codex. The objective remains unfinished. Shared configuration,
+Updated 2026-10-24, Codex. The objective remains unfinished. Shared configuration,
 manual activation/worker/mixer handling, deliberate armed EDF commissioning and
 scheduled PID/effectiveness are implemented with synthetic software evidence.
 Shared selected-power health and original-report expiry now gate Manual/EDF
 readiness and permission; voltage limits and physical feed assignment are explicit.
-Authenticated companion receipt now passes actual-parser/native integration;
-command admission, acceleration control, manual flight admission and physical
-qualification remain incomplete. See [current handoff](PROJECT_CONTEXT.md) and
+Authenticated companion receipt passes actual-parser/native integration; numerical
+acceleration control and bidirectional active handoff pass synthetic native capture tests.
+Signed-parser-to-active-control integration now passes synthetic native capture checks.
+Cold acceleration startup, ordinary manual
+flight admission and physical qualification remain incomplete. See [current handoff](PROJECT_CONTEXT.md) and
 [integration evidence](SLAAPS_CONFIGURATION_INTEGRATION.md) for exact boundaries.
 
 ## User direction
@@ -35,7 +37,7 @@ wiring assignments. Preserve the shared typed configuration and explicit apply
 transaction as that workflow's boundary; do not add a second runtime profile
 source that can disagree with QGC parameters.
 
-The present 299 vehicle fields include mass, CG, inertia, measured canard moment
+The current 463 profile fields include mass, CG, inertia, measured canard moment
 derivatives, calibration, controller limits and the EDF curve. They do not yet
 include a geometry-to-effectiveness derivation or automatic controller tuning.
 A future geometry model must specify body-FRD positions relative to a declared
@@ -56,7 +58,7 @@ software/physical qualification; no implicit retuning while armed is permitted.
 | Mode | Input and behavior | EDF |
 | --- | --- | --- |
 | SLAAPS Manual | Selected PX4 manual input; body-rate commands with attitude hold on stick release; existing controller and four-canard allocator | Selected manual throttle through the common propulsion owner, subject to armed admission |
-| SLAAPS Acceleration | Reserved interface for the existing body-FRD inertial-acceleration-at-CG contract; unavailable for activation until a validated producer and controller are integrated | Future acceleration controller requests thrust through the same propulsion owner |
+| SLAAPS Acceleration | Body-FRD inertial acceleration at CG plus absolute quaternion; numerical control and active handoff verified with synthetic native inputs, ordinary flight admission unavailable | Coupled allocation requests thrust through the shared propulsion owner; applied solve uses current EDF command |
 | SLAAPS Bench / Commissioning | Shared logical routing and calibration; servo-only work may use disarmed/prearmed admission; EDF work requires deliberate visibly armed commissioning or an explicit actuator-test mechanism | Bounded enable/duration, stop/kill and input-loss handling; never silent operation while disarmed |
 
 Mode selection is a request, not permission to bypass profile, health, arming,

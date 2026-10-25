@@ -2,6 +2,23 @@
 
 ## Status And Scope
 
+Current production extension (2026-10-24): the repository-owned SLAAPS dialect
+uses request/session/status IDs200010/200011/200012. Session and status remain
+protocol `0x00010000`. Request `0x00020000` with flags1 explicitly carries both
+the existing body-held FRD inertial CG acceleration and an absolute desired
+NED-from-body attitude quaternion, WXYZ. The quaternion is a MAVLink2 extension
+at offset90, four binary32 values, making maximum request payload106bytes;
+normal trailing-zero trimming applies. Request CRC extra remains130.
+V1 retains flags0 and acceleration-only meaning, rejects a nonzero attitude
+extension, and never acquires an inferred attitude. The full-control accessor
+requires explicit v2 command kind after the same live session/ACK/time checks.
+The shared configured quaternion tolerance governs normalization; q and -q are
+equivalent. Invalid attitude has additive decision38; old decision codes do not move.
+Standalone core/codec/generated C/Python conformance passes. Production decoder
+is connected; combined native verification is pending. This is not acceleration
+controller/output completion. See the current PROJECT_CONTEXT and integration evidence.
+The v1 layout and historical acceptance statements below describe their original scope.
+
 C0c update (2026-09-19): isolated generated C/Python framing conformance now
 passes under a parent-owned offline dialect with local test IDs
 200000/200001/200002 and CRC extras 130/188/131 respectively. This does not

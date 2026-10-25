@@ -1,18 +1,47 @@
 # SLAAPS implementation: start here
 
-Updated 2026-10-23 by Codex. Software progress is not flight acceptance.
-Current uncommitted increment: actionable configuration and routing rejection
-through supervisor status, Commander events and native QGC STATUSTEXT. Host/native
-checks and current FMUv6X source/package/static-resource verification pass.
-Repository: https://github.com/TheLettuce2023/SLAAPS-PX4 (`origin` verified).
-Branch `slaaps-sitl`; verification source base `36a17722eff48e4317bdc0888fc541b935e51b7a`.
-Power-health checkpoint `58f4be89fa` is committed; diagnostic changes remain uncommitted.
-Evidence retains its original source base and explicit overlays. Preserve the separate
-user AGENTS.md edits and unrelated untracked `timestamp`.
-Latest completed increment: retained exact apply errors and current physical routing
-diagnostics through native QGC messages. Power-health and companion-receipt paths
-remain integrated; companion receipt is not acceleration command admission. Current host/native/board checks pass; manual flight
-admission, companion command admission/control and physical qualification remain open.
+Updated 2026-10-24 by Codex. Software progress is not flight acceptance.
+Repository: https://github.com/TheLettuce2023/SLAAPS-PX4; branch `slaaps-sitl`.
+Committed, not pushed: power `58f4be89fa`, diagnostics `54b2da3c6b`.
+Companion/reserve/provenance integration is uncommitted. Preserve user AGENTS.md and `timestamp`.
+[Current evidence](SLAAPS_CONFIGURATION_INTEGRATION.md#october-24-acceleration-diagnostics-compiled-lifecycle-regression-under-investigation) retains exact overlays, hashes and failures.
+
+Signed UDP/parser -> active acceleration -> both captured banks and bidirectional Manual handoff pass.
+Authority/sensors/configuration are synthetic; ordinary flight admission and physical qualification remain absent.
+Last full native matrix: `50clq98f`/runtime `iz6yyzeg` PASS75a4019c (predates authority diagnostics).
+Diagnostic production: `impnyvop` LINK PASS; observation `987m0uek`/runtime `ryjlhws3` signed PASS.
+Prior runtime `4r3fx80u` pilot-expiry failure remains unexplained; source permits bounded map-renewal ACK wait.
+New fixture checks fresh handled output after pilot expiry within the original lease, not instantaneous RUNNING.
+Diagnostic fixture `mq082hsd` LINK PASS26387 (manifestc71ebdc5/binaryde4c8509); `ns1d23at` FAIL88605.
+Failure:7303 epoch12/map10 barrier211 absent from received wire; client correctly withheld ACK.
+Retry100ms cannot rescue first-barrier loss within the outgoing100ms lease; initial drop location unproven.
+Input-config agent implements isolated barrier topic alias; manual-entry agent reviews sender/lifecycle guards.
+Review fixes landed: pin before no-space wait; preserve cached revision across valid new-binding retry. Independent review clear.
+Priority native `u5sxsmx9` LINK PASS38799; runtime `ws3sj92x` C++ scenarios pass but final Python acceptance-status assertion FAIL76388.
+Actual signed request16 reaches allocation rejection/QGC log; investigate final queued status versus immediate revocation.
+Test-only observer after real guarded capture will prove acceptance directly; do not permit post-revocation TX for test receipts.
+Bounded latest queue drain, one priority attempt within8 total; preserve exact payload/original expiry on retry.
+No wire, lease or producer-retry changes. This increment is excluded from the sealed diagnostic board.
+Board `acceleration-diagnostics-20261024` PASS5fb1bc0d;45 fresh/10 exact object-source-command reuses.
+Image1,937,396/free28,684; AXI109116/SRAM42048. Static identified supervisor5516/6500,
+companion4848/6500, MAIN2976/AUX2920 of4096, logger2232/3700; runtime/total stack and boot unqualified.
+Diagnostic topic separates calculated vs exact all-bank-handled evidence; generated formats596/1440 (<1450).
+Host `mq082hsd` suite `y0x_1zx3` PASS36101: Debug/Release/ASan-UBSan,473 parameters; receipte60ee8f6.
+WSL recovered;11019 left no verifier/compiler. Old0u4fbgjq px4-param401 remains untouched; vsock/VMBus faults observed.
+Priority board37324 PASS (image1,937,860/free28,220; receiptaf1e38c4 verified); resource79699 active, board owns slot.
+Current schema: 473 parameters / 463 profile fields. Physical qualification remains absent.
+
+Earlier unexplained failures remain in the evidence log; current passes do not establish their causes.
+NuttX RNG fixes remain dirty; user approval for a TheLettuce2023/NuttX fork/gitlink is pending:
+`build/slaaps_recovery/nuttx-rng-20261024/commit-review.patch`.
+Manual flight admission, cold acceleration startup and measured vehicle qualification remain open.
+Profile declarations now reuse apply/fingerprint/persistence; Qualified grants no authority.
+SLA_MAN_WAIT fixes a 1–60s non-actuating window at entry; READY response remains <=1s.
+Initial activation/first command stay inside that window; running leases remain independent.
+Delayed proposals cannot extend it; expiry requires deliberate re-entry. Flight flags stay denied.
+Mode names/custom IDs, wire selection, CURRENT_MODE, removal/restore pass; GUI and flight permission remain unqualified.
+Only five production registry files are staged (74 insertions/41 deletions); not committed, pending DCO review.
+The earlier six-file review is not standalone; the harness and other work remain unstaged.
 
 ## Navigation
 
@@ -29,7 +58,7 @@ Historical startup context: [October 22 archive](PROJECT_CONTEXT_ARCHIVE_2026102
 | Scheduling | `slaaps_control_schedule`, `slaaps_operating_condition`, `slaaps_operating_condition_observation`, `slaaps_schedule_portable_evidence` |
 | Verification | `slaaps_native_build`, `slaaps_native_test`, `slaaps_board_builder`, `slaaps_board_verifier` |
 | Commissioning | [EDF milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-armed-edf-commissioning), [R09/R10 report](MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md) |
-| Companion semantics | [Acceleration contract](ACCELERATION_WIRE_CONTRACT.md), [state contract](C0B2_STATE_CONTRACT.md); `wire`, `adapter`, `guard`, `clock` |
+| Companion integration | `slaaps_companion_protocol_owner`; [acceleration contract](ACCELERATION_WIRE_CONTRACT.md), [state contract](C0B2_STATE_CONTRACT.md); `wire`, `adapter`, `guard`, `clock` |
 
 ## Objective and boundaries
 
@@ -67,7 +96,8 @@ there is no invented airborne cut/hold-thrust policy. Native callbacks capture o
 One typed configuration and native QGC parameter metadata provide coherent inactive
 apply, persistence and export/restore: mass/CG/inertia, geometry, servo conversion,
 dynamics, controller, EDF curve, input mapping, timing and optional schedule.
-308 parameters are supported; this is not a custom QGC graphical editor or GUI test.
+473 parameters (463 profile fields) are supported in current source; this is not a custom QGC editor or GUI test.
+Schema/record/assessment parameters verify neither external authenticity nor physical qualification.
 Never retune/remap an armed controller. Supported production routing is MAIN/AUX PWM;
 do not imply other boards/banks/protocols are implemented.
 
@@ -89,37 +119,25 @@ SLA_BENCH_EN/CH/SEC control sessions; saved enable never restores permission.
 Servo-only Bench inhibits propulsion. Legacy separate research bench stays disabled.
 Stock FW/MC controllers and hover estimator are disabled/not started. Stock allocator
 is compiled for metadata only, not started as another actuator owner.
-Companion acceleration remains unimplemented: AccelerationControllerPort is an
-unavailable stub; `research_flight_controller` is a planned graph target, not a module.
+Companion numerical control, EDF transfer and worker/caller handoff pass native synthetic tests;
+cold startup, ordinary flight admission and current target refresh remain incomplete.
 Verified receipt transport uses repository-owned `src/modules/mavlink/slaaps.xml`
 (private IDs200010/200011/200012, inherited development dialect), selected only by
 the three SLAAPS targets. Receiver publishes original bounded payload and actual
 signature-verification evidence on four queued per-link topics, with signing
 generation and event sequence. Authentication is not session or output permission.
-`research_acceleration` now has a normal PX4 library target, not yet linked/called
-by the supervisor. Configured-source receipt monitoring and local status are now
-implemented and pass actual-parser/native checks with queued lifetime reads. Trusted
-bounded time mapping, session grant and wire status return remain missing.
-
-## Latest evidence
-
-Detailed results, failures, hashes and earlier scheduling evidence are in the
-linked integration record. Current native build `3eg3u4yv` and runtime `gjoks2mh`
-pass operator rejection diagnostics, power recovery, manual/bench lifecycles, shared
-schedule/mixer checks and companion signed receipt. Isolated manual uses synthetic authority;
-Commander EDF commissioning uses recorded internal forced arming in no-plant
-tests. Normal vehicle health, physical outputs and QGC GUI remain unqualified.
-Current board stage `diagnostics-20261023` links at image1,907,220 B
-with headroom58,860 B; nine fresh probe units and 26 dependency-verified reused units. Snapshots retain baseline
-Git metadata472a7d6786 with explicit committed+dirty overlays; the commit alone
-does not identify tested content. Runtime stack/timing and target boot remain open.
+`research_acceleration` is linked through the production CompanionProtocol owner.
+Explicit preparation, matched signed TIMESYNC, frozen bounded maps, session grant,
+exact barrier acknowledgement, revoke and deliberate re-entry are integrated.
+Source/key/publisher changes and original map expiry cannot revive a session.
+The controller and exclusive active handoff pass native capture tests; cold acceleration entry remains incomplete.
 
 ## Next three tasks and remaining dependencies
 
-1. Finish manual admission/recovery and vehicle-supported ground-spool/takeoff behavior
-   when the required policy and measured envelope exist; keep independent software moving.
-2. Connect feasible companion acceleration through the existing contract and shared
-   calibrated path, with exclusive handoff; do not assume independent force control.
+1. Complete acceleration authority diagnostics from port through worker/supervisor to logged status/QGC text.
+   Verify a valid signed but infeasible demand and calculated-vs-handled ACK evidence; preserve admission behavior.
+2. Normal EDF Bench arming already exposes its readiness gate; the native test lacks raw sensors
+   and avionics system_power. Preserve common checks; positive vehicle-health acceptance remains open.
 3. Close stock QGC operator workflow, working-base boot integration, runtime timing/stack
    and physical acceptance, with separate authorization for any hardware operation.
 
@@ -127,20 +145,19 @@ Still unavailable: actual mass/CG/inertia/CAD, signed effectiveness across quali
 flow/wash, loaded servo dynamics, EDF thrust/response/voltage measurements, authority
 acceptance and recovery hardware/policy. These questions are pending; do not repeat
 unchanged requests or invent fallback values. Physical power-feed assignment/voltage
-bounds, propulsion response and landed/takeoff behavior still need vehicle acceptance.
-EDF ceiling/duration is pending.
+bounds, propulsion response, landed/takeoff behavior and EDF ceiling/duration need acceptance.
 Preserve working e8ea98b404/NuttX11 servo baseline. Newer-base boot issue is unresolved;
 R01-R10 operator servo passes are not numerical flight calibration or exact provenance.
 Use WSL Ubuntu-24.04 and existing Tools/slaaps workflows. Subagents use Sol xhigh.
-Earlier failures, recovery copies and companion/preparation evidence are retained
-in the linked integration record. The deterministic initial-readiness race is fixed;
-the old intermittent `6buyl3gj` failure cannot be conclusively attributed to it.
-Unlinked acceleration-library host/ARM portability passes; it is not a controller.
-Diagnostic host matrix `/var/tmp/slaaps-configuration-31m8u6ae` passes Debug/Release/
-ASan-UBSan (3,082 each) and 308 parameters. Portable test prefix is unchanged by
-native-only compact field renaming. Native build `3eg3u4yv` and full runtime
-`gjoks2mh` pass emitted parameter/channel text, clearing and existing regressions.
-Initial compile exceeded ULog's format-description limit; compact new field names
-resolve it without enlarging logger buffers. Failed runtime `uq8klqnm` exposed a
-truncated test marker; the corrected Python harness is hashed separately.
-All jobs are terminal and evidence is linked; clearing history or a fresh chat is safe.
+Request v2/flags1 supplies absolute NED-from-body WXYZ; v1 remains acceleration-only; session/status stay v1.
+Feedback uses f_IMU + R(q)^T*g - alpha cross r - omega cross(omega cross r); EKF2_IMU_POS is CG-to-IMU.
+Numerical control uses scheduled PID and coupled physical wrench allocation with current EDF fixed in the applied solve.
+Future EDF target never counts as achieved thrust; original command/map/link/state bounds cap output leases.
+Pending numerical state commits only after exact all-bank handled ACK time, without invented initial trim history.
+Cold acceleration requires genuine first handled output and an accepted ground-support/spool/takeoff model
+or measured feasible zero-EDF condition; a zero-output ACK alone cannot supply missing ground-support force.
+No automatic airborne fallback, transfer low-throttle reset, stale demand reuse or lease revival is authorized.
+Capture-boundary disarm and fault precedence now pass focused native regression, including actual active stop/profile restore.
+Historical failures and full hashes remain in the integration evidence record; current PASS does not explain all prior failures.
+Diagnostic board/build/runtime jobs are terminal; no compiler owns the slot. Do not overlap runtime with builds.
+Keep this chat while authority-diagnostic implementation is active; commit/NuttX approvals are unchanged.
