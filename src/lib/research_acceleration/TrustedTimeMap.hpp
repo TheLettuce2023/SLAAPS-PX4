@@ -7,7 +7,10 @@
 namespace research_acceleration
 {
 
-static constexpr uint32_t kWireProtocolVersionV1 = 0x00010000;
+static constexpr uint32_t kWireProtocolVersionV1 = kRequestProtocolVersionV1;
+// Request version only: SESSION and STATUS retain their v1 envelope.
+static constexpr uint32_t kWireProtocolVersionV2 = kRequestProtocolVersionV2;
+static constexpr uint8_t kWireFullCommandFlagsV2 = 1;
 static constexpr uint8_t kWireFrameFrdV1 = 1;
 static constexpr uint8_t kWireQuantityInertialAccelerationV1 = 1;
 static constexpr uint8_t kWireReferencePointCgV1 = 1;
@@ -26,9 +29,9 @@ struct TrustedClockMap {
 	TimeUs valid_until_producer_us;
 };
 
-// Already decoded v1 subset. The caller owns C0a target/flags/reserved/length
+// Already decoded request. The caller owns C0a target/flags/reserved/length
 // validation, plus authentication and live source/epoch checks. Not a wire struct.
-struct WireRequestV1 {
+struct WireRequest {
 	uint64_t source_id;
 	uint64_t session_id;
 	uint64_t sequence;
@@ -44,7 +47,12 @@ struct WireRequestV1 {
 	uint8_t frame;
 	uint8_t quantity;
 	uint8_t reference_point;
+	// MAVLink2 extension, WXYZ absolute NED-from-body FRD. Zero means absent,
+	// never an identity quaternion; only explicit request version 2 may use it.
+	float desired_attitude_ned_from_body[4] {};
 };
+
+using WireRequestV1 = WireRequest;
 
 enum class CanonicalizeCode : uint16_t {
 	Ok,
@@ -57,7 +65,8 @@ enum class CanonicalizeCode : uint16_t {
 	WireTimeInvalid,
 	WireNonFinite,
 	// A wire transition epoch has no TrustedClockMap counterpart and must be nonzero.
-	WireIdentityInvalid
+	WireIdentityInvalid,
+	WireAttitudeInvalid
 };
 
 // Pure conversion, NOT admission: no freshness, replay, bounds, authentication,
@@ -69,5 +78,8 @@ enum class CanonicalizeCode : uint16_t {
 CanonicalizeCode canonicalizeRequestV1(const WireRequestV1 &wire,
 				       const TrustedClockMap &map,
 				       CanonicalRequest &canonical);
+
+CanonicalizeCode canonicalizeRequestV2(const WireRequest &wire, const TrustedClockMap &map,
+				       float quaternion_norm_tolerance, CanonicalRequest &canonical);
 
 } // namespace research_acceleration

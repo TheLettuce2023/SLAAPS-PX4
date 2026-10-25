@@ -98,6 +98,17 @@ FIELDS = {
     ],
 }
 
+REQUEST_NAME = "RESEARCH_ACCELERATION_REQUEST"
+ATTITUDE_EXTENSION = ("float[4]", "desired_attitude_ned_from_body", 90)
+
+
+def layout_fields(name):
+    return FIELDS[name] + ([ATTITUDE_EXTENSION] if XML == PRODUCTION_XML and name == REQUEST_NAME else [])
+
+
+def payload_size(name):
+    return len(PAYLOADS[name]) + (16 if XML == PRODUCTION_XML and name == REQUEST_NAME else 0)
+
 
 def fail(message):
     raise RuntimeError(message)
@@ -152,9 +163,11 @@ def validate_and_scan(production):
     schema.assertValid(document)
     messages = document.xpath("/mavlink/messages/message")
     includes = document.xpath("/mavlink/include/text()")
+    extensions = document.xpath("//extensions")
     if (len(messages) != 3 or includes != ([PRODUCTION_INCLUDE] if production else [])
-            or document.xpath("//extensions")):
-        fail("dialect must contain three frozen base messages and only its declared include")
+            or len(extensions) != (1 if production else 0)
+            or (production and extensions[0].getparent().get("name") != REQUEST_NAME)):
+        fail("dialect must retain three frozen base messages and only its declared request extension")
     if production:
         included = (XML.parent / PRODUCTION_INCLUDE).resolve()
         if included != (MAVLINK / "message_definitions/v1.0/development.xml").resolve() or not included.is_file():
@@ -163,9 +176,11 @@ def validate_and_scan(production):
     for message in messages:
         name, identifier = message.get("name"), int(message.get("id"))
         actual = [(field.get("type"), field.get("name")) for field in message.findall("field")]
-        expected = [(field_type, field_name) for field_type, field_name, _ in FIELDS.get(name, ())]
+        expected = [(field_type, field_name) for field_type, field_name, _ in layout_fields(name)]
         if IDS.get(name) != identifier or actual != expected:
             fail("XML layout differs from frozen table: %s" % name)
+        if production and name == REQUEST_NAME and message.index(message.find("extensions")) != 20:
+            fail("attitude extension must follow all 19 frozen v1 fields and description")
         found[identifier] = name
     if found != {value: key for key, value in IDS.items()}:
         fail("research XML IDs/names do not match frozen allocation")
@@ -210,7 +225,7 @@ def check_header(c_output):
     text = "\n".join(path.read_text(encoding="utf-8") for path in c_output.rglob("mavlink_msg_*.h"))
     for name, identifier in IDS.items():
         upper = name
-        length = len(PAYLOADS[name])
+        length = payload_size(name)
         required = (
             ("MAVLINK_MSG_ID_%s %d" % (upper, identifier)),
             ("MAVLINK_MSG_ID_%s_LEN %d" % (upper, length)),
@@ -239,7 +254,8 @@ def check_offsets(c_output, temp, arguments):
     if compiler is None:
         fail("g++ is mandatory for generated layout validation")
     assertions = ["#include <%s/mavlink.h>" % XML.stem, "#include <cstddef>", "#include <type_traits>"]
-    for name, fields in FIELDS.items():
+    for name in FIELDS:
+        fields = layout_fields(name)
         struct_name = "mavlink_%s_t" % name.lower()
         for field_type, field_name, offset in fields:
             assertions.append("static_assert(offsetof(%s, %s) == %d);" % (struct_name, field_name, offset))
@@ -280,14 +296,15 @@ def load_generated(module_path):
 
 
 def python_frame(module, name, payload):
-    fields = FIELDS[name]
+    fields = layout_fields(name)
+    payload = payload.ljust(payload_size(name), b"\0")
     values = []
     for field_type, _, offset in fields:
-        width = 4 if field_type == "float" else int(re.search(r"\d+", field_type).group()) // 8
+        width = 4 if field_type.startswith("float") else int(re.search(r"\d+", field_type).group()) // 8
         count = int(field_type[field_type.index("[") + 1:-1]) if "[" in field_type else 1
         raw = payload[offset:offset + width * count]
         if count != 1:
-            values.append(list(raw))
+            values.append(list(struct.unpack("<%df" % count, raw)) if field_type.startswith("float") else list(raw))
         elif field_type == "float":
             import struct
             values.append(struct.unpack("<f", raw)[0])
@@ -303,6 +320,8 @@ def python_frame(module, name, payload):
 
 def c_parse(executable, frame, expected_id, expected_payload):
     output = run([executable, "--parse", frame.hex()]).strip()
+    name = next(name for name, identifier in IDS.items() if identifier == expected_id)
+    expected_payload = expected_payload.ljust(payload_size(name), b"\0")
     expected = "%d %s" % (expected_id, expected_payload.hex())
     if output != expected:
         fail("C parse/reencode mismatch: %r != %r" % (output, expected))
@@ -329,13 +348,14 @@ def python_parse(module, name, frame, payload):
     message = parser.parse_char(bytes(frame))
     if message is None or message.get_msgId() != IDS[name] or message.get_type() != name:
         fail("Python generated parser did not deliver expected message")
-    for field_type, field_name, offset in FIELDS[name]:
-        width = 4 if field_type == "float" else int(re.search(r"\d+", field_type).group()) // 8
+    payload = payload.ljust(payload_size(name), b"\0")
+    for field_type, field_name, offset in layout_fields(name):
+        width = 4 if field_type.startswith("float") else int(re.search(r"\d+", field_type).group()) // 8
         count = int(field_type[field_type.index("[") + 1:-1]) if "[" in field_type else 1
         raw = payload[offset:offset + width * count]
         actual = getattr(message, field_name)
         if count != 1:
-            actual_bytes = bytes(actual)
+            actual_bytes = struct.pack("<%df" % count, *actual) if field_type.startswith("float") else bytes(actual)
         elif field_type == "float":
             actual_bytes = struct.pack("<f", actual)
         else:
@@ -344,7 +364,8 @@ def python_parse(module, name, frame, payload):
             fail("Python decoded field bits mismatch: " + field_name)
 
 
-COUNTS = {"roundtrip_vectors": 0, "framing_rejections": 0, "semantic_rejections": 0}
+COUNTS = {"roundtrip_vectors": 0, "framing_rejections": 0, "semantic_rejections": 0,
+          "v2_extension_vectors": 0, "request_length_rejections": 0}
 
 
 def roundtrip(executable, module, name, payload, incoming=None):
@@ -371,6 +392,49 @@ def reject(executable, module, frame):
     if decoded is not None and decoded.get_msgId() in IDS.values():
         fail("Python delivered a known message for malformed framing")
     COUNTS["framing_rejections"] += 1
+
+
+def exercise_full_commands(executable, module):
+    if XML != PRODUCTION_XML:
+        return
+    from codec import CodecError, decode_request
+    base = bytearray(PAYLOADS[REQUEST_NAME])
+    base[76:80] = (0x00020000).to_bytes(4, "little")
+    base[85] = 1
+    extra = crc_extra(REQUEST_NAME, FIELDS[REQUEST_NAME])
+    for attitude in ((1., 0., 0., 0.), (-1., 0., 0., 0.),
+                     (0., 1., 0., 0.), (0., 0., 0., -1.)):
+        payload = bytes(base) + struct.pack("<4f", *attitude)
+        roundtrip(executable, module, REQUEST_NAME, payload)
+        # Generated getters must zero-fill the omitted extension tail; physical
+        # validity is tested by the shared canonicalizer/adapter, not framing.
+        for length in range(len(payload.rstrip(b"\0")), len(payload) + 1):
+            incoming = frame_for(IDS[REQUEST_NAME], payload[:length], extra)
+            roundtrip(executable, module, REQUEST_NAME, payload, incoming)
+        try:
+            decode_request(payload)
+        except CodecError:
+            pass
+        else:
+            fail("v1 codec silently accepted a full v2 command")
+        COUNTS["v2_extension_vectors"] += 1
+    # A correctly framed extension never changes the v1 semantic codec. The
+    # production adapter independently enforces version/flags/reserved/norm.
+    for payload in (bytes(base), PAYLOADS[REQUEST_NAME] + struct.pack("<4f", 1., 0., 0., 0.)):
+        roundtrip(executable, module, REQUEST_NAME, payload)
+        try:
+            decode_request(payload)
+        except CodecError:
+            pass
+        else:
+            fail("v1 codec accepted a v2 discriminator or nonzero attitude tail")
+        COUNTS["semantic_rejections"] += 1
+    for payload in (bytes(base[:84]), bytes(base) + bytes(17)):
+        frame = frame_for(IDS[REQUEST_NAME], payload, extra)
+        result = subprocess.run([executable, "--parse", frame.hex()], text=True, capture_output=True, timeout=15)
+        if result.returncode != 1 or result.stdout or result.stderr:
+            fail("strict generated fixture accepted an out-of-contract request length")
+        COUNTS["request_length_rejections"] += 1
 
 
 def exercise(executable, module):
@@ -443,6 +507,7 @@ def exercise(executable, module):
         if "hex" in vector and payload.hex() != vector["hex"]:
             fail("status golden hex mismatch")
         roundtrip(executable, module, names[2], payload)
+    exercise_full_commands(executable, module)
 
 
 def main():

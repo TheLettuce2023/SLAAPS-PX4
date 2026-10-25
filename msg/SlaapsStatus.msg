@@ -12,7 +12,7 @@ uint32 schedule_interval_us # Requested queue interval, not measured deadline co
 uint8 manual_worker_status # slaaps::ManualWorkerStatus
 uint8 manual_preparation_status # slaaps::PreparationStatus; readiness is not output authority
 uint64 manual_preparation_session # Exact expiring disarmed preparation session
-uint64 manual_preparation_deadline
+uint64 manual_preparation_deadline # Immutable Manual operator window or commissioning preparation deadline; not an active command lease
 uint8 manual_preparation_banks # Required MAIN/AUX bank mask
 uint8 manual_entry_status # Software lifecycle only; never flight/output admission
 uint8 MANUAL_ENTRY_INACTIVE = 0
@@ -23,7 +23,7 @@ uint8 MANUAL_ENTRY_WAIT_CENTER = 4
 uint8 MANUAL_ENTRY_WAIT_THROTTLE = 5
 uint8 MANUAL_ENTRY_WAIT_STATE = 6
 uint8 MANUAL_ENTRY_PREPARING = 7
-uint8 MANUAL_ENTRY_PREPARED = 8
+uint8 MANUAL_ENTRY_PREPARED = 8 # Non-actuating banks prepared within the operator window; can_arm remains independent
 uint8 MANUAL_ENTRY_REJECTED = 9
 uint8 MANUAL_ENTRY_ACTIVATING = 10
 uint8 MANUAL_ENTRY_FIRST_COMMAND = 11
@@ -79,6 +79,7 @@ uint8 UNAVAILABLE_ACCELERATION_PORT = 2
 uint8 UNAVAILABLE_REGISTRATION = 3
 uint8 AVAILABLE_SERVO_BENCH = 4 # Servo selection only; no arming, EDF or flight permission
 uint8 AVAILABLE_EDF_COMMISSIONING = 5 # Deliberate bounded ground commissioning; never flight admission
+uint8 UNAVAILABLE_FLIGHT_ADMISSION = 6 # Manual output path exists; measured-envelope/recovery admission remains absent
 uint8 unavailable_reason
 bool schedule_enabled # Explicit empirical IAS/EDF table selected; not flight qualification
 bool schedule_inputs_valid # Fresh selected IAS/density/voltage observations; not local flow-angle/wash qualification

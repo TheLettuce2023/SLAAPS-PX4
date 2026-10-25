@@ -199,9 +199,17 @@ public:
 		now = hrt_absolute_time();
 		return dispatchImpl(now, permission, inventory, binding, true);
 	}
+	// Actual nav mode may cross before its new permission publication. Observe
+	// lifetime/expiry but neither consume a command nor create a write ticket.
+	ManualBankOutput waitTransferLive(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+					  const ManualOutputBinding &binding)
+	{
+		now = hrt_absolute_time();
+		return dispatchImpl(now, permission, inventory, binding, true, false);
+	}
 private:
 	ManualBankOutput dispatchImpl(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
-				      const ManualOutputBinding &binding, bool live)
+				      const ManualOutputBinding &binding, bool live, bool allow_command = true)
 	{
 		// Poll before reading, including initial silence and duplicate traffic.
 		auto output = _consumer.sample(now, permission, inventory, binding);
@@ -222,6 +230,14 @@ private:
 			output = _consumer.sample(now, permission, inventory, binding);
 
 			if (_consumer.fault() != ManualBankFault::None) { return output; }
+		}
+
+		if (!allow_command) {
+			if (result == BoundRead::Rejected || (_consumer.awaitingHandling()
+							      && (result != BoundRead::Data || memcmp(&wire, &_last, sizeof(wire)) != 0))) { revoke(); }
+
+			output.command_valid = _consumer.awaitingHandling() && _consumer.fault() == ManualBankFault::None;
+			return output;
 		}
 
 		if (!_received && (result == BoundRead::Waiting
@@ -319,6 +335,7 @@ private:
 public:
 	void revoke() { _preparation.cancel(); _command.revoke(); _consumer.revoke(); }
 	bool awaitingHandling() const { return _consumer.awaitingHandling(); }
+	bool canCompleteAtTransition(uint64_t transition_us) const { return _consumer.canCompleteAtTransition(transition_us); }
 	ManualBankFault fault() const { return _consumer.fault(); }
 
 private:

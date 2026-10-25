@@ -57,6 +57,9 @@
 #include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_status.h>
+#if defined(CONFIG_MODULES_SLAAPS)
+#include <uORB/topics/slaaps_vehicle_state.h>
+#endif
 
 // subscriptions
 #include <uORB/Subscription.hpp>
@@ -129,6 +132,9 @@ public:
 private:
 	bool isArmed() const { return (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED); }
 	static ModeChangeSource getSourceFromCommand(const vehicle_command_s &cmd);
+#if defined(CONFIG_MODULES_SLAAPS)
+	void observeSlaapsVehicleState();
+#endif
 
 	void answer_command(const vehicle_command_s &cmd, uint8_t result);
 
@@ -296,6 +302,13 @@ private:
 	actuator_armed_s        _actuator_armed{};
 	vehicle_control_mode_s  _vehicle_control_mode{};
 	vtol_vehicle_status_s	_vtol_vehicle_status{};
+#if defined(CONFIG_MODULES_SLAAPS)
+	slaaps_vehicle_state_s _slaaps_vehicle_state {};
+	uint64_t _slaaps_transition{};
+	bool _slaaps_state_seen{};
+	bool _slaaps_state_available{};
+	bool _slaaps_state_changed{};
+#endif
 
 	// Subscriptions
 	uORB::Subscription					_action_request_sub{ORB_ID(action_request)};
@@ -326,6 +339,9 @@ private:
 	uORB::Publication<vehicle_command_s>			_vehicle_command_pub{ORB_ID(vehicle_command)};
 	uORB::Publication<vehicle_control_mode_s>		_vehicle_control_mode_pub{ORB_ID(vehicle_control_mode)};
 	uORB::Publication<vehicle_status_s>			_vehicle_status_pub{ORB_ID(vehicle_status)};
+#if defined(CONFIG_MODULES_SLAAPS)
+	uORB::Publication<slaaps_vehicle_state_s> _slaaps_vehicle_state_pub {ORB_ID(slaaps_vehicle_state)};
+#endif
 
 	orb_advert_t _mavlink_log_pub{nullptr};
 

@@ -57,7 +57,14 @@ private:
 
 	bool send() override
 	{
-		mavlink_timesync_t msg{};
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+		bool handled {};
+		const bool sent = _mavlink->send_slaaps_timesync(handled);
+
+		if (handled) { return sent; }
+
+#endif
+		mavlink_timesync_t msg {};
 
 		msg.tc1 = 0;
 		msg.ts1 = hrt_absolute_time() * 1000; // boot time in nanoseconds

@@ -22,7 +22,9 @@ inline bool validManualPermission(uint64_t now, const ManualPermissionSample &sa
 	const auto &p = sample.permission;
 	return now && maximum_lease_us && sample.sequence && p.timestamp_us && p.timestamp_us <= now
 	       && p.deadline_us > now && p.deadline_us - p.timestamp_us <= maximum_lease_us
-	       && p.session && p.session <= p.timestamp_us && p.source && p.configuration && ManualBankPreparation::validMode(p.mode);
+	       && p.session && p.session <= p.timestamp_us && p.source && p.configuration && ManualBankPreparation::validMode(p.mode)
+	       && (!p.transition_us || (ManualBankPreparation::flightMode(p.mode)
+					&& p.transition_us > p.session && p.transition_us <= p.timestamp_us));
 }
 
 // Preserve decision time and expiry. Syntactically valid denied decisions are
@@ -33,6 +35,7 @@ inline bool encodeManualPermission(uint64_t now, const ManualPermissionSample &s
 	if (!validManualPermission(now, sample, maximum_lease_us)) { return false; }
 
 	static_assert(static_cast<unsigned>(ControlMode::Manual) == slaaps_manual_permission_s::MANUAL, "manual wire mode");
+	static_assert(static_cast<unsigned>(ControlMode::Acceleration) == slaaps_manual_permission_s::ACCELERATION, "acceleration wire mode");
 	static_assert(static_cast<unsigned>(ControlMode::ServoBench) == slaaps_manual_permission_s::SERVO_BENCH, "bench wire mode");
 	static_assert(static_cast<unsigned>(ControlMode::EdfBench) == slaaps_manual_permission_s::EDF_BENCH, "EDF bench wire mode");
 	const auto &p = sample.permission;
@@ -44,6 +47,7 @@ inline bool encodeManualPermission(uint64_t now, const ManualPermissionSample &s
 	candidate.session = p.session;
 	candidate.source = p.source;
 	candidate.configuration = p.configuration;
+	candidate.transition = p.transition_us;
 	candidate.mode = static_cast<uint8_t>(p.mode);
 	candidate.armed = p.armed;
 	candidate.flight_admitted = p.flight_admitted;
@@ -71,6 +75,7 @@ inline bool decodeManualPermission(uint64_t now, const slaaps_manual_permission_
 	p.session = message.session;
 	p.source = message.source;
 	p.configuration = message.configuration;
+	p.transition_us = message.transition;
 	p.mode = static_cast<ControlMode>(message.mode);
 	p.armed = message.armed;
 	p.flight_admitted = message.flight_admitted;
@@ -142,6 +147,7 @@ private:
 		_clock = now;
 		_first_deadline = request.deadline_us;
 		_mode = request.mode;
+		_transition_us = 0;
 		_active = true;
 		return true;
 	}
@@ -208,11 +214,16 @@ private:
 		const auto &p = sample.permission;
 		const bool disarmed_denial = !p.armed && !p.flight_admitted && !p.healthy && !p.measured_condition_valid
 					     && !p.commissioning_admitted && !p.kill && !p.lockdown && !p.termination;
-		const bool granted = ManualBankPreparation::permitted(p, _mode);
+		const bool transfer = _grant_seen && ManualBankPreparation::flightMode(_mode)
+				      && ManualBankPreparation::flightMode(p.mode) && p.mode != _mode
+				      && p.transition_us > _transition_us && p.transition_us > _session
+				      && _last.timestamp_sample <= p.transition_us;
+		const bool granted = ManualBankPreparation::permitted(p, transfer ? p.mode : _mode);
 
 		if (wire.timestamp > now || (!fresh && !disarmed_denial)
 		    || (awaiting_grant && !(granted || (!_grant_seen && disarmed_denial)))
-		    || p.mode != _mode || sample.permission.session != _session || sample.permission.source != _source
+		    || (!transfer && (p.mode != _mode || p.transition_us != _transition_us))
+		    || (transfer && (!fresh || !granted)) || sample.permission.session != _session || sample.permission.source != _source
 		    || sample.permission.configuration != _configuration || sample.permission.timestamp_us < _earliest) { return reject(); }
 
 		if (_seen) {
@@ -223,6 +234,11 @@ private:
 		}
 
 		_last = wire;
+
+		// Permission-first transfer consumes its marker without changing the
+		// bank's handled mode/history or output expiry. Rollback is never allowed.
+		if (transfer) { _mode = p.mode; _transition_us = p.transition_us; }
+
 		_seen = true;
 		_grant_seen |= granted && (!awaiting_grant || can_accept_grant);
 
@@ -236,6 +252,7 @@ private:
 	slaaps_manual_permission_s _last{};
 	slaaps_manual_permission_s _baseline{};
 	uint64_t _session{}, _source{}, _configuration{}, _earliest{}, _lease{}, _clock{}, _first_deadline{};
+	uint64_t _transition_us{};
 	bool _active{}, _seen{}, _have_baseline{}, _grant_seen{};
 	ControlMode _mode{ControlMode::Manual};
 };

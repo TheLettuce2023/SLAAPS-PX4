@@ -125,6 +125,7 @@
 #include "streams/SYSTEM_TIME.hpp"
 #include "streams/TIME_ESTIMATE_TO_TARGET.hpp"
 #include "streams/TIMESYNC.hpp"
+#include "streams/SLAAPS_COMPANION_STATUS.hpp"
 #include "streams/VFR_HUD.hpp"
 #include "streams/VIBRATION.hpp"
 #include "streams/WIND_COV.hpp"
@@ -328,6 +329,9 @@ static constexpr StreamListItem streams_list[] = {
 #if defined(TIMESYNC_HPP)
 	create_stream_list_item<MavlinkStreamTimesync>(),
 #endif // TIMESYNC_HPP
+#if defined(SLAAPS_COMPANION_STATUS_HPP)
+	create_stream_list_item<MavlinkStreamSlaapsCompanionStatus>(),
+#endif // SLAAPS_COMPANION_STATUS_HPP
 #if defined(GLOBAL_POSITION_INT_HPP)
 	create_stream_list_item<MavlinkStreamGlobalPositionInt>(),
 #endif // GLOBAL_POSITION_INT_HPP

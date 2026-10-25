@@ -45,6 +45,9 @@ using namespace px4::logger;
 
 void LoggedTopics::add_default_topics()
 {
+#if defined(CONFIG_MODULES_SLAAPS)
+	add_optional_topic("slaaps_acceleration_status", 20); // Sample diagnostics at50 Hz; original command/ACK times remain in the payload.
+#endif
 	add_topic("action_request");
 	add_topic("actuator_armed");
 	add_optional_topic("actuator_controls_status_0", 300);

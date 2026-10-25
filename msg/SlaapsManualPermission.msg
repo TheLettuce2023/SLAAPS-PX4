@@ -7,7 +7,9 @@ uint64 sequence # Advances only for a new decision, never a retransmission
 uint64 session
 uint64 source
 uint64 configuration
+uint64 transition # Zero initially; monotonic same-session Manual/Acceleration transition
 uint8 MANUAL = 1
+uint8 ACCELERATION = 2
 uint8 SERVO_BENCH = 3
 uint8 EDF_BENCH = 4
 uint8 mode

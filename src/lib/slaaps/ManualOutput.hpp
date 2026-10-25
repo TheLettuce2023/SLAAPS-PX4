@@ -52,11 +52,14 @@ inline bool sameManualActivation(const ManualActivationAck &a, const ManualActiv
 struct ManualWorkerOutput {
 	uint64_t timestamp_us{};
 	uint64_t deadline_us{};
-	uint64_t sequence{}; // Combined control cycles; EDF has its own raw-input sequence.
+	uint64_t sequence{}; // Combined cycles; EDF has a separate continuous demand sequence.
 	research_stabilized_manual::CanardVector canards{};
 	EdfCommand edf{};
 	ManualOutputBinding binding{};
 	ControlMode mode{ControlMode::Manual};
+	uint64_t transition_us{}; // Retained mode-transition token; zero before the first transfer.
+	uint64_t previous_handled_sequence{}; // Nonzero only on the first frame of a transfer.
+	uint64_t previous_deadline_us{}; // Exact outgoing handled-frame deadline, never renewed.
 };
 
 inline bool validManualOutputBinding(const ManualOutputBinding &binding)

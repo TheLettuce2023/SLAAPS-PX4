@@ -50,6 +50,7 @@ struct EdfPermission {
 	bool termination{};
 	bool prearmed{}; // Actual actuator_armed prearm state; never propulsion permission.
 	bool commissioning_admitted{}; // Explicit ground commissioning, never flight admission.
+	uint64_t transition_us{}; // Zero on begin; exact retained supervisor transfer marker afterward.
 };
 
 struct EdfCommand {
@@ -74,17 +75,26 @@ public:
 	EdfOwner &operator=(const EdfOwner &) = delete;
 	EdfFault begin(uint64_t now, const VehicleConfiguration &configuration, const EdfPermission &permission);
 	EdfFault accept(uint64_t now, const EdfPermission &permission, const EdfRequest &request);
+	// Serialized supervisor transfer within one flight output session. Both
+	// grants keep source/configuration/session; only Manual <-> Acceleration
+	// changes. A fresh post-transition request keeps increasing EDF sequence
+	// and cannot outlive the outgoing request or either permission. No fallback
+	// target is synthesized. The returned current sample is not a driver ACK.
+	EdfFault transfer(uint64_t now, uint64_t transition_us, const EdfPermission &previous,
+			  const EdfPermission &next, const EdfRequest &request, EdfCommand &current);
 	EdfCommand sample(uint64_t now, const EdfPermission &permission);
 	void revoke();
 	EdfFault fault() const { return _fault; }
 private:
 	bool permitted(uint64_t now, const EdfPermission &permission) const;
+	bool permitted(uint64_t now, const EdfPermission &permission, const EdfPermission &grant) const;
 	EdfFault check(uint64_t now, const EdfPermission &permission);
 	EdfFault reject(EdfFault fault);
 	VehicleConfiguration _configuration{};
 	EdfPermission _grant{};
 	EdfRequest _request{};
 	uint64_t _last_session{};
+	uint64_t _last_transition_us{}; // Consumed transitions survive revoke/begin.
 	uint64_t _clock{};
 	uint64_t _last_sample{};
 	uint64_t _started_us{};

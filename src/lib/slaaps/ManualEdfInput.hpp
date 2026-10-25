@@ -54,8 +54,28 @@ public:
 		_entry_max = configuration.edf_entry_max;
 		_lease_us = math::min(mapping.maximum_sample_age_us, static_cast<uint64_t>(configuration.output_lease_ms) * 1000);
 		_sequence = 0;
+		_transfer_us = 0;
 		_clock = grant.timestamp_us;
 		_configured = true;
+		return true;
+	}
+
+	// The shared worker supplies its existing EDF sequence after a deliberate
+	// Acceleration-to-Manual transition. This does not acquire EDF authority.
+	bool configureForTransfer(const VehicleConfiguration &configuration, const EdfPermission &grant,
+				  uint64_t transition_us, uint64_t previous_sequence)
+	{
+		if (!configure(configuration, grant)) { return false; }
+
+		if (grant.mode != ControlMode::Manual || !transition_us || transition_us <= grant.session
+		    || grant.transition_us != transition_us || transition_us > grant.timestamp_us
+		    || !previous_sequence || previous_sequence == UINT64_MAX) {
+			_configured = false;
+			return false;
+		}
+
+		_sequence = previous_sequence;
+		_transfer_us = transition_us;
 		return true;
 	}
 
@@ -71,6 +91,7 @@ public:
 		// been observed after this fresh sample; the deliberate session entry
 		// remains the immutable lower bound against pre-entry input reuse.
 		if (now < _clock || sample.timestamp_sample_us < _grant.session
+		    || (_transfer_us && sample.timestamp_sample_us <= _transfer_us)
 		    || sample.timestamp_sample_us > UINT64_MAX - _lease_us
 		    || _input.evaluate(now, sample, ignored, report) != research_actuator_command::ManualControlStatus::Ok
 		    || now >= sample.timestamp_sample_us + _lease_us) {
@@ -123,6 +144,7 @@ private:
 	EdfPermission _grant{};
 	uint64_t _lease_us{};
 	uint64_t _sequence{};
+	uint64_t _transfer_us{};
 	uint64_t _clock{};
 	float _throttle_low{}, _throttle_high{};
 	float _maximum{1.F}, _entry_max{};

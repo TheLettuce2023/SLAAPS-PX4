@@ -96,6 +96,10 @@ public:
 	static Status validateConfiguration(const Configuration &configuration);
 	Status configure(const Configuration &configuration);
 	Status enable(TimeUs now, const ManualSample &manual, const StateSample &sample);
+	// Serialized output owner only: seed a deliberate mode transfer from an
+	// exact all-bank handled command, never an assumed trim/physical position.
+	Status enableFromHandled(TimeUs now, const ManualSample &manual, const StateSample &sample,
+				 TimeUs handled_us, const CanardVector &canards, const Vector3f &rate_setpoint);
 	Status cycle(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report);
 	// Preserve control history and commit both gains/effectiveness only after a
 	// complete successful cycle. An infeasible gain transition latches Fault;
@@ -126,6 +130,7 @@ private:
 	CanardVector _last_command{};
 	TimeUs _last_cycle_us{};
 	TimeUs _last_observed_us{};
+	bool _handled_entry{};
 	State _state{State::Disabled};
 	Status _fault{Status::Ok};
 };

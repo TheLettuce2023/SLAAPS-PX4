@@ -1,6 +1,7 @@
 #include "TrustedTimeMap.hpp"
 
 #include <cmath>
+#include <cstring>
 #include <stdint.h>
 
 namespace research_acceleration
@@ -53,9 +54,8 @@ bool validMap(const TrustedClockMap &map)
 
 } // namespace
 
-CanonicalizeCode canonicalizeRequestV1(const WireRequestV1 &wire,
-				       const TrustedClockMap &map,
-				       CanonicalRequest &canonical)
+static CanonicalizeCode canonicalizeRequest(const WireRequest &wire, const TrustedClockMap &map,
+		uint32_t version, float quaternion_norm_tolerance, CanonicalRequest &canonical)
 {
 	if (!validMap(map)) {
 		return CanonicalizeCode::MapInvalid;
@@ -74,7 +74,7 @@ CanonicalizeCode canonicalizeRequestV1(const WireRequestV1 &wire,
 		return CanonicalizeCode::MapBindingMismatch;
 	}
 
-	if (wire.protocol_version != kWireProtocolVersionV1) {
+	if (wire.protocol_version != version) {
 		return CanonicalizeCode::WireVersionInvalid;
 	}
 
@@ -96,6 +96,28 @@ CanonicalizeCode canonicalizeRequestV1(const WireRequestV1 &wire,
 		return CanonicalizeCode::WireNonFinite;
 	}
 
+	QuaternionNedFromFrd attitude(0.F, 0.F, 0.F, 0.F);
+
+	if (version == kWireProtocolVersionV2) {
+		const MathStatus status = normaliseAttitudeQuaternion(QuaternionNedFromFrd(wire.desired_attitude_ned_from_body),
+					  quaternion_norm_tolerance, attitude);
+
+		if (status != MathStatus::Ok) {
+			return status == MathStatus::NonFinite ? CanonicalizeCode::WireNonFinite : CanonicalizeCode::WireAttitudeInvalid;
+		}
+
+	} else {
+		for (float value : wire.desired_attitude_ned_from_body) {
+			if (!std::isfinite(value)) { return CanonicalizeCode::WireNonFinite; }
+
+			uint32_t bits{};
+			static_assert(sizeof(value) == sizeof(bits), "wire quaternion requires binary32");
+			memcpy(&bits, &value, sizeof(bits));
+
+			if (bits != 0) { return CanonicalizeCode::WireAttitudeInvalid; }
+		}
+	}
+
 	TimeUs mapped_creation{};
 	TimeUs mapped_expiry{};
 	TimeUs raw_duration{};
@@ -109,7 +131,7 @@ CanonicalizeCode canonicalizeRequestV1(const WireRequestV1 &wire,
 	}
 
 	CanonicalRequest result{};
-	result.protocol_version = kWireProtocolVersionV1;
+	result.protocol_version = version;
 	result.source = wire.source_id;
 	result.session = wire.session_id;
 	result.sequence = wire.sequence;
@@ -124,9 +146,23 @@ CanonicalizeCode canonicalizeRequestV1(const WireRequestV1 &wire,
 	result.acceleration_frd_m_s2 = Vec3f(wire.acceleration_x_frd_m_s2,
 					     wire.acceleration_y_frd_m_s2,
 					     wire.acceleration_z_frd_m_s2);
+	result.command_kind = version == kWireProtocolVersionV2 ? CommandKind::AccelerationAndAttitude : CommandKind::AccelerationOnly;
+	result.desired_attitude_ned_from_body = attitude;
 
 	canonical = result;
 	return CanonicalizeCode::Ok;
+}
+
+CanonicalizeCode canonicalizeRequestV1(const WireRequestV1 &wire, const TrustedClockMap &map,
+				       CanonicalRequest &canonical)
+{
+	return canonicalizeRequest(wire, map, kWireProtocolVersionV1, 0.F, canonical);
+}
+
+CanonicalizeCode canonicalizeRequestV2(const WireRequest &wire, const TrustedClockMap &map,
+				       float quaternion_norm_tolerance, CanonicalRequest &canonical)
+{
+	return canonicalizeRequest(wire, map, kWireProtocolVersionV2, quaternion_norm_tolerance, canonical);
 }
 
 } // namespace research_acceleration

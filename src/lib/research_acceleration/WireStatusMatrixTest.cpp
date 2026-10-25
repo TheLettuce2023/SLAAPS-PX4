@@ -196,7 +196,7 @@ void localMatrix()
 		{IngressCode::MapInvalid, 15}, {IngressCode::MapIntervalInvalid, 77}, {IngressCode::MapArithmeticInvalid, 82},
 		{IngressCode::WireVersionInvalid, 4}, {IngressCode::WireEnumInvalid, 25}, {IngressCode::WireEnumInvalid, 26},
 		{IngressCode::WireEnumInvalid, 27}, {IngressCode::WireTimeInvalid, 21}, {IngressCode::WireTimeInvalid, 23},
-		{IngressCode::WireNonFinite, 28}
+		{IngressCode::WireNonFinite, 28}, {IngressCode::WireAttitudeInvalid, 38}
 	};
 
 	for (const auto &item : cases) {

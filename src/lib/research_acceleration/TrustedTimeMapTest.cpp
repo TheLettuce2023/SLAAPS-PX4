@@ -107,6 +107,58 @@ void copiedFields()
 	}
 }
 
+void fullCommandVersion()
+{
+	auto wire = wireFixture();
+	wire.protocol_version = kWireProtocolVersionV2;
+	wire.desired_attitude_ned_from_body[1] = -1.F;
+	CanonicalRequest output = sentinel();
+	check(canonicalizeRequestV2(wire, mapFixture(), 0.01F, output) == CanonicalizeCode::Ok,
+	      "v2_explicit_full_command");
+	check(output.protocol_version == kWireProtocolVersionV2
+	      && output.command_kind == CommandKind::AccelerationAndAttitude
+	      && output.desired_attitude_ned_from_body(1) == 1.F
+	      && output.source == wire.source_id && output.sequence == wire.sequence
+	      && output.producer_monotonic_us == wire.producer_monotonic_us
+	      && output.expiry_time_in_validator_domain_us == 1200,
+	      "v2_preserves_original_identity_times_and_canonical_absolute_attitude");
+	const auto canonical = output;
+	wire.desired_attitude_ned_from_body[1] = 1.F;
+	check(canonicalizeRequestV2(wire, mapFixture(), 0.01F, output) == CanonicalizeCode::Ok
+	      && (output.desired_attitude_ned_from_body - canonical.desired_attitude_ned_from_body).norm() == 0.F,
+	      "v2_q_and_minus_q_equivalent_at_half_turn");
+
+	for (unsigned fault = 0; fault < 5; ++fault) {
+		auto bad = wire;
+		float tolerance = 0.01F;
+
+		if (fault == 0) { bad.desired_attitude_ned_from_body[1] = 0.F; }
+
+		if (fault == 1) { bad.desired_attitude_ned_from_body[1] = 1.02F; }
+
+		if (fault == 2) { bad.desired_attitude_ned_from_body[1] = std::numeric_limits<float>::quiet_NaN(); }
+
+		if (fault == 3) { tolerance = 0.F; }
+
+		if (fault == 4) { bad.protocol_version = kWireProtocolVersionV1; }
+
+		output = sentinel();
+		const auto before = bytes(output);
+		check(canonicalizeRequestV2(bad, mapFixture(), tolerance, output) != CanonicalizeCode::Ok
+		      && bytes(output) == before, "v2_bad_attitude_or_version_preserves_output");
+	}
+
+	wire.protocol_version = kWireProtocolVersionV1;
+	expectFailure(wire, mapFixture(), CanonicalizeCode::WireAttitudeInvalid, "v1_cannot_gain_attitude_tail");
+	wire.desired_attitude_ned_from_body[1] = -0.F;
+	expectFailure(wire, mapFixture(), CanonicalizeCode::WireAttitudeInvalid, "v1_extension_is_byte_zero_even_for_signed_zero");
+	wire.desired_attitude_ned_from_body[1] = 0.F;
+	check(canonicalizeRequestV1(wire, mapFixture(), output) == CanonicalizeCode::Ok
+	      && output.command_kind == CommandKind::AccelerationOnly
+	      && output.desired_attitude_ned_from_body.norm() == 0.F,
+	      "v1_stays_acceleration_only_without_identity_default");
+}
+
 void rejectedInputs()
 {
 	const auto wire = wireFixture();
@@ -271,6 +323,7 @@ void existingGuardBoundary()
 int main()
 {
 	copiedFields();
+	fullCommandVersion();
 	rejectedInputs();
 	arithmeticEdges();
 	existingGuardBoundary();

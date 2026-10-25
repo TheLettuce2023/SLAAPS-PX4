@@ -25,17 +25,22 @@ struct ManualPreparationRequest {
 class ManualBankPreparation
 {
 public:
+	// Initial bank responses remain bounded to one second by the supervisor.
 	static constexpr uint64_t kMaximumPreparationUs = 1000000;
+	// An explicitly configured non-actuating Manual operator window; never an output lease.
+	static constexpr uint64_t kMaximumManualPreparationUs = 60000000;
 	// Match the existing finite commissioning-session ceiling. This permits a
 	// deliberate human arming step; it does not qualify hardware timing.
 	static constexpr uint64_t kMaximumEdfPreparationUs = 60000000;
 	static uint64_t maximumPreparationUs(ControlMode mode)
 	{
-		return mode == ControlMode::EdfBench ? kMaximumEdfPreparationUs : kMaximumPreparationUs;
+		return mode == ControlMode::Manual ? kMaximumManualPreparationUs :
+		       (mode == ControlMode::EdfBench ? kMaximumEdfPreparationUs : kMaximumPreparationUs);
 	}
 	static bool commissioningMode(ControlMode mode) { return mode == ControlMode::ServoBench || mode == ControlMode::EdfBench; }
-	static bool validMode(ControlMode mode) { return mode == ControlMode::Manual || commissioningMode(mode); }
-	static bool requiresEdf(ControlMode mode) { return mode == ControlMode::Manual || mode == ControlMode::EdfBench; }
+	static bool flightMode(ControlMode mode) { return mode == ControlMode::Manual || mode == ControlMode::Acceleration; }
+	static bool validMode(ControlMode mode) { return flightMode(mode) || commissioningMode(mode); }
+	static bool requiresEdf(ControlMode mode) { return flightMode(mode) || mode == ControlMode::EdfBench; }
 	static bool permitted(const EdfPermission &permission, ControlMode mode)
 	{
 		return permission.mode == mode && permission.healthy && !permission.kill && !permission.lockdown && !permission.termination
@@ -43,7 +48,7 @@ public:
 			   (permission.armed && permission.commissioning_admitted && !permission.flight_admitted && !permission.measured_condition_valid) :
 			   (!permission.commissioning_admitted && (mode == ControlMode::ServoBench ?
 					   (!permission.armed && permission.prearmed && !permission.flight_admitted && !permission.measured_condition_valid) :
-					   (mode == ControlMode::Manual && permission.armed && permission.flight_admitted && permission.measured_condition_valid))));
+					   (flightMode(mode) && permission.armed && permission.flight_admitted && permission.measured_condition_valid))));
 	}
 	static ConfigurationUse configurationUse(ControlMode mode)
 	{
@@ -63,13 +68,15 @@ public:
 	}
 	static bool activationTimingConfigured(const VehicleConfiguration &configuration, ControlMode mode)
 	{
-		return mode == ControlMode::Manual ? manualActivationTimingConfigured(configuration) :
+		return flightMode(mode) ? manualActivationTimingConfigured(configuration) :
 		       (commissioningMode(mode) && benchActivationTimingConfigured(configuration));
 	}
 	static bool validConfiguration(const VehicleConfiguration &configuration, ControlMode mode)
 	{
 		return validMode(mode) && validate(configuration, configurationUse(mode)).valid()
-		       && (!commissioningMode(mode) || activationTimingConfigured(configuration, mode));
+		       && activationTimingConfigured(configuration, mode)
+		       && (mode != ControlMode::Acceleration || (configuration.acceleration_control.enabled == 1
+				       && validateAccelerationControlConfiguration(configuration).valid()));
 	}
 	static bool validRequest(uint64_t now, const ManualPreparationRequest &request)
 	{
@@ -97,9 +104,18 @@ public:
 
 		_last_session = request.session; // Failed proposals cannot be replayed after repair.
 
-		if (!validRequest(now, request) || bank >= 2 || !(request.binding.banks & (1U << bank))
+		// Cold acceleration entry requires a separately handled initial output.
+		// This increment admits only an explicit transfer of existing flight history.
+		if (request.mode == ControlMode::Acceleration || !validRequest(now, request) || bank >= 2 || !(request.binding.banks & (1U << bank))
 		    || !validConfiguration(configuration, request.mode)
 		    || request.configuration != fingerprint(configuration)) { return false; }
+
+		// Manual session is the deliberate entry time, which can precede proposal
+		// publication. A delayed proposal must not add time to the configured wait.
+		if (request.mode == ControlMode::Manual
+		    && request.deadline_us - request.session > static_cast<uint64_t>(configuration.manual_ready_wait_s) * 1000000) {
+			return false;
+		}
 
 		RoutingPlan routing{};
 

@@ -9,6 +9,7 @@
 #endif
 
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -25,7 +26,8 @@ constexpr unsigned kUnsignedFrameOverhead = 12;
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST == GENERATED_MAVLINK_REQUEST_ID, "request ID");
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION == GENERATED_MAVLINK_REQUEST_ID + 1, "session ID");
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS == GENERATED_MAVLINK_REQUEST_ID + 2, "status ID");
-static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST_LEN == 90, "request length");
+static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST_LEN ==
+	      (GENERATED_MAVLINK_REQUEST_ID == 200010 ? 106 : 90), "request length");
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION_LEN == 76, "session length");
 static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_LEN == 106, "status length");
 // Generated base MIN_LEN is not the contract's trimmed logical minimum.
@@ -165,7 +167,8 @@ bool parse(const std::string &hex, bool framed_output)
 	unsigned minimum = 0;
 
 	switch (id) {
-	case MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST: nominal = 90; minimum = 85; break;
+	case MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST:
+		nominal = MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST_LEN; minimum = 85; break;
 
 	case MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION: nominal = 76; minimum = 71; break;
 
@@ -200,6 +203,13 @@ bool parse(const std::string &hex, bool framed_output)
 	case MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST: {
 			mavlink_research_acceleration_request_t value{};
 			mavlink_msg_research_acceleration_request_decode(&decoded, &value);
+#if MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST_LEN == 106
+			float attitude[4] {};
+			mavlink_msg_research_acceleration_request_get_desired_attitude_ned_from_body(&decoded, attitude);
+
+			if (std::memcmp(attitude, value.desired_attitude_ned_from_body, sizeof(attitude)) != 0) { return false; }
+
+#endif
 			mavlink_msg_research_acceleration_request_encode_status(decoded.sysid, decoded.compid, &transmit, &reencoded, &value);
 			break;
 		}

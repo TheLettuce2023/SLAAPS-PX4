@@ -25,14 +25,19 @@ EdfFault EdfOwner::reject(EdfFault fault)
 
 bool EdfOwner::permitted(uint64_t now, const EdfPermission &p) const
 {
-	const bool admitted = _grant.mode == ControlMode::EdfBench ?
+	return permitted(now, p, _grant);
+}
+
+bool EdfOwner::permitted(uint64_t now, const EdfPermission &p, const EdfPermission &grant) const
+{
+	const bool admitted = grant.mode == ControlMode::EdfBench ?
 			      (p.commissioning_admitted && !p.flight_admitted && !p.measured_condition_valid) :
 			      (!p.commissioning_admitted && p.flight_admitted && p.measured_condition_valid);
 	return !inhibited(p) && admitted && p.healthy
 	       && p.timestamp_us != 0 && p.session <= p.timestamp_us && p.timestamp_us <= now && now < p.deadline_us
 	       && p.deadline_us - p.timestamp_us <= _lease_us
-	       && p.session == _grant.session && p.source == _grant.source
-	       && p.configuration == _grant.configuration && p.mode == _grant.mode;
+	       && p.session == grant.session && p.source == grant.source
+	       && p.configuration == grant.configuration && p.mode == grant.mode && p.transition_us == grant.transition_us;
 }
 
 EdfFault EdfOwner::begin(uint64_t now, const VehicleConfiguration &configuration, const EdfPermission &permission)
@@ -55,7 +60,7 @@ EdfFault EdfOwner::begin(uint64_t now, const VehicleConfiguration &configuration
 	// Consume even a rejected token; retry needs a deliberate new session.
 	_last_session = permission.session;
 
-	if (permission.source == 0 || permission.configuration == 0
+	if (permission.source == 0 || permission.configuration == 0 || permission.transition_us != 0
 	    || (permission.mode != ControlMode::Manual && permission.mode != ControlMode::Acceleration
 		&& permission.mode != ControlMode::EdfBench)) { return reject(EdfFault::InvalidGrant); }
 
@@ -140,6 +145,71 @@ EdfFault EdfOwner::accept(uint64_t now, const EdfPermission &permission, const E
 	_request = request;
 	_target = target;
 	_received = true;
+	return EdfFault::None;
+}
+
+EdfFault EdfOwner::transfer(uint64_t now, uint64_t transition_us, const EdfPermission &previous,
+			    const EdfPermission &next, const EdfRequest &request, EdfCommand &current)
+{
+	if (check(now, previous) != EdfFault::None) { return _fault; }
+
+	if (!transition_us || transition_us <= _last_transition_us || transition_us <= _grant.session
+	    || transition_us > now || previous.timestamp_us > transition_us) { return reject(EdfFault::InvalidGrant); }
+
+	// A rejected transfer cannot replay this supervisor event after repair.
+	_last_transition_us = transition_us;
+	const bool opposite_modes = (_grant.mode == ControlMode::Manual && next.mode == ControlMode::Acceleration)
+				    || (_grant.mode == ControlMode::Acceleration && next.mode == ControlMode::Manual);
+
+	if (!opposite_modes || next.session != _grant.session || next.source != _grant.source
+	    || next.configuration != _grant.configuration || _grant.configuration != fingerprint(_configuration)
+	    || next.transition_us != transition_us || next.timestamp_us < transition_us
+	    || !permitted(now, next, next)) { return reject(EdfFault::InvalidGrant); }
+
+	if (!_received || request.session != next.session || request.source != next.source
+	    || request.configuration != next.configuration || request.mode != next.mode) { return reject(EdfFault::WrongOwner); }
+
+	if (!request.sequence || request.sequence <= _request.sequence || request.timestamp_us <= transition_us
+	    || request.timestamp_us <= _request.timestamp_us || request.timestamp_us > now || request.deadline_us <= now
+	    || request.deadline_us - request.timestamp_us > _lease_us || request.deadline_us > _request.deadline_us
+	    || request.deadline_us > previous.deadline_us || request.deadline_us > next.deadline_us
+	    || !std::isfinite(request.value)) { return reject(EdfFault::InvalidRequest); }
+
+	float target{};
+
+	if (next.mode == ControlMode::Manual) {
+		if (request.units != EdfUnits::Normalized || request.value < 0.F || request.value > 1.F) { return reject(EdfFault::InvalidRequest); }
+
+		target = request.value;
+
+	} else if (request.units != EdfUnits::Newtons || !thrustToCommand(_configuration, request.value, target)) {
+		return reject(EdfFault::InvalidRequest);
+	}
+
+	// Spend elapsed slew time only under the outgoing target, exactly as an
+	// ordinary accept would. The incoming target starts now, with no saved time
+	// budget and no low-throttle reset. Nothing has altered the sampled output.
+	const float dt = static_cast<float>(now - _last_sample) * kSecondsPerUs;
+	const float sampled = _output + math::constrain(_target - _output, -_configuration.edf_fall * dt,
+			      _configuration.edf_rise * dt);
+
+	if (!std::isfinite(sampled) || sampled < 0.F || sampled > 1.F) { return reject(EdfFault::InvalidRequest); }
+
+	EdfCommand candidate{};
+	candidate.disposition = EdfDisposition::Command;
+	candidate.normalized = sampled;
+	candidate.session = request.session;
+	candidate.source = request.source;
+	candidate.configuration = request.configuration;
+	candidate.sequence = request.sequence;
+	candidate.request_timestamp_us = request.timestamp_us;
+	candidate.deadline_us = request.deadline_us;
+	_grant = next;
+	_request = request;
+	_target = target;
+	_output = sampled;
+	_last_sample = now;
+	current = candidate;
 	return EdfFault::None;
 }
 

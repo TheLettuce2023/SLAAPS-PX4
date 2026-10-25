@@ -40,6 +40,18 @@ add_subdirectory(MulticopterThrowLaunch)
 
 set(SRCS)
 
+# Commander and land-detector code consume shared navigation parameters even
+# on targets without Navigator. Retain their canonical metadata without
+# compiling navigation/observation services; parameters alone enable neither.
+set(COMMANDER_SHARED_NAVIGATOR_CONFIG)
+if(NOT CONFIG_MODULES_NAVIGATOR)
+	list(APPEND COMMANDER_SHARED_NAVIGATOR_CONFIG
+		../navigator/geofence_params.yaml
+		../navigator/navigator_params.yaml
+		../navigator/rtl_params.yaml
+		../navigator/DetectAndAvoid/detect_and_avoid_params.yaml)
+endif()
+
 if(CONFIG_SENSORS_VEHICLE_MAGNETOMETER)
 	list(APPEND SRCS mag_calibration.cpp)
 endif()
@@ -70,6 +82,7 @@ px4_add_module(
 	MODULE_CONFIG
 		module.yaml
 		commander_params.yaml
+		${COMMANDER_SHARED_NAVIGATOR_CONFIG}
 	DEPENDS
 		ArmAuthorization
 		circuit_breaker

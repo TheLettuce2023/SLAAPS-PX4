@@ -6,7 +6,7 @@
   <dialect>0</dialect>
   <messages>
     <message id="200010" name="RESEARCH_ACCELERATION_REQUEST">
-      <description>SLAAPS private v1 contract. Requires verified link, configured source, session and clock admission; payload alone grants no control.</description>
+      <description>SLAAPS request versions 1 and 2; session/status administration remains v1. Version 1 with flags 0 is acceleration-only commissioning and cannot supply attitude. Version 2 (0x00020000) with flags 1 atomically supplies acceleration plus absolute desired NED-from-body FRD quaternion WXYZ. Requires verified link, configured source, session and clock admission; payload alone grants no control.</description>
       <field type="uint64_t" name="source_id"/>
       <field type="uint64_t" name="session_id"/>
       <field type="uint64_t" name="sequence"/>
@@ -26,6 +26,8 @@
       <field type="uint8_t" name="reference_point"/>
       <field type="uint8_t" name="flags"/>
       <field type="uint8_t[4]" name="reserved"/>
+      <extensions/>
+      <field type="float[4]" name="desired_attitude_ned_from_body">Absolute desired orientation WXYZ, rotating body FRD into NED. Required finite near-unit quaternion for request v2/flags 1; q and -q are equivalent. Must be absent/zero for v1/flags 0. Not a relative rotation or implicit entry hold. Acceleration remains inertial CG acceleration held in rotating body FRD until superseded or expired.</field>
     </message>
     <message id="200011" name="RESEARCH_ACCELERATION_SESSION">
       <description>SLAAPS private v1 session administration. Requires independent supervisor authorization; a received packet cannot establish its own authority.</description>

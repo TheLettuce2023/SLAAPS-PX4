@@ -75,6 +75,21 @@
 #define MAVLINK_RECEIVER_NET_ADDED_STACK 0
 #endif
 
+namespace
+{
+// MAVLink 2 carries a 24-bit message ID; do not narrow COMMAND_LONG's float
+// parameter before validating its finite, representable range.
+bool message_id_from_param(float parameter, uint32_t &message_id)
+{
+	constexpr uint32_t maximum_message_id = 0xFFFFFFU;
+
+	if (!PX4_ISFINITE(parameter) || parameter < 0.f || parameter > static_cast<float>(maximum_message_id)) { return false; }
+
+	message_id = static_cast<uint32_t>(roundf(parameter));
+	return true;
+}
+}
+
 MavlinkReceiver::~MavlinkReceiver()
 {
 	delete _tune_publisher;
@@ -131,7 +146,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink &parent) :
 #error "SLAAPS companion ingress requires the MAVLink signature verifier"
 #endif
 void MavlinkReceiver::publish_slaaps_companion(const mavlink_message_t *msg, bool verified,
-		bool signing_active, uint32_t generation)
+		bool signing_active, uint32_t generation, const slaaps_companion_packet_s *clock)
 {
 	const int instance = _mavlink.get_instance_id();
 
@@ -145,7 +160,15 @@ void MavlinkReceiver::publish_slaaps_companion(const mavlink_message_t *msg, boo
 	packet.signing_active = signing_active;
 	packet.receiver_system = _mavlink.get_system_id();
 	packet.receiver_component = _mavlink.get_component_id();
-	packet.event = msg ? slaaps_companion_packet_s::EVENT_FRAME : slaaps_companion_packet_s::EVENT_LINK_STATE;
+	packet.event = clock ? slaaps_companion_packet_s::EVENT_CLOCK_SAMPLE :
+		       msg ? slaaps_companion_packet_s::EVENT_FRAME : slaaps_companion_packet_s::EVENT_LINK_STATE;
+
+	if (clock) {
+		packet.control_binding_id = clock->control_binding_id;
+		packet.controller_instance_id = clock->controller_instance_id;
+		packet.configuration_identity = clock->configuration_identity;
+		packet.clock_sent_us = clock->clock_sent_us;
+	}
 
 	if (msg) {
 		packet.message_id = msg->msgid;
@@ -765,36 +788,50 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 	if (zero_mask) { PX4_DEBUG("MAV_CMD %u: unsupported params with 0.0 sentinel (use NaN) mask=0x%02x", (unsigned)vehicle_command.command, zero_mask); }
 
 	if (vehicle_command.command == MAV_CMD_SET_MESSAGE_INTERVAL) {
-		if (set_message_interval(
-			    (int)(vehicle_command.param1 + 0.5f), vehicle_command.param2, vehicle_command.param3, vehicle_command.param4, vehicle_command.param7)) {
+		uint32_t message_id{};
+
+		if (!message_id_from_param(vehicle_command.param1, message_id)
+		    || set_message_interval(message_id, vehicle_command.param2, vehicle_command.param3, vehicle_command.param4, vehicle_command.param7)) {
 			result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_FAILED;
 		}
 
 	} else if (vehicle_command.command == MAV_CMD_GET_MESSAGE_INTERVAL) {
-		get_message_interval((int)(vehicle_command.param1 + 0.5f));
+		uint32_t message_id{};
+
+		if (!message_id_from_param(vehicle_command.param1, message_id) || !get_message_interval(message_id)) {
+			result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_UNSUPPORTED;
+		}
 
 	} else if (vehicle_command.command == MAV_CMD_REQUEST_MESSAGE) {
+		uint32_t message_id{};
 
-		uint16_t message_id = (uint16_t)roundf(vehicle_command.param1);
+		if (!message_id_from_param(vehicle_command.param1, message_id)) {
+			result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_UNSUPPORTED;
 
+		} else {
 #if defined(MAVLINK_MSG_ID_ESC_EEPROM)
 
-		// Translate ESC_EEPROM request into the PX4 internal command so the DShot driver handles it
-		if (message_id == MAVLINK_MSG_ID_ESC_EEPROM) {
-			vehicle_command_s eeprom_cmd = vehicle_command;
-			eeprom_cmd.command = vehicle_command_s::VEHICLE_CMD_ESC_REQUEST_EEPROM;
-			_cmd_pub.publish(eeprom_cmd);
+			// Translate ESC_EEPROM request into the PX4 internal command so the DShot driver handles it
+			if (message_id == MAVLINK_MSG_ID_ESC_EEPROM) {
+				vehicle_command_s eeprom_cmd = vehicle_command;
+				eeprom_cmd.command = vehicle_command_s::VEHICLE_CMD_ESC_REQUEST_EEPROM;
+				_cmd_pub.publish(eeprom_cmd);
 
-		} else
+			} else
 #endif
-			if (message_id == MAVLINK_MSG_ID_MESSAGE_INTERVAL) {
-				get_message_interval((int)(vehicle_command.param2 + 0.5f));
+				if (message_id == MAVLINK_MSG_ID_MESSAGE_INTERVAL) {
+					uint32_t requested_id{};
 
-			} else {
-				result = handle_request_message_command(message_id,
-									vehicle_command.param2, vehicle_command.param3, vehicle_command.param4,
-									vehicle_command.param5, vehicle_command.param6, vehicle_command.param7);
-			}
+					if (!message_id_from_param(vehicle_command.param2, requested_id) || !get_message_interval(requested_id)) {
+						result = vehicle_command_ack_s::VEHICLE_CMD_RESULT_UNSUPPORTED;
+					}
+
+				} else {
+					result = handle_request_message_command(message_id,
+										vehicle_command.param2, vehicle_command.param3, vehicle_command.param4,
+										vehicle_command.param5, vehicle_command.param6, vehicle_command.param7);
+				}
+		}
 
 	} else if (vehicle_command.command == MAV_CMD_INJECT_FAILURE) {
 		if (_mavlink.failure_injection_enabled()) {
@@ -951,7 +988,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 	}
 }
 
-uint8_t MavlinkReceiver::handle_request_message_command(uint16_t message_id, float param2, float param3, float param4,
+uint8_t MavlinkReceiver::handle_request_message_command(uint32_t message_id, float param2, float param3, float param4,
 		float param5, float param6, float param7)
 {
 	bool stream_found = false;
@@ -2558,9 +2595,9 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 }
 
 int
-MavlinkReceiver::set_message_interval(int msgId, float interval, float param3, float param4, float param7)
+MavlinkReceiver::set_message_interval(uint32_t msgId, float interval, float param3, float param4, float param7)
 {
-	if (msgId == MAVLINK_MSG_ID_HEARTBEAT) {
+	if (msgId > 0xFFFFFFU || msgId == MAVLINK_MSG_ID_HEARTBEAT) {
 		return PX4_ERROR;
 	}
 
@@ -2606,9 +2643,13 @@ MavlinkReceiver::set_message_interval(int msgId, float interval, float param3, f
 	return (found_id ? PX4_OK : PX4_ERROR);
 }
 
-void
-MavlinkReceiver::get_message_interval(int msgId)
+bool
+MavlinkReceiver::get_message_interval(uint32_t msgId)
 {
+	// The MESSAGE_INTERVAL wire format still has a 16-bit message_id.
+	// Report an unsupported command instead of silently truncating it.
+	if (msgId > UINT16_MAX) { return false; }
+
 	int interval = -1;
 
 	for (const auto &stream : _mavlink.get_streams()) {
@@ -2620,8 +2661,9 @@ MavlinkReceiver::get_message_interval(int msgId)
 
 	// send back this value...
 	_mavlink.lock_send();
-	mavlink_msg_message_interval_send(_mavlink.get_channel(), msgId, interval);
+	mavlink_msg_message_interval_send(_mavlink.get_channel(), static_cast<uint16_t>(msgId), interval);
 	_mavlink.unlock_send();
+	return true;
 }
 
 void
@@ -3984,19 +4026,23 @@ MavlinkReceiver::run()
 					const bool frame_verified = parsed == MAVLINK_FRAMING_OK && msg.magic == MAVLINK_STX
 								    && (msg.incompat_flags & MAVLINK_IFLAG_SIGNED) && signing
 								    && signing->last_status == MAVLINK_SIGNING_STATUS_OK;
+					slaaps_companion_packet_s clock_sample{};
+					const bool matched_clock = parsed && msg.msgid == MAVLINK_MSG_ID_TIMESYNC
+								   && _mavlink.match_slaaps_clock(msg, frame_verified, frame_signing_generation, clock_sample);
 #endif
 					_mavlink.unlock_send();
 
 					if (parsed) {
 #if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
 
-						if (msg.msgid == MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST
+						if (matched_clock || msg.msgid == MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST
 						    || msg.msgid == MAVLINK_MSG_ID_RESEARCH_ACCELERATION_SESSION) {
 							if (frame_signing_generation != _slaaps_signing_generation || frame_signing_active != _slaaps_signing_active) {
 								publish_slaaps_companion(nullptr, false, frame_signing_active, frame_signing_generation);
 							}
 
-							publish_slaaps_companion(&msg, frame_verified, frame_signing_active, frame_signing_generation);
+							publish_slaaps_companion(&msg, frame_verified, frame_signing_active, frame_signing_generation,
+										 matched_clock ? &clock_sample : nullptr);
 						}
 
 #endif
@@ -4268,7 +4314,7 @@ void MavlinkReceiver::print_detailed_rx_stats() const
 
 							const float elapsed_s = (now_ms - msg_stat.last_time_received_ms) / 1000.f;
 
-							printf("\t    msgid:%5" PRIu16 ", Rate:%5.1f Hz, last %.2fs ago\n",
+							printf("\t    msgid:%5" PRIu32 ", Rate:%5.1f Hz, last %.2fs ago\n",
 							       msg_stat.msg_id, (double)msg_stat.avg_rate_hz, (double)elapsed_s);
 						}
 					}

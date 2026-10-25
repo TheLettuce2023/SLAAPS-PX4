@@ -22,7 +22,13 @@ public:
 		ReportedRoutingSnapshot candidate{};
 		unsigned revisions[ORB_MULTI_MAX_INSTANCES] {};
 		unsigned generations[ORB_MULTI_MAX_INSTANCES] {};
+		unsigned baseline_revisions[ORB_MULTI_MAX_INSTANCES] {};
 		uint8_t instances[2] {};
+		bool baseline_valid{};
+		bool retryable{};
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+		unsigned attempt {};
+#endif
 	};
 
 	OutputRoutingObservation()
@@ -40,6 +46,8 @@ public:
 
 	InventoryFault capture(uint64_t now, ReportedRoutingSnapshot &snapshot, Workspace &workspace)
 	{
+		workspace.baseline_valid = false;
+		workspace.retryable = false;
 		return captureImpl(now, snapshot, workspace, false);
 	}
 
@@ -53,11 +61,34 @@ public:
 	// freshness decision. Return the final observation time for caller guards.
 	InventoryFault captureLive(uint64_t &now, ReportedRoutingSnapshot &snapshot, Workspace &workspace)
 	{
-		now = hrt_absolute_time();
-		const auto result = captureImpl(now, snapshot, workspace, true);
-		now = hrt_absolute_time();
+		workspace.baseline_valid = false;
+		workspace.retryable = false;
+		constexpr unsigned kMaximumAttempts = 3;
+		InventoryFault result{InventoryFault::UnstablePublisher};
+
+		for (unsigned attempt = 0; attempt < kMaximumAttempts; ++attempt) {
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+			workspace.attempt = attempt;
+#endif
+			now = hrt_absolute_time();
+			result = captureImpl(now, snapshot, workspace, true);
+			now = hrt_absolute_time();
+
+			if (result != InventoryFault::UnstablePublisher || !workspace.retryable) { return result; }
+		}
+
 		return result;
 	}
+
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+	// Deterministic native fixture boundary; no authority or check override.
+	using CapturePassHook = void (*)(void *context, unsigned attempt);
+	void setCapturePassHook(CapturePassHook hook, void *context)
+	{
+		_capture_hook = hook;
+		_capture_context = context;
+	}
+#endif
 private:
 	InventoryFault captureImpl(uint64_t &now, ReportedRoutingSnapshot &snapshot, Workspace &workspace, bool live)
 	{
@@ -66,6 +97,7 @@ private:
 		auto &generations = workspace.generations;
 		auto &instances = workspace.instances;
 		auto &candidate = workspace.candidate;
+		workspace.retryable = false;
 
 		// Reset only values whose absence is interpreted below. Every used
 		// report/current payload and the complete inventory are overwritten.
@@ -89,11 +121,33 @@ private:
 			instances[count++] = i;
 		}
 
+		if (live) {
+			for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; ++i) {
+				if (workspace.baseline_valid && revisions[i] != workspace.baseline_revisions[i]) {
+					return InventoryFault::UnstablePublisher;
+				}
+			}
+
+			if (!workspace.baseline_valid) {
+				for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; ++i) { workspace.baseline_revisions[i] = revisions[i]; }
+
+				workspace.baseline_valid = true;
+			}
+
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+
+			if (_capture_hook) { _capture_hook(_capture_context, workspace.attempt); }
+
+#endif
+		}
+
 		if (!live) {
 			const auto result = assembleOutputInventory(now, reports, count, 3, candidate.inventory);
 
 			if (result != InventoryFault::None) { return result; }
 		}
+
+		bool generation_changed = false;
 
 		for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; ++i) {
 			auto &subscription = _reports[i];
@@ -107,8 +161,15 @@ private:
 			auto &current = workspace.current;
 			unsigned revision{};
 
-			if (!subscription.copyBound(&current, revision) || revision != revisions[i]
-			    || subscription.get_last_generation() != generations[i]) { return InventoryFault::UnstablePublisher; }
+			if (!subscription.copyBound(&current, revision) || revision != revisions[i]) {
+				return InventoryFault::UnstablePublisher;
+			}
+
+			if (subscription.get_last_generation() != generations[i]) {
+				if (!live) { return InventoryFault::UnstablePublisher; }
+
+				generation_changed = true;
+			}
 		}
 
 		if (live) {
@@ -116,6 +177,14 @@ private:
 			const auto result = assembleOutputInventory(now, reports, count, 3, candidate.inventory);
 
 			if (result != InventoryFault::None) { return result; }
+		}
+
+		// A normal report update may race a pass. Retry only after every
+		// publisher/enumeration check and the original reports' freshness and
+		// validity checks pass. The next full pass must keep the first lifetimes.
+		if (generation_changed) {
+			workspace.retryable = true;
+			return InventoryFault::UnstablePublisher;
 		}
 
 		candidate.captured_us = now;
@@ -132,6 +201,10 @@ private:
 		return InventoryFault::None;
 	}
 	uORB::ResearchSubscription _reports[ORB_MULTI_MAX_INSTANCES];
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+	CapturePassHook _capture_hook {};
+	void *_capture_context{};
+#endif
 };
 
 } // namespace slaaps

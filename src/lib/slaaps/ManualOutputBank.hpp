@@ -47,12 +47,15 @@ public:
 		_active = false;
 		_received = false;
 		_awaiting_handling = false;
+		_handled_us = 0;
+		_pending_transition = 0;
 
 		if (!now || now < _clock) { return reject(ManualBankFault::InvalidTime); }
 
 		_clock = now;
 
-		if (!permission.session || permission.session <= _session || permission.session > now) { return reject(ManualBankFault::InvalidGrant); }
+		if (!permission.session || permission.session <= _session || permission.session > now
+		    || permission.mode == ControlMode::Acceleration || permission.transition_us) { return reject(ManualBankFault::InvalidGrant); }
 
 		_session = permission.session; // Failed entry also consumes the token.
 
@@ -85,15 +88,22 @@ public:
 		if (poll(now, permission, inventory, binding) != ManualBankFault::None) { return _fault; }
 
 		const auto &edf = frame.edf;
-		const bool bench = _grant.mode == ControlMode::ServoBench;
-		const bool edf_bench = _grant.mode == ControlMode::EdfBench;
-		const uint64_t lease = static_cast<uint64_t>(math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+		const bool transfer = _pending_transition != 0;
+		const ControlMode mode = transfer ? permission.mode : _grant.mode;
+		const bool bench = mode == ControlMode::ServoBench;
+		const bool edf_bench = mode == ControlMode::EdfBench;
+		const uint64_t lease = static_cast<uint64_t>(mode == ControlMode::Acceleration ? _configuration.output_lease_ms :
+				       math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
 
 		if (_awaiting_handling || _sequence == UINT64_MAX || frame.sequence != _sequence + 1 || frame.timestamp_us < _last_timestamp
 		    || (_received && frame.timestamp_us == _last_timestamp) || frame.timestamp_us > now
-		    || frame.deadline_us <= now || frame.deadline_us - frame.timestamp_us > ManualBankPreparation::cycleMaximumUs(_configuration, _grant.mode)
+		    || frame.deadline_us <= now || frame.deadline_us - frame.timestamp_us > ManualBankPreparation::cycleMaximumUs(_configuration, mode)
 		    || frame.deadline_us > edf.deadline_us || !sameManualOutputBinding(frame.binding, _binding)
-		    || frame.mode != _grant.mode
+		    || frame.mode != mode || frame.transition_us != permission.transition_us
+		    || (transfer ? (frame.transition_us != _pending_transition || frame.previous_handled_sequence != _sequence
+				    || frame.previous_deadline_us != _deadline || frame.deadline_us > _deadline
+				    || frame.timestamp_us <= _pending_transition || edf.request_timestamp_us <= _pending_transition) :
+			(frame.previous_handled_sequence || frame.previous_deadline_us))
 		    || (bench ? (edf.disposition != EdfDisposition::Inhibited || !(edf.normalized >= 0.F && edf.normalized <= 0.F)) :
 			(edf.disposition != EdfDisposition::Command))
 		    || edf.session != _grant.session || edf.source != _grant.source
@@ -148,6 +158,9 @@ public:
 		}
 
 		_candidate = candidate;
+
+		if (transfer) { _grant = permission; _pending_transition = 0; }
+
 		_received = true;
 		_sequence = frame.sequence;
 		_last_timestamp = frame.timestamp_us;
@@ -175,6 +188,7 @@ public:
 		}
 
 		_awaiting_handling = false;
+		_handled_us = now;
 		ack = {_grant.session, _grant.source, _grant.configuration, _binding.routing, _binding.driver[_bank],
 		       _sequence, _last_timestamp, now, static_cast<uint8_t>(_bank)
 		      };
@@ -201,11 +215,16 @@ public:
 		return true;
 	}
 	bool awaitingHandling() const { return _active && _awaiting_handling; }
+	bool canCompleteAtTransition(uint64_t transition_us) const
+	{
+		return _active && _awaiting_handling && transition_us && _accepted_us <= transition_us
+		       && _last_timestamp <= transition_us;
+	}
 
 	ManualBankOutput sample(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
 				const ManualOutputBinding &binding)
 	{
-		if (poll(now, permission, inventory, binding) == ManualBankFault::None && _received) {
+		if (poll(now, permission, inventory, binding) == ManualBankFault::None && _received && !_pending_transition) {
 			auto result = _candidate;
 			result.deadline_us = math::min(result.deadline_us, permission.deadline_us);
 			return result;
@@ -243,13 +262,25 @@ private:
 		_clock = now;
 		const uint64_t lease = static_cast<uint64_t>(_configuration.output_lease_ms) * 1000;
 
-		if (!ManualBankPreparation::permitted(permission, _grant.mode)
+		const bool transfer = permission.mode != _grant.mode;
+		const bool transfer_valid = transfer && ManualBankPreparation::flightMode(_grant.mode)
+					    && ManualBankPreparation::flightMode(permission.mode) && _received && !_awaiting_handling && _handled_us
+					    && permission.transition_us > _grant.transition_us && permission.transition_us > _grant.session
+					    && _grant.timestamp_us <= permission.transition_us && _last_timestamp <= permission.transition_us
+					    && _accepted_us <= permission.transition_us
+					    && (!_pending_transition || _pending_transition == permission.transition_us)
+					    && ManualBankPreparation::validConfiguration(_configuration, permission.mode);
+
+		if ((transfer ? !transfer_valid : (permission.transition_us != _grant.transition_us || _pending_transition))
+		    || !ManualBankPreparation::permitted(permission, permission.mode)
 		    || permission.session != _grant.session || permission.source != _grant.source || permission.configuration != _grant.configuration
 		    || !permission.timestamp_us || permission.session > permission.timestamp_us
 		    || permission.timestamp_us > now || now >= permission.deadline_us
 		    || permission.deadline_us - permission.timestamp_us > lease) { return reject(ManualBankFault::PermissionLost); }
 
 		if (now >= _deadline) { return reject(ManualBankFault::Expired); }
+
+		if (transfer) { _pending_transition = permission.transition_us; }
 
 		RoutingPlan live{};
 
@@ -281,6 +312,7 @@ private:
 	bool _received{};
 	bool _awaiting_handling{};
 	uint64_t _accepted_us{};
+	uint64_t _handled_us{}, _pending_transition{};
 	ManualBankFault _fault{ManualBankFault::Revoked};
 };
 

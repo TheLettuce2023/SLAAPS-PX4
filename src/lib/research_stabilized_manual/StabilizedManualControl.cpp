@@ -95,6 +95,7 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 	_last_cycle_us = 0;
 	_last_observed_us = 0;
 	_rate_setpoint.zero();
+	_handled_entry = false;
 	_fault = Status::Ok;
 	_state = State::Ready;
 	return Status::Ok;
@@ -135,6 +136,31 @@ Status StabilizedManualControl::enable(TimeUs now, const ManualSample &manual, c
 	_last_cycle_us = now;
 	_last_observed_us = now;
 	_state = State::Hold;
+	return Status::Ok;
+}
+
+Status StabilizedManualControl::enableFromHandled(TimeUs now, const ManualSample &manual, const StateSample &sample,
+		TimeUs handled_us, const CanardVector &canards, const Vector3f &rate_setpoint)
+{
+	if (_state != State::Ready) { return Status::InvalidState; }
+
+	if (!handled_us || handled_us > now || now - handled_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
+
+	if (!boundedVector(rate_setpoint, _configuration.maximum_rate_rad_s)) { return reject(Status::InvalidState); }
+
+	for (unsigned i = 0; i < canards.size(); ++i) {
+		if (!std::isfinite(canards[i]) || canards[i] < _configuration.allocation.minimum[i]
+		    || canards[i] > _configuration.allocation.maximum[i]) { return reject(Status::InvalidState); }
+	}
+
+	const Status result = enable(now, manual, sample);
+
+	if (result != Status::Ok) { return result; }
+
+	_last_command = canards;
+	_rate_setpoint = rate_setpoint;
+	_last_cycle_us = handled_us;
+	_handled_entry = true;
 	return Status::Ok;
 }
 
@@ -181,7 +207,7 @@ Status StabilizedManualControl::cycleImpl(TimeUs now, const ManualSample &manual
 {
 	if (!eligible()) { return Status::InvalidState; }
 
-	if (now <= _last_cycle_us) { return reject(Status::InvalidTime); }
+	if (now < _last_cycle_us || (now == _last_cycle_us && !_handled_entry)) { return reject(Status::InvalidTime); }
 
 	Quaternion attitude;
 	const Status status = inspect(now, manual, sample, attitude);
@@ -292,6 +318,7 @@ Status StabilizedManualControl::cycleImpl(TimeUs now, const ManualSample &manual
 	}
 
 	_last_command = candidate.allocation.command;
+	_handled_entry = false;
 	_rate_setpoint = rate_setpoint;
 	_reference = reference;
 	_last_sample = sample;
@@ -308,6 +335,7 @@ void StabilizedManualControl::disable()
 	_last_cycle_us = 0;
 	_last_observed_us = 0;
 	_state = State::Disabled;
+	_handled_entry = false;
 	_fault = Status::Ok;
 }
 

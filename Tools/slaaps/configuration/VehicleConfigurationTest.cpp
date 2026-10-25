@@ -15,6 +15,8 @@
 #include <lib/slaaps/AccelerationControllerPort.hpp>
 #include <lib/slaaps/ReportedRouting.hpp>
 #include <lib/slaaps/ControlSchedule.hpp>
+#include <lib/slaaps/WrenchAllocator.hpp>
+#include <lib/research_acceleration/TrustedTimeMap.hpp>
 #include <lib/rate_control/rate_control.hpp>
 #include <output_functions.hpp>
 #include <algorithm>
@@ -25,6 +27,12 @@
 #include <limits>
 
 using namespace slaaps;
+bool slaapsAccelerationFeedbackTests(unsigned &checks);
+bool slaapsAccelerationControllerTests(unsigned &checks);
+bool slaapsEdfOwnerTransferTests(unsigned &checks, const slaaps::VehicleConfiguration &configuration);
+slaaps::VehicleConfiguration slaapsFlightTransferConfiguration(const slaaps::VehicleConfiguration &base);
+bool slaapsFlightTransferTests(unsigned &checks, const slaaps::VehicleConfiguration &configuration,
+			       const slaaps::OutputInventory &inventory);
 static_assert(static_cast<unsigned>(OutputFunction::SLAAPS_Canard1) == kCanardFunctionFirst,
 	      "QGC canard function identity");
 static_assert(static_cast<unsigned>(OutputFunction::SLAAPS_EDF) == kEdfFunction, "QGC EDF function identity");
@@ -63,6 +71,7 @@ static VehicleConfiguration fixture()
 	c.manual_age_ms = 100;
 	c.state_age_ms = 20;
 	c.state_skew_ms = 10;
+	c.manual_ready_wait_s = 5; // Explicit synthetic operator window, never a firmware default.
 	c.cycle_min_us = 4000;
 	c.cycle_max_us = 12000;
 	c.selected_status_age_us = 100000;
@@ -138,6 +147,562 @@ static VehicleConfiguration fixture()
 	return c;
 }
 
+// Entirely synthetic physical wrench data, never vehicle measurements/defaults.
+static VehicleConfiguration wrenchFixture()
+{
+	auto c = fixture();
+	c.wrench.enabled = 1;
+	c.wrench.edf_force_per_thrust[0] = 1.2F; // Installed measured gain need not have unit norm.
+	c.wrench.edf_moment_per_thrust[2] = .03F;
+	c.wrench.trim_force[0] = 14.F;
+	c.wrench.trim_force[1] = 2.F;
+	c.wrench.trim_moment[2] = .5F;
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		c.wrench.force_residual_tolerance[axis] = .01F;
+		c.wrench.moment_residual_tolerance[axis] = .001F;
+	}
+
+	for (unsigned canard = 0; canard < kCanards; ++canard) {
+		c.canard[canard].trim = .1F * (static_cast<float>(canard) - 1.F);
+		c.canard[canard].force_derivative[0] = .5F * static_cast<float>(canard + 1);
+		c.canard[canard].force_derivative[1] = -.25F;
+	}
+
+	c.canard[0].deflection_slope = -c.canard[0].deflection_slope;
+	return c;
+}
+
+static float wrenchComponent(const WrenchModel &model, unsigned row, const float (&command)[kWrenchInputs])
+{
+	float result = model.offset[row];
+
+	for (unsigned actuator = 0; actuator < kWrenchInputs; ++actuator) {
+		result += model.effectiveness[row][actuator] * command[actuator];
+	}
+
+	return result;
+}
+
+static void wrenchConfigurationTests()
+{
+	auto c = fixture();
+	WrenchModel output{};
+	output.offset[0] = 123.F;
+	unsigned char sentinel[sizeof(output)];
+	std::memcpy(sentinel, &output, sizeof(output));
+	check(validateWrenchConfiguration(c).valid() && !makeWrenchModel(c, output)
+	      && std::memcmp(sentinel, &output, sizeof(output)) == 0,
+	      "disabled wrench may stage but cannot convert or mutate a caller model");
+	c.wrench.enabled = 1;
+	check(!validateWrenchConfiguration(c).valid() && !makeWrenchModel(c, output)
+	      && validate(c, ConfigurationUse::Bench).valid() && validate(c, ConfigurationUse::StabilizedManual).valid(),
+	      "incomplete enabled acceleration data cannot disable existing Manual or Bench profiles");
+	c = wrenchFixture();
+	check(validateWrenchConfiguration(c).valid() && makeWrenchModel(c, output),
+	      "explicit physical force/moment model permits zero measured rows and non-unit installed EDF gain");
+	float reference[kWrenchInputs] {};
+
+	for (unsigned canard = 0; canard < kCanards; ++canard) { reference[canard] = c.canard[canard].trim; }
+
+	reference[kCanards] = c.condition_thrust;
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		check(near(wrenchComponent(output, axis, reference), c.wrench.trim_force[axis])
+		      && near(wrenchComponent(output, axis + kAxes, reference), c.wrench.trim_moment[axis]),
+		      "absolute affine model reconstructs total measured trim wrench at the declared reference thrust");
+
+		for (unsigned canard = 0; canard < kCanards; ++canard) {
+			check(near(output.effectiveness[axis][canard], c.canard[canard].force_derivative[axis] * c.canard[canard].deflection_slope)
+			      && near(output.effectiveness[axis + kAxes][canard], c.canard[canard].moment_derivative[axis] * c.canard[canard].deflection_slope),
+			      "one shared signed servo slope converts physical force and existing moment derivatives exactly once");
+		}
+	}
+
+	for (unsigned fault = 0; fault < 6; ++fault) {
+		auto bad = c;
+
+		if (fault == 0) { bad.wrench.enabled = 2; }
+
+		if (fault == 1) { bad.wrench.force_residual_tolerance[0] = 0.F; }
+
+		if (fault == 2) { bad.wrench.moment_residual_tolerance[2] = 0.F; }
+
+		if (fault == 3) { bad.wrench.edf_force_per_thrust[0] = 0.F; }
+
+		if (fault == 4) { bad.condition_thrust = c.edf_thrust[kThrustPoints - 1] + 1.F; }
+
+		if (fault == 5) { bad.canard[0].force_derivative[0] = std::numeric_limits<float>::quiet_NaN(); }
+
+		const auto rejected = validateWrenchConfiguration(bad);
+		const char *parameter[] {"SLA_WR_EN", "SLA_WR_FT_X", "SLA_WR_MT_Z", nullptr, "SLA_TEST_THR", "SLA_C1_DFX"};
+		check(!rejected.valid() && (!parameter[fault] || (rejected.parameter && std::strcmp(rejected.parameter, parameter[fault]) == 0)),
+		      "invalid wrench declarations, residuals, EDF column, reference and finite data reject with available exact parameter");
+		std::memcpy(sentinel, &output, sizeof(output));
+		check(!makeWrenchModel(bad, output) && std::memcmp(sentinel, &output, sizeof(output)) == 0,
+		      "failed physical conversion preserves the complete destination model");
+	}
+
+	for (unsigned field = 0; field < 5; ++field) {
+		auto changed = c;
+
+		if (field == 0) { changed.canard[0].force_derivative[0] += .1F; }
+
+		if (field == 1) { changed.wrench.trim_force[0] += .1F; }
+
+		if (field == 2) { changed.wrench.edf_moment_per_thrust[0] += .1F; }
+
+		if (field == 3) { changed.wrench.force_residual_tolerance[0] += .1F; }
+
+		if (field == 4) { changed.schedule.corner[1][1].trim_force[2] += .1F; }
+
+		check(!equal(c, changed) && fingerprint(c) != fingerprint(changed),
+		      "shared profile identity binds fixed and scheduled wrench data even while a table is staged");
+	}
+
+	const float nonlinear[kThrustPoints] {0.F, 1.F, 4.F, 10.F, 20.F};
+
+	for (unsigned i = 0; i < kThrustPoints; ++i) { c.edf_thrust[i] = nonlinear[i]; }
+
+	float thrust = 123.F;
+	check(commandToThrust(c, .625F, thrust) && near(thrust, 7.F), "forward conversion uses the actual nonlinear EDF knot segment");
+	check(!commandToThrust(c, 1.1F, thrust) && near(thrust, 7.F), "invalid forward command preserves caller thrust");
+	auto &table = c.schedule;
+	table.enabled = 1;
+	table.airspeed_instance = table.air_data_instance = table.battery_instance = 0;
+	table.battery_id = 1;
+	table.maximum_age_us = 100000;
+	table.indicated_airspeed_m_s[0] = 10.F;
+	table.indicated_airspeed_m_s[1] = 30.F;
+	table.edf_command[0] = .25F;
+	table.edf_command[1] = .75F;
+	table.density_min = 1.F;
+	table.density_max = 1.4F;
+	table.voltage_min = 20.F;
+	table.voltage_max = 25.F;
+	table.filter_time_s = .02F;
+	table.airspeed_filter_rate = 100.F;
+	table.edf_filter_rate = 10.F;
+	table.airspeed_transient_rate = 1000.F;
+	table.edf_transient_rate = 10.F;
+
+	for (unsigned i = 0; i < kScheduleKnots; ++i) {
+		for (unsigned j = 0; j < kScheduleKnots; ++j) {
+			auto &corner = table.corner[i][j];
+			corner.trim_force[0] = 20.F + 4.F * static_cast<float>(i) + 8.F * static_cast<float>(j);
+			corner.edf_force_per_thrust[0] = 1.F + .2F * static_cast<float>(i) + 2.F * static_cast<float>(j);
+			corner.edf_moment_per_thrust[2] = .01F * static_cast<float>(i + j);
+
+			for (unsigned axis = 0; axis < kAxes; ++axis) {
+				corner.rate_p[axis] = c.axis[axis].rate_p;
+				corner.rate_i[axis] = c.axis[axis].rate_i;
+				corner.rate_d[axis] = c.axis[axis].rate_d;
+
+				for (unsigned canard = 0; canard < kCanards; ++canard) {
+					corner.moment_derivative[axis][canard] = c.canard[canard].moment_derivative[axis];
+					corner.force_derivative[axis][canard] = c.canard[canard].force_derivative[axis];
+				}
+			}
+		}
+	}
+
+	OperatingConditionSample observed{};
+	observed.observed_us = observed.airspeed_timestamp_us = observed.airspeed_sample_us = observed.air_data_timestamp_us
+			       = observed.air_data_sample_us = observed.battery_timestamp_us = 1000;
+	observed.deadline_us = 101001;
+	observed.density_kg_m3 = 1.2F;
+	observed.voltage_v = 22.F;
+	observed.source.airspeed_revision = observed.source.air_data_revision = observed.source.battery_revision = 1;
+	observed.source.baro_device_id = 456;
+	observed.source.battery_id = 1;
+	observed.indicated_airspeed_m_s = 10.F;
+	WrenchModel corner{};
+	check(!makeWrenchModel(c, output) && makeWrenchCornerModel(c, 0, 0, corner)
+	      && !makeWrenchCornerModel(c, 2, 0, output), "scheduled models cannot silently fall back to fixed data or an invalid knot");
+	ControlSchedule exact;
+	ControlSchedule::Step point{};
+	check(exact.begin(1000, c, observed, .25F, point) && point.wrench_valid,
+	      "shared schedule exposes its physical affine model at the same exact measured corner");
+
+	for (unsigned row = 0; row < kWrenchAxes; ++row) {
+		check(near(point.wrench.offset[row], corner.offset[row]), "exact schedule corner retains formed affine intercept");
+
+		for (unsigned actuator = 0; actuator < kWrenchInputs; ++actuator) {
+			check(near(point.wrench.effectiveness[row][actuator], corner.effectiveness[row][actuator]),
+			      "exact corner shares physical coefficients with validated profile conversion");
+		}
+	}
+
+	observed.indicated_airspeed_m_s = 20.F;
+	ControlSchedule middle;
+	check(middle.begin(1000, c, observed, .5F, point) && point.wrench_valid, "physical and PID schedule use one midpoint");
+	float trim_contribution{};
+
+	for (unsigned canard = 0; canard < kCanards; ++canard) {
+		trim_contribution += c.canard[canard].force_derivative[0] * c.canard[canard].deflection_slope * c.canard[canard].trim;
+	}
+
+	check(near(point.wrench.effectiveness[0][kCanards], 2.1F)
+	      && near(point.wrench.offset[0], 26.F - trim_contribution - 16.05F)
+	      && !near(point.wrench.offset[0], 26.F - trim_contribution - 2.1F * 5.5F),
+	      "midpoint interpolates formed affine offsets rather than the product of averaged varying EDF columns and reference thrusts");
+	auto bounded = c;
+	// This synthetic physical matrix has a scaled normal diagonal of 1.768e7;
+	// stay above the solver's 0.001768 numerical-resolution floor.
+	bounded.regularization = .01F;
+	bounded.edf_rise = bounded.edf_fall = 100.F;
+	float previous[kWrenchInputs] {}, target[kWrenchInputs] {}, requested[kWrenchAxes] {};
+
+	for (unsigned canard = 0; canard < kCanards; ++canard) {
+		previous[canard] = target[canard] = c.canard[canard].trim;
+	}
+
+	check(commandToThrust(bounded, .5F, previous[kCanards]) && commandToThrust(bounded, 1.F, target[kCanards]),
+	      "schedule-bound allocation fixture distinguishes an in-envelope history from an excessive thrust request");
+
+	for (unsigned row = 0; row < kWrenchAxes; ++row) { requested[row] = wrenchComponent(point.wrench, row, target); }
+
+	WrenchAllocationReport limited{};
+	limited.command[0] = 77.F;
+	unsigned char report_sentinel[sizeof(limited)];
+	std::memcpy(report_sentinel, &limited, sizeof(limited));
+	float previous_command{};
+	check(thrustToCommand(bounded, previous[kCanards], previous_command),
+	      "scheduled allocation supplies an explicit canonical previous owner command");
+	const auto bounded_result = allocateVehicleWrench(bounded, point.wrench, requested, previous, previous_command, .1F, limited);
+	float allocated{};
+	check((bounded_result == WrenchAllocationResult::Success
+	       && thrustToCommand(bounded, limited.command[kCanards], allocated)
+	       && allocated >= bounded.schedule.edf_command[0] && allocated <= bounded.schedule.edf_command[1])
+	      || (bounded_result == WrenchAllocationResult::ResidualExceeded
+		  && std::memcmp(report_sentinel, &limited, sizeof(limited)) == 0),
+	      "high permitted EDF slew cannot allocate beyond a narrower calibrated schedule envelope or leak a rejected candidate");
+
+	for (float outside : {.2F, .8F}) {
+		check(commandToThrust(bounded, outside, previous[kCanards]), "outside-history test still uses the shared valid EDF curve");
+		std::memcpy(report_sentinel, &limited, sizeof(limited));
+		check(allocateVehicleWrench(bounded, point.wrench, requested, previous, outside, .1F, limited) == WrenchAllocationResult::InvalidInput
+		      && std::memcmp(report_sentinel, &limited, sizeof(limited)) == 0,
+		      "an accepted EDF history outside either calibrated schedule knot is rejected without report mutation");
+	}
+
+	auto broken_corner = c;
+	broken_corner.schedule.corner[1][1].edf_force_per_thrust[0] = 0.F;
+	std::memcpy(sentinel, &output, sizeof(output));
+	check(!validateWrenchConfiguration(broken_corner).valid()
+	      && !makeWrenchCornerModel(broken_corner, 0, 0, output)
+	      && std::memcmp(sentinel, &output, sizeof(output)) == 0,
+	      "a missing installed EDF column at any scheduled corner rejects the whole wrench model without fixed-model fallback");
+
+	for (bool enabled : {false, true}) {
+		auto staged = c;
+		staged.wrench.enabled = enabled;
+		staged.wrench.force_residual_tolerance[0] = 0.F;
+		ControlSchedule manual;
+		check(validate(staged, ConfigurationUse::StabilizedManual).valid()
+		      && manual.begin(1000, staged, observed, .5F, point) && !point.wrench_valid,
+		      "disabled or incomplete enabled wrench leaves Manual schedule usable but acceleration model unavailable");
+	}
+}
+
+static void vehicleWrenchAllocationTests()
+{
+	auto c = wrenchFixture();
+	c.regularization = .001F;
+	WrenchModel model{};
+	check(makeWrenchModel(c, model), "physical coupled allocation uses the accepted shared wrench conversion");
+	float previous[kWrenchInputs] {}, requested[kWrenchAxes] {};
+
+	for (unsigned canard = 0; canard < kCanards; ++canard) { previous[canard] = c.canard[canard].trim; }
+
+	previous[kCanards] = c.condition_thrust;
+	float previous_command{};
+	check(thrustToCommand(c, previous[kCanards], previous_command), "shared allocation supplies the actual previous normalized EDF command");
+
+	for (unsigned row = 0; row < kWrenchAxes; ++row) { requested[row] = wrenchComponent(model, row, previous); }
+
+	WrenchAllocationReport report{};
+	check(allocateVehicleWrench(c, model, requested, previous, previous_command, .1F, report) == WrenchAllocationResult::Success,
+	      "coupled allocator and existing calibrated limits reproduce a physically feasible trim wrench");
+
+	float realized[kWrenchInputs] {};
+	std::memcpy(realized, report.command, sizeof(realized));
+	realized[kCanards] = report.realized_edf_thrust_n;
+
+	for (unsigned row = 0; row < kWrenchAxes; ++row) {
+		check(near(report.achieved[row], wrenchComponent(model, row, realized))
+		      && near(report.achieved[row], requested[row]),
+		      "reported physical wrench is reconstructed from calibrated realized EDF thrust and the returned canard commands");
+	}
+
+	unsigned char sentinel[sizeof(report)];
+	std::memcpy(sentinel, &report, sizeof(report));
+	requested[2] = 1.F; // This synthetic model has no body-Z force authority at all.
+	check(allocateVehicleWrench(c, model, requested, previous, previous_command, .1F, report) == WrenchAllocationResult::ResidualExceeded
+	      && std::memcmp(sentinel, &report, sizeof(report)) == 0,
+	      "unavailable force direction is rejected without pretending the six wrench rows are independently controllable");
+	check(allocateVehicleWrench(c, model, requested, previous, previous_command, 0.F, report) == WrenchAllocationResult::InvalidInput
+	      && std::memcmp(sentinel, &report, sizeof(report)) == 0, "invalid cycle interval preserves complete caller report");
+	const float nonlinear[kThrustPoints] {0.F, 1.F, 4.F, 10.F, 20.F};
+
+	for (unsigned knot = 0; knot < kThrustPoints; ++knot) { c.edf_thrust[knot] = nonlinear[knot]; }
+
+	c.condition_thrust = 4.F;
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		c.wrench.trim_force[axis] = axis ? 0.F : c.condition_thrust;
+		c.wrench.trim_moment[axis] = 0.F;
+		c.wrench.edf_force_per_thrust[axis] = axis ? 0.F : 1.F;
+		c.wrench.edf_moment_per_thrust[axis] = 0.F;
+
+		for (unsigned canard = 0; canard < kCanards; ++canard) { c.canard[canard].force_derivative[axis] = 0.F; }
+	}
+
+	check(makeWrenchModel(c, model) && commandToThrust(c, .45F, previous[kCanards]),
+	      "nonlinear EDF slew fixture starts below the shared half-command curve knot");
+	check(thrustToCommand(c, previous[kCanards], previous_command), "nonlinear fixture retains its explicit previous normalized command");
+	float upper_thrust{};
+	check(commandToThrust(c, .55F, upper_thrust), "shared calibration converts the true command-rate endpoint across a curve knot");
+
+	for (unsigned row = 0; row < kWrenchAxes; ++row) { requested[row] = wrenchComponent(model, row, previous); }
+
+	requested[0] = upper_thrust;
+	check(allocateVehicleWrench(c, model, requested, previous, previous_command, .1F, report) == WrenchAllocationResult::Success,
+	      "EDF command-slew interval crossing a nonlinear thrust knot remains physically allocatable");
+	float command{};
+	check(thrustToCommand(c, report.command[kCanards], command) && command > .45F && command <= .55F
+	      && report.command[kCanards] <= upper_thrust,
+	      "allocated thrust respects the exact nonlinear shared-curve command slew, not a single N-per-second approximation");
+	std::memcpy(sentinel, &report, sizeof(report));
+	requested[0] = 15.F;
+	check(allocateVehicleWrench(c, model, requested, previous, previous_command, .1F, report) == WrenchAllocationResult::ResidualExceeded
+	      && std::memcmp(sentinel, &report, sizeof(report)) == 0,
+	      "a force beyond this same EDF command-rate window rejects without leaking an oversized target or partial report");
+
+	// Adjacent thrust knots can quantize a valid interval of owner commands to
+	// the same float N. Recovering prior command from N would fabricate .25.
+	c.edf_thrust[1] = 1.F;
+	c.edf_thrust[2] = std::nextafter(1.F, std::numeric_limits<float>::infinity());
+	c.condition_thrust = c.wrench.trim_force[0] = 1.F;
+	c.edf_rise = c.edf_fall = 1.F;
+	previous_command = .30F;
+	check(makeWrenchModel(c, model) && commandToThrust(c, previous_command, previous[kCanards])
+	      && sameFloatBits(previous[kCanards], 1.F), "explicit owner command .30 legitimately realizes one N between adjacent float thrust knots");
+
+	for (unsigned row = 0; row < kWrenchAxes; ++row) { requested[row] = wrenchComponent(model, row, previous); }
+
+	float canonical{};
+	check(thrustToCommand(c, previous[kCanards], canonical) && near(canonical, .25F),
+	      "the plateau fixture proves thrust alone cannot recover the actual prior owner command");
+	std::memcpy(sentinel, &report, sizeof(report));
+	check(allocateVehicleWrench(c, model, requested, previous, previous_command, .01F, report) == WrenchAllocationResult::ArithmeticFailure
+	      && std::memcmp(sentinel, &report, sizeof(report)) == 0,
+	      "unrepresentable narrow owner-command slew rejects instead of silently moving .30 to inverse .25 or mutating the report");
+}
+
+static void accelerationFeedbackConfigurationTests()
+{
+	auto c = fixture();
+	check(!c.feedback.enabled && validateAccelerationFeedbackConfiguration(c).valid(),
+	      "disabled feedback has no invented gravity, latency or sample bounds");
+	c.feedback.enabled = 1;
+	check(!validateAccelerationFeedbackConfiguration(c).valid()
+	      && validate(c, ConfigurationUse::Bench).valid() && validate(c, ConfigurationUse::StabilizedManual).valid(),
+	      "incomplete enabled feedback cannot remove existing Manual and Bench model validity");
+	c.feedback.maximum_age_us = 20000;
+	c.feedback.maximum_bias_age_us = 50000;
+	c.feedback.latency_bound_us = 1000;
+	c.feedback.settling_us = 2000;
+	c.feedback.maximum_specific_force_m_s2 = 50.F;
+	c.feedback.maximum_acceleration_m_s2 = 20.F;
+	c.feedback.gravity_m_s2 = 9.8F; // Explicit synthetic value, not a production default.
+	c.feedback.imu_position[0] = .2F;
+	c.feedback.imu_position[1] = -.1F;
+	c.feedback.imu_position[2] = .05F;
+	check(validateAccelerationFeedbackConfiguration(c).valid(),
+	      "explicit feedback policy accepts native zero cutoff as disabled filtering, without declaring it applied");
+	c.feedback.cutoff_hz = 30.F;
+	check(validateAccelerationFeedbackConfiguration(c).valid(), "finite native filter intent is valid configuration, not producer metadata");
+
+	for (unsigned fault = 0; fault < 19; ++fault) {
+		auto bad = c;
+		const char *parameter{};
+
+		switch (fault) {
+		case 0: bad.feedback.enabled = 2; parameter = "SLA_FB_EN"; break;
+
+		case 1: bad.feedback.maximum_age_us = bad.feedback.latency_bound_us; parameter = "SLA_FB_AGE"; break;
+
+		case 2: bad.feedback.maximum_bias_age_us = 0; parameter = "SLA_FB_BIAS_AGE"; break;
+
+		case 3: bad.feedback.latency_bound_us = 0; parameter = "SLA_FB_LAT_US"; break;
+
+		case 4: bad.feedback.settling_us = bad.feedback.latency_bound_us - 1; parameter = "SLA_FB_SETTLE_US"; break;
+
+		case 5: bad.feedback.maximum_specific_force_m_s2 = 0.F; parameter = "SLA_FB_F_MAX"; break;
+
+		case 6: bad.feedback.maximum_acceleration_m_s2 = 0.F; parameter = "SLA_FB_A_MAX"; break;
+
+		case 7: bad.feedback.gravity_m_s2 = 0.F; parameter = "SLA_FB_GRAV"; break;
+
+		case 8: bad.state_age_ms = 0; parameter = "SLA_STATE_AGE"; break;
+
+		case 9: bad.state_skew_ms = 1; parameter = "SLA_STATE_SKEW"; break;
+
+		case 10: bad.quaternion_tolerance = 0.F; parameter = "SLA_QUAT_TOL"; break;
+
+		case 11: bad.axis[0].measured_rate_limit = 0.F; parameter = "SLA_R_MEAS_R"; break;
+
+		case 12: bad.axis[2].measured_accel_limit = 0.F; parameter = "SLA_Y_MEAS_A"; break;
+
+		case 13: bad.feedback.imu_position[1] = std::numeric_limits<float>::quiet_NaN(); parameter = "EKF2_IMU_POS_Y"; break;
+
+		case 14: bad.feedback.cutoff_hz = -1.F; parameter = "IMU_ACCEL_CUTOFF"; break;
+
+		case 15: bad.feedback.cutoff_hz = 1001.F; parameter = "IMU_ACCEL_CUTOFF"; break;
+
+		case 16: bad.feedback.maximum_age_us = 1000001; parameter = "SLA_FB_AGE"; break;
+
+		case 17: bad.feedback.cutoff_hz = std::numeric_limits<float>::infinity(); parameter = "IMU_ACCEL_CUTOFF"; break;
+
+		default: bad.selected_status_age_us = 0; parameter = "SLA_STATUS_AGE"; break;
+		}
+
+		const auto result = validateAccelerationFeedbackConfiguration(bad);
+		check(!result.valid() && result.parameter && std::strcmp(result.parameter, parameter) == 0,
+		      "feedback timing, numerical and native-intent failures retain the exact actionable parameter");
+	}
+
+	auto boundary = c;
+	boundary.feedback.settling_us = boundary.feedback.latency_bound_us;
+	check(validateAccelerationFeedbackConfiguration(boundary).valid(),
+	      "declared settling may equal latency while original sample age remains strictly larger");
+
+	for (unsigned field = 0; field < 5; ++field) {
+		auto changed = c;
+
+		if (field < kAxes) { changed.feedback.imu_position[field] += .01F; }
+
+		if (field == 3) { changed.feedback.cutoff_hz += 1.F; }
+
+		if (field == 4) { changed.feedback.settling_us += 1; }
+
+		check(!equal(c, changed) && fingerprint(c) != fingerprint(changed),
+		      "native external position/filter intents and feedback policy participate in immutable profile identity");
+	}
+
+	auto signed_zero = fixture();
+	auto negative_zero = signed_zero;
+	negative_zero.feedback.imu_position[0] = -0.F;
+	check(!equal(signed_zero, negative_zero) && fingerprint(signed_zero) != fingerprint(negative_zero),
+	      "external native scalar identity preserves signed-zero edits without struct-padding dependence");
+	negative_zero.feedback.imu_position[0] = std::numeric_limits<float>::infinity();
+	check(!validate(negative_zero, ConfigurationUse::Bench).valid(),
+	      "disabled feedback still rejects nonfinite native parameter intent");
+	ConfigurationStore store;
+	check(store.commit(signed_zero, ConfigurationUse::Bench).valid() && store.activate() && store.eligible(),
+	      "external-intent invalidation test starts an eligible accepted bench calibration");
+	auto edited = signed_zero;
+	edited.feedback.cutoff_hz = 30.F;
+	store.observe(edited);
+	check(!store.eligible(), "native filter-intent edits cannot retain an accepted configuration fingerprint");
+}
+
+static void dataProvenanceTests()
+{
+	const VehicleConfiguration defaults{};
+	check(defaults.data_schema_version == 1 && !defaults.data_record_id && !defaults.data_revision
+	      && defaults.data_assessment == static_cast<int32_t>(DataAssessment::Incomplete),
+	      "provenance defaults name SLAAPS profile schema1 but claim no external record or assessment");
+	const auto incomplete = fixture();
+	research_actuator_command::BenchOutputProfile bench{};
+	check(validate(incomplete, ConfigurationUse::Bench).valid() && makeBenchProfile(incomplete, bench),
+	      "incomplete assessment and unassigned record ID preserve explicitly calibrated servo commissioning");
+
+	for (const auto use : {ConfigurationUse::Bench, ConfigurationUse::StabilizedManual, ConfigurationUse::EdfCommissioning}) {
+		auto c = incomplete;
+
+		if (use == ConfigurationUse::EdfCommissioning) {
+			c.edf_commission_max = .25F;
+			c.activation_ack_timeout_us = 10000;
+			c.first_command_budget_us = 40000;
+		}
+
+		for (const auto state : {DataAssessment::Calibrated, DataAssessment::Qualified}) {
+			c.data_record_id = 42;
+			c.data_revision = 7;
+			c.data_assessment = static_cast<int32_t>(state);
+			check(validate(c, use).valid(), "operator-declared assessment with explicit record and revision can be accepted");
+			auto missing = c;
+			missing.data_record_id = 0;
+			auto result = validate(missing, use);
+			check(result.fault == ConfigurationFault::MissingRecord && result.parameter
+			      && std::strcmp(result.parameter, "SLA_DATA_REC") == 0,
+			      "calibrated or qualified assessment requires the actionable external record ID");
+			missing = c;
+			missing.data_revision = 0;
+			result = validate(missing, use);
+			check(result.fault == ConfigurationFault::MissingRecord && result.parameter
+			      && std::strcmp(result.parameter, "SLA_DATA_REV") == 0,
+			      "operator assessment cannot omit its external record revision");
+		}
+
+		for (unsigned invalid = 0; invalid < 6; ++invalid) {
+			auto bad = c;
+			const char *parameter{};
+
+			switch (invalid) {
+			case 0: bad.data_schema_version = 0; parameter = "SLA_DATA_VER"; break;
+
+			case 1: bad.data_schema_version = 2; parameter = "SLA_DATA_VER"; break;
+
+			case 2: bad.data_record_id = -1; parameter = "SLA_DATA_REC"; break;
+
+			case 3: bad.data_assessment = -1; parameter = "SLA_DATA_STATE"; break;
+
+			case 4: bad.data_assessment = 3; parameter = "SLA_DATA_STATE"; break;
+
+			default: bad.data_revision = -1; parameter = "SLA_DATA_REV"; break;
+			}
+
+			const auto result = validate(bad, use);
+			check(result.fault == ConfigurationFault::ParameterRange && result.parameter
+			      && std::strcmp(result.parameter, parameter) == 0,
+			      "unsupported schema, record or assessment returns its exact parameter");
+		}
+	}
+
+	int32_t VehicleConfiguration::*const fields[] = {
+		&VehicleConfiguration::data_schema_version, &VehicleConfiguration::data_record_id,
+		&VehicleConfiguration::data_revision, &VehicleConfiguration::data_assessment
+	};
+
+	for (const auto field : fields) {
+		auto changed = incomplete;
+		++(changed.*field);
+		check(!equal(incomplete, changed) && fingerprint(incomplete) != fingerprint(changed),
+		      "each record reference and assessment field belongs to canonical profile identity");
+		ConfigurationStore store;
+		check(store.commit(incomplete, ConfigurationUse::Bench).valid() && store.activate(), "bind synthetic provenance profile");
+		store.observe(changed);
+		store.observe(incomplete);
+		check(!store.eligible(), "provenance mutation invalidates a bound profile even after reversion");
+	}
+
+	auto qualified = incomplete;
+	qualified.data_record_id = 42;
+	qualified.data_assessment = static_cast<int32_t>(DataAssessment::Qualified);
+	EdfPermission denied{};
+	denied.mode = ControlMode::Manual;
+	denied.armed = denied.healthy = true;
+	AccelerationControllerPort acceleration;
+	check(validate(qualified, ConfigurationUse::StabilizedManual).valid()
+	      && !ManualBankPreparation::permitted(denied, ControlMode::Manual)
+	      && !denied.flight_admitted && !denied.measured_condition_valid && !denied.commissioning_admitted
+	      && !acceleration.available() && acceleration.configure(qualified) == AccelerationPortStatus::Unavailable,
+	      "operator-declared qualified record cannot grant flight permission or create an acceleration controller");
+}
+
 static void manualTimingConfigurationTests()
 {
 	const auto c = fixture();
@@ -145,6 +710,7 @@ static void manualTimingConfigurationTests()
 	auto staged = c;
 	staged.selected_status_age_us = staged.actuator_permission_age_us = 0;
 	staged.activation_ack_timeout_us = staged.first_command_budget_us = 0;
+	staged.manual_ready_wait_s = 0;
 	check(validate(staged, ConfigurationUse::StabilizedManual).valid()
 	      && !manualActivationTimingConfigured(staged), "all-zero timing can stage without activation readiness");
 
@@ -155,6 +721,9 @@ static void manualTimingConfigurationTests()
 	timing_only.first_command_budget_us = c.first_command_budget_us;
 	timing_only.cycle_min_us = c.cycle_min_us;
 	timing_only.cycle_max_us = c.cycle_max_us;
+	timing_only.output_lease_ms = c.output_lease_ms;
+	timing_only.manual_age_ms = c.manual_age_ms;
+	timing_only.manual_ready_wait_s = c.manual_ready_wait_s;
 	check(manualActivationTimingConfigured(timing_only)
 	      && !validate(timing_only, ConfigurationUse::StabilizedManual).valid(),
 	      "timing helper is independent of vehicle-model validity and grants no profile acceptance");
@@ -163,7 +732,8 @@ static void manualTimingConfigurationTests()
 		&VehicleConfiguration::selected_status_age_us,
 		&VehicleConfiguration::actuator_permission_age_us,
 		&VehicleConfiguration::activation_ack_timeout_us,
-		&VehicleConfiguration::first_command_budget_us
+		&VehicleConfiguration::first_command_budget_us,
+		&VehicleConfiguration::manual_ready_wait_s
 	};
 
 	for (const auto field : timing_fields) {
@@ -219,6 +789,110 @@ static void manualTimingConfigurationTests()
 	boundary = c;
 	boundary.cycle_max_us = std::numeric_limits<int32_t>::max();
 	check(!manualActivationTimingConfigured(boundary), "cycle maximum must fit its existing configured bound");
+
+	for (int32_t seconds : {1, 60}) {
+		boundary = c;
+		boundary.manual_ready_wait_s = seconds;
+		check(manualActivationTimingConfigured(boundary) && validate(boundary, ConfigurationUse::StabilizedManual).valid(),
+		      "explicit manual operator wait accepts both software bounds without changing activation budgets");
+	}
+
+	for (int32_t seconds : {-1, 0, 61}) {
+		boundary = c;
+		boundary.manual_ready_wait_s = seconds;
+		const auto result = validate(boundary, ConfigurationUse::StabilizedManual);
+		check(!manualActivationTimingConfigured(boundary) && !result.valid() && result.parameter
+		      && std::strcmp(result.parameter, "SLA_MAN_WAIT") == 0,
+		      "missing or out-of-range manual operator wait reports its exact parameter");
+	}
+
+	auto bench_only = c;
+	bench_only.manual_ready_wait_s = 0;
+	bench_only.activation_ack_timeout_us = 10000;
+	bench_only.first_command_budget_us = 40000;
+	bench_only.edf_commission_max = .25F;
+	check(validate(bench_only, ConfigurationUse::Bench).valid() && benchActivationTimingConfigured(bench_only)
+	      && validate(bench_only, ConfigurationUse::EdfCommissioning).valid(),
+	      "servo and EDF commissioning do not require a manual operator wait");
+	staged.manual_ready_wait_s = 5;
+	check(!validate(staged, ConfigurationUse::StabilizedManual).valid(),
+	      "an operator wait alone cannot make otherwise absent manual timing configured");
+}
+
+static void activationReserveConfigurationTests()
+{
+	auto c = fixture();
+	uint64_t reserve = 17;
+	check(activationReserveUs(c, reserve) && reserve == 8000,
+	      "activation reserve is the complete declared reply window plus first-command budget");
+
+	for (unsigned invalid = 0; invalid < 4; ++invalid) {
+		auto bad = c;
+
+		if (invalid < 2) { bad.activation_ack_timeout_us = invalid ? -1 : 0; }
+
+		else { bad.first_command_budget_us = invalid == 2 ? 0 : -1; }
+
+		check(!activationReserveUs(bad, reserve) && reserve == 8000,
+		      "missing or negative reserve bounds preserve the caller's destination");
+	}
+
+	auto wide = c;
+	wide.activation_ack_timeout_us = wide.first_command_budget_us = std::numeric_limits<int32_t>::max();
+	check(activationReserveUs(wide, reserve)
+	      && reserve == 2 * static_cast<uint64_t>(std::numeric_limits<int32_t>::max()),
+	      "reserve arithmetic widens before addition without claiming metadata validity");
+
+	// Explicit synthetic values cover a full 60ms activation window and 80ms
+	// first-command reserve. They do not establish measured timing qualification.
+	c.activation_ack_timeout_us = 60000;
+	c.first_command_budget_us = 80000;
+	c.cycle_max_us = 200000;
+	c.bench_gap_ms = c.output_lease_ms = c.manual_age_ms = 200;
+	c.actuator_permission_age_us = c.power.maximum_age_us = 200000;
+	c.edf_commission_max = .25F;
+
+	for (const auto use : {ConfigurationUse::StabilizedManual, ConfigurationUse::EdfCommissioning}) {
+		check(validate(c, use).valid(), "synthetic propulsion timing supports the full declared activation reserve");
+
+		for (unsigned field = 0; field < 4; ++field) {
+			// Bench already requires output lease >= cycle maximum > reserve.
+			if (use == ConfigurationUse::EdfCommissioning && field == 0) { continue; }
+
+			auto bad = c;
+			const char *parameter{};
+
+			switch (field) {
+			case 0: bad.output_lease_ms = 140; parameter = "SLA_OUT_LEASE"; break;
+
+			case 1: bad.actuator_permission_age_us = 139999; parameter = "SLA_ARM_AGE"; break;
+
+			case 2: bad.manual_age_ms = 140; parameter = "SLA_IN_AGE"; break;
+
+			default: bad.power.maximum_age_us = 139999; parameter = "SLA_PWR_AGE"; break;
+			}
+
+			const auto result = validate(bad, use);
+			check(result.fault == ConfigurationFault::InvalidTiming && result.parameter
+			      && std::strcmp(result.parameter, parameter) == 0,
+			      "every insufficient original lease rejects with its actionable exact parameter");
+		}
+
+		auto boundary = c;
+		boundary.bench_gap_ms = 141;
+		boundary.output_lease_ms = 141;
+		boundary.manual_age_ms = 141;
+		boundary.actuator_permission_age_us = boundary.power.maximum_age_us = 140000;
+		check(validate(boundary, use).valid(),
+		      "inclusive authority ages allow one microsecond beyond reserve while output and raw leases remain exclusive");
+		boundary.power.maximum_age_us = 100000;
+		check(validate(boundary, use).fault == ConfigurationFault::InvalidTiming,
+		      "100ms battery lifetime cannot cover the declared 60ms activation and 80ms first-command windows");
+	}
+
+	c.power = {};
+	check(validate(c, ConfigurationUse::Bench).valid() && benchActivationTimingConfigured(c),
+	      "servo-only bench activation remains independent of propulsion battery configuration");
 }
 
 static void powerConfigurationTests()
@@ -513,6 +1187,183 @@ static void companionConfigurationTests()
 	check(!store.eligible(), "changing companion payload identity invalidates the active accepted profile");
 	store.observe(c);
 	check(!store.eligible(), "restoring the old companion source cannot revive an invalidated profile");
+}
+
+static void companionAdmissionConfigurationTests()
+{
+	using research_acceleration::ContractConfig;
+	using research_acceleration::DisarmedPolicy;
+	VehicleConfiguration c{};
+	const auto &defaults = c.companion;
+	check(defaults.admission_enabled == 0 && defaults.disarmed_policy == 0 && near(defaults.acceleration_norm_max, 0.F)
+	      && defaults.minimum_validity_us == 0 && defaults.maximum_validity_us == 0
+	      && defaults.maximum_command_age_us == 0 && defaults.maximum_future_skew_us == 0
+	      && defaults.maximum_clock_uncertainty_us == 0 && defaults.maximum_relative_drift_ppm == 0
+	      && defaults.timestamp_uncertainty_us == 0 && defaults.maximum_round_trip_us == 0 && defaults.map_interval_us == 0,
+	      "companion admission and every required timing or clock assumption default absent, not operational");
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		check(near(defaults.acceleration_minimum[axis], 0.F) && near(defaults.acceleration_maximum[axis], 0.F),
+		      "companion acceleration bounds have no fabricated physical defaults");
+	}
+
+	ContractConfig destination{};
+	destination.protocol_version = 0x12345678;
+	destination.permitted_source = 99;
+	destination.acceleration_bounds.maximum_norm_m_s2 = 19.F;
+	unsigned char original[sizeof(destination)];
+	std::memcpy(original, &destination, sizeof(destination));
+	check(validateCompanionConfiguration(c).valid() && !companionAdmissionConfigured(c)
+	      && !makeCompanionContractConfiguration(c, destination)
+	      && std::memcmp(original, &destination, sizeof(destination)) == 0,
+	      "disabled admission stages but cannot convert or modify a caller's existing contract");
+
+	// Explicit synthetic transport/admission limits. This conversion requires
+	// neither a vehicle plant nor a session, trusted map or output owner.
+	c.companion = {1, 3, 42, 191, 16777217, 500000};
+	c.companion.admission_enabled = 1;
+	c.companion.disarmed_policy = 1;
+	c.companion.acceleration_minimum[0] = -7.F;
+	c.companion.acceleration_minimum[1] = -5.F;
+	c.companion.acceleration_minimum[2] = -3.F;
+	c.companion.acceleration_maximum[0] = 11.F;
+	c.companion.acceleration_maximum[1] = 9.F;
+	c.companion.acceleration_maximum[2] = 6.F;
+	c.companion.acceleration_norm_max = 13.F;
+	c.companion.minimum_validity_us = 1100;
+	c.companion.maximum_validity_us = 43000;
+	c.companion.maximum_command_age_us = 17000;
+	c.companion.maximum_future_skew_us = 1900;
+	c.companion.maximum_clock_uncertainty_us = 2300;
+	c.companion.maximum_relative_drift_ppm = 51;
+	c.companion.timestamp_uncertainty_us = 700;
+	c.companion.maximum_round_trip_us = 3100;
+	c.companion.map_interval_us = 500000;
+	c.quaternion_tolerance = .015F;
+	check(validateCompanionConfiguration(c).valid() && companionAdmissionConfigured(c)
+	      && makeCompanionContractConfiguration(c, destination),
+	      "explicit companion admission configuration converts independently of a vehicle model");
+	check(destination.protocol_version == research_acceleration::kWireProtocolVersionV1
+	      && destination.permitted_source == 16777217 && destination.disarmed_policy == DisarmedPolicy::Reject
+	      && near(destination.acceleration_bounds.maximum_norm_m_s2, 13.F)
+	      && near(destination.quaternion_norm_tolerance, .015F),
+	      "contract conversion retains exact payload identity, v1 semantics, configured norm and quaternion tolerance");
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		check(sameFloatBits(destination.acceleration_bounds.minimum_m_s2(axis), c.companion.acceleration_minimum[axis])
+		      && sameFloatBits(destination.acceleration_bounds.maximum_m_s2(axis), c.companion.acceleration_maximum[axis]),
+		      "conversion preserves signed inertial acceleration FRD components without scaling or axis remapping");
+	}
+
+	check(destination.timing.minimum_validity_us == 1100 && destination.timing.maximum_validity_us == 43000
+	      && destination.timing.maximum_command_age_us == 17000 && destination.timing.maximum_future_skew_us == 1900
+	      && destination.timing.maximum_clock_uncertainty_us == 2300,
+	      "contract conversion copies independent microsecond timing bounds exactly without borrowing local receipt age");
+	c.companion.disarmed_policy = 2;
+	check(makeCompanionContractConfiguration(c, destination) && destination.disarmed_policy == DisarmedPolicy::ValidateOnly,
+	      "explicit disarmed validate-only policy maps to its existing guard enum without session authority");
+
+	auto vehicle = fixture();
+	vehicle.companion = c.companion;
+	vehicle.cycle_max_us = 100000;
+	vehicle.first_command_budget_us = 30000;
+	vehicle.activation_ack_timeout_us = 20000;
+	vehicle.edf_commission_max = .1F;
+	const ConfigurationUse scopes[] = {ConfigurationUse::Bench, ConfigurationUse::StabilizedManual, ConfigurationUse::EdfCommissioning};
+
+	for (const auto use : scopes) {
+		check(validate(vehicle, use).valid(), "valid companion admission limits may be accepted without changing the vehicle's mode scope");
+	}
+
+	for (unsigned fault = 0; fault < 20; ++fault) {
+		auto bad = c;
+		const char *parameter = nullptr;
+
+		switch (fault) {
+		case 0: bad.companion.enabled = 0; parameter = "SLA_CMP_EN"; break;
+
+		case 1: bad.companion.admission_enabled = 2; parameter = "SLA_CMP_ADMIT"; break;
+
+		case 2: bad.companion.disarmed_policy = 0; parameter = "SLA_CMP_DISARM"; break;
+
+		case 3: bad.companion.disarmed_policy = 3; parameter = "SLA_CMP_DISARM"; break;
+
+		case 4: bad.companion.acceleration_minimum[1] = 10.F; parameter = "SLA_CMP_AY_MAX"; break;
+
+		case 5: bad.companion.acceleration_norm_max = 0.F; parameter = "SLA_CMP_A_NORM"; break;
+
+		case 6: bad.companion.acceleration_norm_max = std::numeric_limits<float>::quiet_NaN(); parameter = "SLA_CMP_A_NORM"; break;
+
+		case 7: bad.companion.minimum_validity_us = 0; parameter = "SLA_CMP_V_MIN"; break;
+
+		case 8: bad.companion.maximum_validity_us = 0; parameter = "SLA_CMP_V_MAX"; break;
+
+		case 9: bad.companion.maximum_validity_us = bad.companion.minimum_validity_us - 1; parameter = "SLA_CMP_V_MAX"; break;
+
+		case 10: bad.companion.maximum_command_age_us = 0; parameter = "SLA_CMP_CMD_AGE"; break;
+
+		case 11: bad.companion.maximum_future_skew_us = 0; parameter = "SLA_CMP_FUTURE"; break;
+
+		case 12: bad.companion.maximum_clock_uncertainty_us = 0; parameter = "SLA_CMP_CLOCK_U"; break;
+
+		case 13: bad.companion.maximum_relative_drift_ppm = 0; parameter = "SLA_CMP_DRIFT"; break;
+
+		case 14: bad.companion.timestamp_uncertainty_us = 0; parameter = "SLA_CMP_STAMP_U"; break;
+
+		case 15: bad.companion.maximum_round_trip_us = 0; parameter = "SLA_CMP_RTT"; break;
+
+		case 16: bad.companion.map_interval_us = 0; parameter = "SLA_CMP_MAP_US"; break;
+
+		case 17: bad.quaternion_tolerance = 0.F; parameter = "SLA_QUAT_TOL"; break;
+
+		case 18: bad.quaternion_tolerance = 1.F; parameter = "SLA_QUAT_TOL"; break;
+
+		case 19: bad.companion.source_id = 0; parameter = "SLA_CMP_SOURCE"; break;
+		}
+
+		const auto result = validateCompanionConfiguration(bad);
+		check(!result.valid() && result.parameter && std::strcmp(result.parameter, parameter) == 0
+		      && !companionAdmissionConfigured(bad),
+		      "incomplete admission, timing or explicit clock assumptions reject with the actionable exact parameter");
+		std::memcpy(original, &destination, sizeof(destination));
+		check(!makeCompanionContractConfiguration(bad, destination)
+		      && std::memcmp(original, &destination, sizeof(destination)) == 0,
+		      "failed admission conversion leaves the whole existing destination byte-for-byte unchanged");
+		vehicle.companion = bad.companion;
+		vehicle.quaternion_tolerance = bad.quaternion_tolerance;
+
+		for (const auto use : scopes) {
+			check(!validate(vehicle, use).valid(), "every mode scope rejects an invalid enabled companion admission policy");
+		}
+	}
+
+	auto box = c;
+	box.companion.acceleration_minimum[0] = 3.F;
+	box.companion.acceleration_maximum[0] = 4.F;
+	box.companion.acceleration_minimum[1] = 4.F;
+	box.companion.acceleration_maximum[1] = 5.F;
+	box.companion.acceleration_minimum[2] = 0.F;
+	box.companion.acceleration_maximum[2] = 0.F;
+	box.companion.acceleration_norm_max = 5.F;
+	check(makeCompanionContractConfiguration(box, destination),
+	      "a box touching the norm sphere at its closest point and a zero-width axis remain feasible");
+	box.companion.acceleration_norm_max = std::nextafter(5.F, 0.F);
+	std::memcpy(original, &destination, sizeof(destination));
+	const auto infeasible = validateCompanionConfiguration(box);
+	check(!infeasible.valid() && infeasible.parameter && std::strcmp(infeasible.parameter, "SLA_CMP_A_NORM") == 0
+	      && !makeCompanionContractConfiguration(box, destination)
+	      && std::memcmp(original, &destination, sizeof(destination)) == 0,
+	      "a box wholly outside the sphere rejects instead of silently widening acceleration bounds");
+
+	box.companion.admission_enabled = 0;
+	box.companion.maximum_relative_drift_ppm = 0;
+	box.companion.timestamp_uncertainty_us = 0;
+	box.companion.maximum_round_trip_us = 0;
+	box.companion.map_interval_us = 0;
+	check(validateCompanionConfiguration(box).valid() && !companionAdmissionConfigured(box)
+	      && !makeCompanionContractConfiguration(box, destination)
+	      && std::memcmp(original, &destination, sizeof(destination)) == 0,
+	      "source-only staging may retain incomplete admission geometry or clock assumptions without enabling conversion");
 }
 
 static void scalarTests()
@@ -2465,10 +3316,11 @@ static void edfTests()
 	AccelerationControllerPort development_port;
 	AccelerationControlOutput unchanged{};
 	unchanged.edf_thrust_n = 7.F;
-	check(!development_port.available(), "future acceleration port cannot advertise an implemented controller");
-	check(development_port.configure(c) == AccelerationPortStatus::Unavailable, "configuration cannot enable placeholder controller");
+	check(!development_port.available(), "disabled acceleration calculation is unavailable");
+	check(development_port.configure(c) == AccelerationPortStatus::Unavailable,
+	      "default incomplete profile cannot enable acceleration calculation");
 	check(development_port.cycle({}, unchanged) == AccelerationPortStatus::Unavailable && near(unchanged.edf_thrust_n, 7.F),
-	      "unimplemented acceleration port produces no replacement output");
+	      "disabled acceleration calculation produces no replacement output");
 	EdfOwner owner;
 	auto p = permission(1000);
 	check(owner.begin(1000, c, p) == EdfFault::None, "explicit admitted EDF grant");
@@ -2712,6 +3564,50 @@ static void bankPreparationTests()
 	check(aux.prepare(2001, 1, c, inventory, request) && aux.consume(3000, c, inventory, binding, p, 77, 99),
 	      "AUX activation binds its own acknowledgment lifetime");
 
+	auto operator_wait = request;
+	operator_wait.deadline_us = operator_wait.timestamp_us + 2000000;
+	ManualBankPreparation waiting;
+	const uint64_t after_one_second = operator_wait.timestamp_us + 1000001;
+	check(waiting.prepare(operator_wait.timestamp_us, 0, c, inventory, operator_wait)
+	      && waiting.prepared(after_one_second) && waiting.prepared(operator_wait.deadline_us - 1)
+	      && !waiting.prepared(operator_wait.deadline_us),
+	      "configured non-actuating Manual preparation survives one second and expires at its exact original deadline");
+	auto too_long = request;
+	too_long.deadline_us = too_long.timestamp_us + static_cast<uint64_t>(c.manual_ready_wait_s) * 1000000 + 1;
+	ManualBankPreparation bounded;
+	check(ManualBankPreparation::validRequest(too_long.timestamp_us, too_long)
+	      && !bounded.prepare(too_long.timestamp_us, 0, c, inventory, too_long),
+	      "a proposal within the absolute Manual ceiling cannot exceed its accepted five-second operator wait");
+	check(!bounded.prepare(operator_wait.timestamp_us, 0, c, inventory, operator_wait),
+	      "shortening a rejected operator window cannot replay its consumed session token");
+
+	auto delayed = request;
+	delayed.timestamp_us += 1000000;
+	delayed.deadline_us = delayed.timestamp_us + static_cast<uint64_t>(c.manual_ready_wait_s) * 1000000;
+	ManualBankPreparation delayed_bank;
+	check(ManualBankPreparation::validRequest(delayed.timestamp_us, delayed)
+	      && !delayed_bank.prepare(delayed.timestamp_us, 0, c, inventory, delayed),
+	      "delaying a proposal cannot restart the five-second wait from its later publication time");
+	delayed.deadline_us = delayed.session + static_cast<uint64_t>(c.manual_ready_wait_s) * 1000000;
+	ManualBankPreparation exact_entry_window;
+	check(exact_entry_window.prepare(delayed.timestamp_us, 0, c, inventory, delayed)
+	      && exact_entry_window.prepared(delayed.deadline_us - 1) && !exact_entry_window.prepared(delayed.deadline_us),
+	      "a delayed proposal may use only the remaining part of the exact original entry window");
+
+	auto denied = p;
+	denied.timestamp_us = after_one_second;
+	denied.deadline_us = after_one_second + 100000;
+	denied.armed = denied.healthy = denied.flight_admitted = denied.measured_condition_valid = false;
+	ManualBankPreparation consumed;
+	check(consumed.prepare(operator_wait.timestamp_us, 0, c, inventory, operator_wait)
+	      && consumed.consume(after_one_second, c, inventory, binding, denied, 77, 88),
+	      "non-actuating preparation consumption validates transaction identity without manufacturing permission");
+	ManualOutputBank output;
+	check(output.begin(after_one_second, 0, c, inventory, binding, denied) != ManualBankFault::None && !output.active()
+	      && !denied.armed && !denied.healthy && !denied.flight_admitted && !denied.measured_condition_valid
+	      && denied.timestamp_us == after_one_second && denied.deadline_us == after_one_second + 100000,
+	      "long disarmed readiness leaves the actual output consumer denied and cannot renew authority");
+
 	for (unsigned scenario = 0; scenario < 11; ++scenario) {
 		ManualBankPreparation bank;
 		auto candidate = c;
@@ -2759,7 +3655,7 @@ static void bankPreparationTests()
 		unsigned bank_id = 0;
 
 		switch (scenario) {
-		case 0: proposal.deadline_us = proposal.timestamp_us + ManualBankPreparation::kMaximumPreparationUs + 1; break;
+		case 0: proposal.deadline_us = proposal.timestamp_us + ManualBankPreparation::maximumPreparationUs(proposal.mode) + 1; break;
 
 		case 1: proposal.timestamp_us = 3000; break;
 
@@ -2815,7 +3711,7 @@ static void preparationWireTests()
 
 		case 3: wire.deadline = 1400; break;
 
-		case 4: wire.deadline = 1001001; break;
+		case 4: wire.deadline = request.timestamp_us + ManualBankPreparation::maximumPreparationUs(request.mode) + 1; break;
 
 		case 5: wire.session = 0; break;
 
@@ -3130,10 +4026,20 @@ static int runConfigurationTests()
 {
 	checks = 0;
 	manualTimingConfigurationTests();
+	wrenchConfigurationTests();
+	accelerationFeedbackConfigurationTests();
+	check(slaapsAccelerationFeedbackTests(checks), "selected acceleration feedback numerical, source and expiry regressions");
+	check(slaapsAccelerationControllerTests(checks), "scheduled acceleration controller coupled current-output regressions");
+	check(slaapsEdfOwnerTransferTests(checks, fixture()), "same-owner EDF transfer preserves applied output and original authority");
+	check(slaapsFlightTransferTests(checks, fixture(), routingFixture()), "shared worker and physical-bank flight transfer boundaries");
+	vehicleWrenchAllocationTests();
+	dataProvenanceTests();
+	activationReserveConfigurationTests();
 	powerConfigurationTests();
 	profileTests();
 	benchTravelBoundsTests();
 	companionConfigurationTests();
+	companionAdmissionConfigurationTests();
 	scalarTests();
 	storeTests();
 	thrustTests();
@@ -3176,6 +4082,7 @@ static int runConfigurationTests()
 #include <lib/slaaps/OperatingConditionObservation.hpp>
 #include <lib/slaaps/PowerObservation.hpp>
 #include <uORB/PublicationMulti.hpp>
+#include <uORB/topics/sensor_accel.h>
 #include <lib/slaaps/ManualExecution.hpp>
 #include <uORB/Subscription.hpp>
 #include <memory>
@@ -3772,6 +4679,100 @@ static void nativeSelectedInputTests()
 	      "fresh single estimator metadata observed");
 	check(snapshot.state.attitude_sample_us == now && snapshot.manual.timestamp_sample_us == now,
 	      "original sensor and pilot sample times retained");
+	{
+		using BiasPublication = uORB::PublicationMulti<estimator_sensor_bias_s>;
+		using RawPublication = uORB::PublicationMulti<sensor_accel_s>;
+		BiasPublication bias_pub{ORB_ID(estimator_sensor_bias)};
+		RawPublication raw_pub{ORB_ID(sensor_accel)};
+		uORB::ResearchSubscription bias_lifetime{ORB_ID::estimator_sensor_bias};
+		uORB::ResearchSubscription raw_lifetime{ORB_ID::sensor_accel};
+		uORB::Publication<vehicle_acceleration_s> acceleration_pub{ORB_ID(vehicle_acceleration)};
+		sensor_accel_s raw{};
+		raw.timestamp = raw.timestamp_sample = now;
+		raw.device_id = selection.accel_device_id;
+		raw.z = -9.8F;
+		check(raw_pub.publish(raw) && raw_pub.get_instance() == 0 && raw_lifetime.revision(),
+		      "optional acceleration fixture binds an actual advertised raw accelerometer lifetime");
+		estimator_sensor_bias_s bias{};
+		bias.timestamp = bias.timestamp_sample = now;
+		bias.accel_device_id = selection.accel_device_id;
+		bias.accel_bias_valid = true;
+		check(bias_pub.publish(bias) && bias_pub.get_instance() == 0 && bias_lifetime.revision(),
+		      "optional acceleration fixture owns the supported single-estimator bias instance zero");
+		vehicle_acceleration_s acceleration{};
+		acceleration.timestamp = acceleration.timestamp_sample = now;
+		acceleration.xyz[2] = -9.8F;
+		acceleration.device_id = selection.accel_device_id;
+		acceleration.calibrated = true;
+		acceleration.source_generation = 7;
+		acceleration.filter_cutoff_hz = 30.F;
+		acceleration.filter_sample_rate_hz = 1000.F;
+		acceleration.bias_timestamp = acceleration.bias_timestamp_sample = now;
+		acceleration.bias_valid = true;
+		acceleration.bias_publisher_revision = bias_lifetime.revision();
+		acceleration.bias_instance = 0;
+		acceleration.raw_publisher_revision = raw_lifetime.revision();
+		acceleration.raw_instance = 0;
+		check(acceleration_pub.publish(acceleration), "publish one original acceleration payload with applied bias and filter metadata");
+		SelectedStateObservation acceleration_observation;
+		auto selected = acceleration_observation.captureAccelerationState(1000000, 1000000);
+		check(selected.selected.state.valid && selected.acceleration_stable && selected.bias_publisher_current && selected.raw_publisher_current
+		      && selected.selected.required_topics == PublisherBinding::kStateTopicsMask
+		      && !selected.selected.manual.timestamp_us && selected.acceleration_revision,
+		      "optional acceleration observation retains selected state without inventing or requiring manual input");
+		check(selected.acceleration.timestamp == now && selected.acceleration.timestamp_sample == now
+		      && selected.acceleration.device_id == acceleration.device_id && selected.acceleration.calibrated
+		      && selected.acceleration.source_generation == acceleration.source_generation
+		      && sameFloatBits(selected.acceleration.filter_cutoff_hz, acceleration.filter_cutoff_hz)
+		      && sameFloatBits(selected.acceleration.filter_sample_rate_hz, acceleration.filter_sample_rate_hz)
+		      && selected.acceleration.bias_timestamp == now && selected.acceleration.bias_timestamp_sample == now
+		      && selected.acceleration.bias_valid && selected.acceleration.bias_instance == 0
+		      && selected.acceleration.bias_publisher_revision == acceleration.bias_publisher_revision
+		      && selected.acceleration.raw_publisher_revision == acceleration.raw_publisher_revision && selected.acceleration.raw_instance == 0
+		      && sameFloatBits(selected.acceleration.xyz[2], acceleration.xyz[2]),
+		      "observer copies original raw timestamps, applied filter/source and bias provenance without renewing them");
+		const unsigned original_bias_revision = acceleration.bias_publisher_revision;
+		bias_pub.~BiasPublication();
+		selected = acceleration_observation.captureAccelerationState(1000000, 1000000);
+		check(selected.acceleration_stable && selected.acceleration.bias_valid && !selected.bias_publisher_current
+		      && selected.acceleration.bias_publisher_revision == original_bias_revision,
+		      "a held acceleration payload cannot keep its bias publisher current after actual publisher loss");
+		new (&bias_pub) BiasPublication{ORB_ID(estimator_sensor_bias)};
+		check(bias_pub.advertise() && bias_pub.get_instance() == 0 && bias_lifetime.revision()
+		      && bias_lifetime.revision() != original_bias_revision, "replacement bias publisher has a distinct lifetime at the same instance");
+		selected = acceleration_observation.captureAccelerationState(1000000, 1000000);
+		check(selected.acceleration_stable && selected.acceleration.bias_valid && !selected.bias_publisher_current,
+		      "replacement advertisement cannot inherit held acceleration bias provenance");
+		check(bias_pub.publish(bias), "replacement publishes the identical old bias payload");
+		selected = acceleration_observation.captureAccelerationState(1000000, 1000000);
+		check(selected.acceleration_stable && selected.acceleration.bias_valid && !selected.bias_publisher_current,
+		      "identical replacement bias data cannot retroactively change the applied lifetime in an old acceleration sample");
+		acceleration.bias_publisher_revision = bias_lifetime.revision();
+		++acceleration.source_generation;
+		check(acceleration_pub.publish(acceleration), "publish explicit replacement applied-source metadata without renewing original timestamps");
+		selected = acceleration_observation.captureAccelerationState(1000000, 1000000);
+		check(selected.acceleration_stable && selected.bias_publisher_current && selected.acceleration.timestamp_sample == now
+		      && selected.acceleration.source_generation == acceleration.source_generation,
+		      "only an acceleration sample carrying the replacement applied lifetime can observe it as current");
+		const unsigned original_raw_revision = acceleration.raw_publisher_revision;
+		// Queued uORB publishers deliberately do not unadvertise in their
+		// destructor. Match PX4Accelerometer's explicit driver teardown.
+		check(raw_pub.unadvertise(), "explicitly retire queued raw accelerometer publisher");
+		raw_pub.~RawPublication();
+		new (&raw_pub) RawPublication{ORB_ID(sensor_accel)};
+		check(raw_pub.publish(raw) && raw_pub.get_instance() == 0 && raw_lifetime.revision()
+		      && raw_lifetime.revision() != original_raw_revision, "raw publisher replacement keeps device ID but changes actual lifetime");
+		selected = acceleration_observation.captureAccelerationState(1000000, 1000000);
+		check(selected.acceleration_stable && selected.bias_publisher_current && !selected.raw_publisher_current,
+		      "held applied acceleration cannot inherit a restarted raw publisher even with identical sensor ID and payload");
+		acceleration.raw_publisher_revision = raw_lifetime.revision();
+		++acceleration.source_generation;
+		check(acceleration_pub.publish(acceleration), "publish explicit replacement raw-source metadata");
+		selected = acceleration_observation.captureAccelerationState(1000000, 1000000);
+		check(selected.acceleration_stable && selected.bias_publisher_current && selected.raw_publisher_current,
+		      "new applied raw lifetime is observable only from corresponding acceleration metadata");
+		check(raw_pub.unadvertise(), "release queued raw fixture instance for later integration scenarios");
+	}
 	check(bench.capture(profile).prearmed_servo_condition, "bench accepts disarmed prearmed metadata");
 	armed.armed = true;
 	check(armed_pub.publish(armed), "publish armed observation");
@@ -4295,6 +5296,106 @@ static void nativeRoutingObservationTests()
 	++changed.topic_instance[0];
 	check(!sameReportedDrivers(snapshot, changed) && !sameReportedDrivers(snapshot, ReportedRoutingSnapshot{}),
 	      "driver identity requires matching instance and successful capture metadata");
+
+	// Deterministic live-copy interleavings; no sleeps or writer threads. The
+	// callback runs after initial copies and cannot override capture's checks.
+	using BankPublication = uORB::PublicationMulti<slaaps_output_bank_s>;
+	struct Interleave {
+		BankPublication *main{}, *aux{}, *extra{};
+		slaaps_output_bank_s *banks{};
+		unsigned calls{}, publish_attempts{}, change_attempt{};
+		bool replace{}, enumerate{};
+	};
+	const auto interleave = [](void *opaque, unsigned attempt) {
+		auto &context = *static_cast<Interleave *>(opaque);
+		check(attempt == context.calls, "live capture callback identifies contiguous zero-based attempts");
+		++context.calls;
+
+		if (attempt == context.change_attempt && context.replace) {
+			context.main->~BankPublication();
+			new (context.main) BankPublication{ORB_ID::slaaps_output_bank};
+			context.banks[0].timestamp = hrt_absolute_time();
+			check(context.main->publish(context.banks[0]), "replace a routing publisher between initial copy and lifetime recheck");
+			return;
+		}
+
+		if (attempt == context.change_attempt && context.enumerate) {
+			check(context.extra->publish(context.banks[0]), "add an advertised routing instance between initial copy and enumeration recheck");
+			return;
+		}
+
+		if (attempt < context.publish_attempts) {
+			context.banks[0].timestamp = context.banks[1].timestamp = hrt_absolute_time();
+			check(context.main->publish(context.banks[0]) && context.aux->publish(context.banks[1]),
+			      "same-lifetime report heartbeats deterministically change both copied generations");
+		}
+	};
+	OutputRoutingObservation::Workspace workspace{};
+	uint64_t observed{};
+	banks[0].timestamp = banks[1].timestamp = hrt_absolute_time();
+	check(restarted.publish(banks[0]) && aux.publish(banks[1])
+	      && observation.captureLive(observed, snapshot, workspace) == InventoryFault::None,
+	      "live retry fixture starts from a complete fresh unchanged routing snapshot");
+	const auto live_identity = snapshot;
+	Interleave heartbeat{&restarted, &aux, nullptr, banks, 0, 2};
+	observation.setCapturePassHook(interleave, &heartbeat);
+	check(observation.captureLive(observed, snapshot, workspace) == InventoryFault::None && heartbeat.calls == 3
+	      && sameReportedDrivers(live_identity, snapshot) && snapshot.reported_us[0] == banks[0].timestamp
+	      && snapshot.reported_us[1] == banks[1].timestamp && snapshot.captured_us <= observed,
+	      "two concurrent heartbeat generations retry full copies and a stable third pass retains exact publisher identities");
+	const unsigned before_strict = heartbeat.calls;
+	check(observation.capture(hrt_absolute_time(), snapshot, workspace) == InventoryFault::None && heartbeat.calls == before_strict,
+	      "explicit-time capture remains one strict pass and never invokes the live test callback");
+	unsigned char retained[sizeof(snapshot)];
+	std::memcpy(retained, &snapshot, sizeof(snapshot));
+	heartbeat.calls = 0;
+	heartbeat.publish_attempts = 3;
+	check(observation.captureLive(observed, snapshot, workspace) == InventoryFault::UnstablePublisher
+	      && heartbeat.calls == 3 && std::memcmp(retained, &snapshot, sizeof(snapshot)) == 0,
+	      "three changing live generations exhaust the bound without modifying any byte of the previous snapshot");
+	observation.setCapturePassHook(nullptr, nullptr);
+	check(observation.captureLive(observed, snapshot, workspace) == InventoryFault::None,
+	      "a later independent capture may observe stability after the bounded failed call");
+
+	for (bool replace : {true, false}) {
+		for (unsigned change_attempt : {0U, 1U}) {
+			BankPublication added{ORB_ID::slaaps_output_bank};
+			Interleave lifetime{&restarted, &aux, &added, banks, 0, change_attempt, change_attempt, replace, !replace};
+			std::memcpy(retained, &snapshot, sizeof(snapshot));
+			observation.setCapturePassHook(interleave, &lifetime);
+			check(observation.captureLive(observed, snapshot, workspace) == InventoryFault::UnstablePublisher
+			      && lifetime.calls == change_attempt + 1 && std::memcmp(retained, &snapshot, sizeof(snapshot)) == 0,
+			      "publisher replacement or absent-to-present enumeration is terminal even after an earlier permitted heartbeat retry");
+			observation.setCapturePassHook(nullptr, nullptr);
+
+			if (!replace) { check(added.unadvertise(), "remove deliberately added routing publisher"); }
+
+			check(observation.captureLive(observed, snapshot, workspace) == InventoryFault::None,
+			      "new independent capture can bind the current complete enumeration after terminal lifetime rejection");
+		}
+	}
+
+	for (unsigned fault = 0; fault < 3; ++fault) {
+		auto bad = banks[0];
+		InventoryFault expected{};
+
+		if (fault == 0) { bad.channel_count = kMaximumChannelsPerBank + 1; expected = InventoryFault::InvalidReport; }
+
+		if (fault == 1) { bad.timestamp = 1; expected = InventoryFault::Stale; }
+
+		if (fault == 2) { bad.ready = false; expected = InventoryFault::DriverNotReady; }
+
+		check(restarted.publish(bad), "publish original malformed, stale or unready routing report");
+		Interleave corrected{&restarted, &aux, nullptr, banks, 0, 3};
+		std::memcpy(retained, &snapshot, sizeof(snapshot));
+		observation.setCapturePassHook(interleave, &corrected);
+		check(observation.captureLive(observed, snapshot, workspace) == expected && corrected.calls == 1
+		      && std::memcmp(retained, &snapshot, sizeof(snapshot)) == 0,
+		      "generation change cannot retry away an originally malformed, stale or unready report even when the callback publishes a valid correction");
+		observation.setCapturePassHook(nullptr, nullptr);
+		check(observation.captureLive(observed, snapshot, workspace) == InventoryFault::None,
+		      "corrected reports become usable only on a new independent capture call");
+	}
 }
 
 static void nativePreparationCoordinatorTests()
@@ -5432,6 +6533,31 @@ static void nativeSelectedWorkerTests()
 
 	check(manualScheduleInterval(c, true) == static_cast<uint32_t>(c.cycle_min_us), "active schedule uses configured fast interval");
 	check(manualScheduleInterval(c, false) == kSupervisorIdleIntervalUs, "inactive schedule returns to slow supervisor interval");
+	auto companion_timing = slaapsFlightTransferConfiguration(c);
+	check(companionScheduleInterval(companion_timing) == 50000,
+	      "inactive companion observation precedes the original 100ms control lease");
+	companion_timing.actuator_permission_age_us = 20000;
+	check(companionScheduleInterval(companion_timing) == 10000,
+	      "companion monitoring respects the shortest configured authority lifetime");
+	companion_timing.companion.map_interval_us = 10000;
+	companion_timing.companion.maximum_round_trip_us = 1000;
+	companion_timing.companion.timestamp_uncertainty_us = 1;
+	companion_timing.companion.maximum_relative_drift_ppm = 1;
+	uint64_t renewal_lead{};
+	check(companionClockRenewalConfigured(companion_timing.companion, renewal_lead) && renewal_lead == 5000
+	      && companionScheduleInterval(companion_timing) == 1999,
+	      "short valid clock map requests dispatches within its renewal window");
+	companion_timing.companion.map_interval_us = 500000;
+	companion_timing.companion.maximum_round_trip_us = 240000;
+	companion_timing.companion.maximum_clock_uncertainty_us = 300000;
+	uint64_t observation_slack{};
+	check(companionClockRenewalConfigured(companion_timing.companion, renewal_lead, &observation_slack)
+	      && renewal_lead == 250000 && observation_slack == 9998
+	      && companionScheduleInterval(companion_timing) == 4999,
+	      "large declared round trip retains dispatch opportunities before renewal slack is spent");
+	companion_timing.companion.admission_enabled = 0;
+	check(companionScheduleInterval(companion_timing) == kSupervisorIdleIntervalUs,
+	      "disabled companion admission leaves ordinary inactive cadence unchanged");
 	auto invalid_timing = c;
 	invalid_timing.cycle_min_us = 0;
 	check(manualScheduleInterval(invalid_timing, true) == 0, "invalid active timing requests stop instead of zero-period scheduling");
@@ -5553,6 +6679,7 @@ static void nativeDisarmedInputTests()
 #include <lib/slaaps/Px4ConfigurationSource.hpp>
 #include <uORB/topics/actuator_test.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/failsafe_flags.h>
 #include <uORB/topics/vehicle_command_ack.h>
 #include <atomic>
 #include <new>
@@ -5580,6 +6707,25 @@ public:
 	}
 	void printStatus() const
 	{
+		const uint64_t gap = _power_maximum_gap.load();
+		const uint64_t gap_start = _power_gap_start.load(), gap_end = _power_gap_end.load();
+		const bool coherent_gap = gap == _power_maximum_gap.load() && (!gap || (gap_end >= gap_start && gap_end - gap_start == gap));
+		PX4_INFO("SLAAPS_POWER_TIMING window=%llu last=%llu", static_cast<unsigned long long>(_power_window.load()),
+			 static_cast<unsigned long long>(_power_last.load()));
+		PX4_INFO("SLAAPS_POWER_PUBLICATION previous=%llu published=%llu", static_cast<unsigned long long>(_power_previous.load()),
+			 static_cast<unsigned long long>(_power_published.load()));
+		PX4_INFO("SLAAPS_POWER_GAP gap=%llu begin=%llu end=%llu", static_cast<unsigned long long>(gap),
+			 static_cast<unsigned long long>(gap_start), static_cast<unsigned long long>(gap_end));
+		PX4_INFO("SLAAPS_POWER_GAP_STATE coherent=%d regressions=%u first_fault=%llu", coherent_gap,
+			 _power_regressions.load(), static_cast<unsigned long long>(_edf_first_terminal.load()));
+		PX4_INFO("SLAAPS_ESTIMATOR_STATUS only=%u running=%u samples=%u synthetic=1 authority_publishers=0",
+			 _estimator_only.load() ? 1U : 0U, _publishing.load() ? 1U : 0U, _samples.load());
+		PX4_INFO("SLAAPS_FEEDBACK_STATUS enabled=%u holding=%u generation=%llu last_sample=%llu",
+			 _feedback_enabled.load() ? 1U : 0U, _feedback_hold.load() ? 1U : 0U,
+			 static_cast<unsigned long long>(_feedback_generation.load()),
+			 static_cast<unsigned long long>(_feedback_last_sample.load()));
+		PX4_INFO("SLAAPS_FEEDBACK_SOURCES bias_revision=%u raw_revision=%u synthetic=1 authority_publishers=0",
+			 _feedback_bias_revision.load(), _feedback_raw_revision.load());
 		PX4_INFO("SLAAPS_SELECTED_STATUS running=%u scenario=%u samples=%u failures=%u power_running=%u power_scenario=%u power_samples=%u synthetic=1 authority_publishers=0",
 			 _publishing.load() ? 1U : 0U, _scenario.load(), _samples.load(), _failures.load(),
 			 _power_publishing.load() ? 1U : 0U, _power_scenario.load(), _power_samples.load());
@@ -5591,7 +6737,7 @@ private:
 
 		if (request == 1) { _publishing.store(false); }
 
-		if (request == 2) { _publishing.store(true); }
+		if (request == 2) { _estimator_only.store(false); _publishing.store(true); }
 
 		if (request >= 3 && request <= 7) { _scenario.store(request - 3); }
 
@@ -5607,7 +6753,17 @@ private:
 			    || _attitude_lifetime.revision() == previous) { ++_failures; }
 		}
 
-		if (request == 9) { _power_publishing.store(true); _power_scenario.store(0); }
+		if (request == 9) {
+			// A new explicit valid-power command starts a diagnostic window;
+			// earlier intentional drop tests cannot inflate this window's gap.
+			_power_window.store(hrt_absolute_time());
+			_power_last.store(0); _power_previous.store(0); _power_published.store(0);
+			_power_maximum_gap.store(0); _power_gap_start.store(0); _power_gap_end.store(0);
+			_edf_first_terminal.store(0); _power_regressions.store(0);
+			_edf_watched_session = _power_last_status_time = 0;
+			_power_last_status_entry = _power_last_status_power = 0;
+			_power_publishing.store(true); _power_scenario.store(0);
+		}
 
 		if (request == 10) { _power_publishing.store(false); }
 
@@ -5621,6 +6777,58 @@ private:
 
 			if (!_power.advertise() || !_power_lifetime.revision()
 			    || _power_lifetime.revision() == previous) { ++_failures; }
+		}
+
+		if (request == 20) {
+			// Companion protocol exercises need only estimator observations.
+			// Commander remains the sole publisher of its actual state witness.
+			_estimator_only.store(true);
+			_power_publishing.store(false);
+			_scenario.store(0);
+			_publishing.store(true);
+		}
+
+		if (request == 21) {
+			_estimator_only.store(true);
+			_power_publishing.store(false);
+			const bool first_feedback = !_feedback_enabled.exchange(true);
+			_feedback_hold.store(false);
+			_publishing.store(true);
+
+			if (first_feedback) { _feedback_generation.store(1); }
+		}
+
+		if (request == 22) { _feedback_hold.store(true); }
+
+		if (request == 23) {
+			_feedback_hold.store(true);
+			const unsigned previous = _feedback_bias_lifetime.revision();
+			using BiasPublication = uORB::PublicationMulti<estimator_sensor_bias_s>;
+			_feedback_bias.~BiasPublication();
+			new (&_feedback_bias) BiasPublication{ORB_ID(estimator_sensor_bias)};
+
+			if (!_feedback_enabled.load() || !_feedback_bias.advertise() || _feedback_bias.get_instance() != 0
+			    || !_feedback_bias_lifetime.revision() || _feedback_bias_lifetime.revision() == previous) { ++_failures; }
+
+			const uint64_t generation = _feedback_generation.load();
+			_feedback_generation.store(generation == UINT64_MAX ? 0 : generation + 1);
+		}
+
+		if (request == 24) {
+			_feedback_hold.store(true);
+			const unsigned previous = _feedback_raw_lifetime.revision();
+			using RawPublication = uORB::PublicationMulti<sensor_accel_s>;
+
+			if (!_feedback_raw.unadvertise()) { ++_failures; }
+
+			_feedback_raw.~RawPublication();
+			new (&_feedback_raw) RawPublication{ORB_ID(sensor_accel)};
+
+			if (!_feedback_enabled.load() || !_feedback_raw.advertise() || _feedback_raw.get_instance() != 0
+			    || !_feedback_raw_lifetime.revision() || _feedback_raw_lifetime.revision() == previous) { ++_failures; }
+
+			const uint64_t generation = _feedback_generation.load();
+			_feedback_generation.store(generation == UINT64_MAX ? 0 : generation + 1);
 		}
 
 		if (!_publishing.load()) { return; }
@@ -5647,7 +6855,21 @@ private:
 			power.faults = power_scenario == 3 ? 1U << battery_status_s::FAULT_OVER_CURRENT : 0;
 			power.is_powering_off = power_scenario == 4;
 
-			if (_power.publish(power)) { ++_power_samples; }
+			if (_power.publish(power)) {
+				const uint64_t previous = _power_last.load();
+
+				if (!_power_window.load()) { _power_window.store(now); }
+
+				if (previous && now < previous) { ++_power_regressions; }
+
+				if (previous && now >= previous && now - previous > _power_maximum_gap.load()) {
+					_power_gap_start.store(previous); _power_gap_end.store(now);
+					_power_maximum_gap.store(now - previous);
+				}
+
+				_power_previous.store(previous); _power_last.store(now); _power_published.store(hrt_absolute_time());
+				++_power_samples;
+			}
 
 			else { ++_failures; }
 		}
@@ -5667,13 +6889,162 @@ private:
 		manual.roll = scenario == 1 ? .3F : 0.F;
 		manual.throttle = scenario == 2 ? 1.F : -1.F;
 		manual.sticks_moving = scenario == 1;
+		const bool feedback_published = publishFeedback(now);
 		const bool published = _attitude.publish(attitude) && _rates.publish(rates) && _estimator.publish(estimator)
-				       && _flags.publish(flags) && _manual.publish(manual) && _selection.publish(selection)
-				       && _attitude_lifetime.revision();
+				       && _flags.publish(flags) && (_estimator_only.load() || _manual.publish(manual)) && _selection.publish(selection)
+				       && _attitude_lifetime.revision() && feedback_published;
 
 		if (published) { ++_samples; }
 
 		else { ++_failures; }
+
+		captureFirstEdfTerminal();
+	}
+	bool publishFeedback(uint64_t now)
+	{
+		if (!_feedback_enabled.load()) { return true; }
+
+		// Explicit synthetic specific force/bias only. Commander remains the sole
+		// authority witness; this fixture never creates an acceleration setpoint.
+		sensor_accel_s raw{};
+		raw.timestamp = raw.timestamp_sample = now;
+		raw.device_id = 456;
+		raw.z = -9.8F;
+		const bool raw_published = _feedback_raw.publish(raw) && _feedback_raw.get_instance() == 0;
+		const unsigned raw_revision = _feedback_raw_lifetime.revision();
+		_feedback_raw_revision.store(raw_revision);
+		estimator_sensor_bias_s bias{};
+		bias.timestamp = bias.timestamp_sample = now;
+		bias.accel_device_id = 456;
+		bias.accel_bias_valid = true;
+		const bool bias_published = _feedback_bias.publish(bias) && _feedback_bias.get_instance() == 0;
+		const unsigned revision = _feedback_bias_lifetime.revision();
+		_feedback_bias_revision.store(revision);
+
+		if (!raw_published || !raw_revision || !bias_published || !revision) { return false; }
+
+		if (_feedback_hold.load()) { return true; }
+
+		vehicle_acceleration_s acceleration{};
+		acceleration.timestamp = acceleration.timestamp_sample = now;
+		acceleration.xyz[2] = -9.8F;
+		acceleration.device_id = 456;
+		acceleration.calibrated = true;
+		acceleration.source_generation = _feedback_generation.load();
+		// Matches the explicit native IMU_ACCEL_CUTOFF=0 synthetic profile.
+		acceleration.filter_cutoff_hz = acceleration.filter_sample_rate_hz = 0.F;
+		acceleration.bias_timestamp = acceleration.bias_timestamp_sample = now;
+		acceleration.bias_valid = true;
+		acceleration.bias_publisher_revision = revision;
+		acceleration.bias_instance = 0;
+		acceleration.raw_publisher_revision = raw_revision;
+		acceleration.raw_instance = 0;
+		const bool published = _feedback_acceleration.publish(acceleration);
+
+		if (published) { _feedback_last_sample.store(now); }
+
+		return published;
+	}
+	void captureFirstEdfTerminal()
+	{
+		if (_edf_first_terminal.load()) { return; }
+
+		slaaps_status_s status{};
+
+		if (!_observed_supervisor.copy(&status) || status.timestamp < _power_window.load()) { return; }
+
+		const uint64_t previous_status = _power_last_status_time;
+		const unsigned previous_entry = _power_last_status_entry, previous_power = _power_last_status_power;
+		_power_last_status_time = status.timestamp;
+		_power_last_status_entry = status.bench_entry_status;
+		_power_last_status_power = status.power_status;
+
+		if (status.bench_edf_commissioning && status.manual_preparation_session && status.power_ready
+		    && (status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_ARM
+			|| status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_ACTIVATING
+			|| status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_FIRST_COMMAND
+			|| status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_EDF_RUNNING)) {
+			_edf_watched_session = status.manual_preparation_session;
+		}
+
+		const bool terminal = status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_REJECTED
+				      || status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_DISARM
+				      || status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_DISARM_FAILED
+				      || status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_COMPLETE;
+		const bool session_lost = status.manual_preparation_session != _edf_watched_session;
+
+		if (!_edf_watched_session || (!terminal && !session_lost)) { return; }
+
+		const uint64_t started = hrt_absolute_time();
+		vehicle_status_s vehicle{};
+		actuator_armed_s armed{};
+		failsafe_flags_s failsafe{};
+		battery_status_s battery{};
+		slaaps_manual_permission_s permission{};
+		slaaps_manual_command_s command{};
+		slaaps_manual_preparation_s ready[2] {}, transition{};
+		slaaps_manual_activation_s activation[2] {};
+		slaaps_manual_ack_s handled[2] {};
+		slaaps_output_bank_s bank_report[2] {};
+		_observed_vehicle.copy(&vehicle); _observed_armed.copy(&armed); _observed_failsafe.copy(&failsafe);
+		_observed_power.copy(&battery); _observed_permission.copy(&permission); _observed_command.copy(&command);
+		_observed_transition.copy(&transition);
+
+		for (unsigned bank = 0; bank < 2; ++bank) {
+			_observed_ready[bank].copy(&ready[bank]); _observed_activation[bank].copy(&activation[bank]);
+			_observed_handled[bank].copy(&handled[bank]); _observed_bank[bank].copy(&bank_report[bank]);
+		}
+
+		const uint64_t observed = hrt_absolute_time();
+		_edf_first_terminal.store(observed);
+		const auto t = [](uint64_t value) { return static_cast<unsigned long long>(value); };
+		// First sampled terminal/session-loss evidence, not the exact causal
+		// read or a proven ordering against Commander failsafe. In particular,
+		// power9 with a retained deadline may be later status-expiry synthesis.
+		std::fprintf(stderr,
+			     "EDF_TERMINAL_FIRST sampled_only=1 window=%llu copy_start=%llu observed=%llu status=%llu session=%llu entry=%u worker=%u power=%u retained_deadline=%llu\n",
+			     t(_power_window.load()), t(started), t(observed), t(status.timestamp), t(status.manual_preparation_session),
+			     status.bench_entry_status, status.manual_worker_status, status.power_status, t(status.power_deadline));
+		std::fprintf(stderr, "EDF_TERMINAL_FIRST previous_sampled_status=%llu entry=%u power=%u\n", t(previous_status), previous_entry,
+			     previous_power);
+		std::fprintf(stderr, "EDF_TERMINAL_FIRST watched_session=%llu terminal=%d session_lost=%d\n", t(_edf_watched_session), terminal,
+			     session_lost);
+		std::fprintf(stderr,
+			     "EDF_TERMINAL_FIRST producer previous=%llu last=%llu published=%llu max_gap=%llu gap_start=%llu gap_end=%llu regressions=%u\n",
+			     t(_power_previous.load()), t(_power_last.load()), t(_power_published.load()), t(_power_maximum_gap.load()),
+			     t(_power_gap_start.load()), t(_power_gap_end.load()), _power_regressions.load());
+		std::fprintf(stderr, "EDF_TERMINAL_FIRST battery timestamp=%llu voltage=%.6f connected=%d id=%u source=%u warning=%u faults=%u\n",
+			     t(battery.timestamp), static_cast<double>(battery.voltage_v), battery.connected, battery.id, battery.source, battery.warning,
+			     battery.faults);
+		std::fprintf(stderr,
+			     "EDF_TERMINAL_FIRST authority vehicle=%llu state=%u nav=%u intent=%u failsafe=%d actuator=%llu armed=%d prearmed=%d inhibits=%d/%d/%d masks=%u/%u\n",
+			     t(vehicle.timestamp), vehicle.arming_state, vehicle.nav_state, vehicle.nav_state_user_intention, vehicle.failsafe,
+			     t(armed.timestamp), armed.armed, armed.prearmed, armed.kill, armed.lockdown, armed.termination, status.can_arm_mask, status.can_run_mask);
+		std::fprintf(stderr,
+			     "EDF_TERMINAL_FIRST failsafe time=%llu other=%u prevent_arming=%u manual_required=%u manual_lost=%d gcs_lost=%d battery_unhealthy=%d attitude_invalid=%d rates_invalid=%d fd=%d/%d\n",
+			     t(failsafe.timestamp), failsafe.mode_req_other, failsafe.mode_req_prevent_arming, failsafe.mode_req_manual_control,
+			     failsafe.manual_control_signal_lost, failsafe.gcs_connection_lost, failsafe.battery_unhealthy,
+			     failsafe.attitude_invalid, failsafe.angular_velocity_invalid, failsafe.fd_critical_failure, failsafe.fd_esc_arming_failure);
+		std::fprintf(stderr,
+			     "EDF_TERMINAL_FIRST permission=%llu/%llu session=%llu armed=%d healthy=%d commission=%d command=%llu/%llu/%llu deadline=%llu edf=%.6f\n",
+			     t(permission.timestamp), t(permission.deadline), t(permission.session), permission.armed, permission.healthy,
+			     permission.commissioning_admitted,
+			     t(command.session), t(command.sequence), t(command.timestamp_sample), t(command.deadline), static_cast<double>(command.edf));
+		std::fprintf(stderr,
+			     "EDF_TERMINAL_FIRST transition time=%llu session=%llu operation=%u deadline=%llu routing=%llu status_prep=%u/%llu total_deadline=%llu routing=%d/%u/%u\n",
+			     t(transition.timestamp), t(transition.session), transition.operation, t(transition.deadline), t(transition.routing),
+			     status.manual_preparation_status, t(status.manual_preparation_deadline), t(status.bench_session_deadline),
+			     status.routing_snapshot_valid, status.inventory_fault, status.routing_fault);
+
+		for (unsigned bank = 0; bank < 2; ++bank) {
+			std::fprintf(stderr,
+				     "EDF_TERMINAL_FIRST bank=%u ready=%llu/%llu/%llu/%llu activation=%llu/%llu/%llu ack=%llu/%llu/%llu/%llu/%llu report=%llu/%d/%llu\n",
+				     bank, t(ready[bank].timestamp), t(ready[bank].session), t(ready[bank].prepared), t(ready[bank].deadline),
+				     t(activation[bank].session), t(activation[bank].timestamp_sample), t(activation[bank].first_command_deadline),
+				     t(handled[bank].session), t(handled[bank].sequence), t(handled[bank].timestamp), t(handled[bank].timestamp_sample),
+				     t(handled[bank].accepted),
+				     t(bank_report[bank].timestamp), bank_report[bank].ready, t(bank_report[bank].driver_instance));
+		}
 	}
 	uORB::Publication<vehicle_attitude_s> _attitude{ORB_ID(vehicle_attitude)};
 	uORB::ResearchSubscription _attitude_lifetime{ORB_ID(vehicle_attitude)};
@@ -5683,11 +7054,34 @@ private:
 	uORB::Publication<manual_control_setpoint_s> _manual{ORB_ID(manual_control_setpoint)};
 	uORB::Publication<sensor_selection_s> _selection{ORB_ID(sensor_selection)};
 	uORB::Publication<battery_status_s> _power{ORB_ID(battery_status)};
+	uORB::Publication<vehicle_acceleration_s> _feedback_acceleration{ORB_ID(vehicle_acceleration)};
+	uORB::PublicationMulti<estimator_sensor_bias_s> _feedback_bias{ORB_ID(estimator_sensor_bias)};
+	uORB::ResearchSubscription _feedback_bias_lifetime{ORB_ID(estimator_sensor_bias)};
+	uORB::PublicationMulti<sensor_accel_s> _feedback_raw{ORB_ID(sensor_accel)};
+	uORB::ResearchSubscription _feedback_raw_lifetime{ORB_ID(sensor_accel)};
 	uORB::ResearchSubscription _power_lifetime{ORB_ID(battery_status)};
+	uORB::Subscription _observed_supervisor{ORB_ID(slaaps_status)}, _observed_vehicle{ORB_ID(vehicle_status)};
+	uORB::Subscription _observed_armed{ORB_ID(actuator_armed)}, _observed_failsafe{ORB_ID(failsafe_flags)};
+	uORB::Subscription _observed_power{ORB_ID(battery_status)}, _observed_permission{ORB_ID(slaaps_manual_permission)};
+	uORB::Subscription _observed_command{ORB_ID(slaaps_manual_command)};
+	uORB::Subscription _observed_transition{ORB_ID(slaaps_manual_transition)};
+	uORB::Subscription _observed_ready[2] {{ORB_ID(slaaps_manual_ready_main)}, {ORB_ID(slaaps_manual_ready_aux)}};
+	uORB::Subscription _observed_activation[2] {{ORB_ID(slaaps_manual_active_main)}, {ORB_ID(slaaps_manual_active_aux)}};
+	uORB::Subscription _observed_handled[2] {{ORB_ID(slaaps_manual_ack_main)}, {ORB_ID(slaaps_manual_ack_aux)}};
+	uORB::Subscription _observed_bank[2] {{ORB_ID(slaaps_output_bank), 0}, {ORB_ID(slaaps_output_bank), 1}};
 	std::atomic<unsigned> _request{0}, _scenario{0}, _samples{0}, _failures{0};
 	std::atomic<unsigned> _power_scenario{0}, _power_samples{0};
 	std::atomic<bool> _publishing{true};
+	std::atomic<bool> _estimator_only{false};
+	std::atomic<bool> _feedback_enabled{false}, _feedback_hold{false};
+	std::atomic<uint64_t> _feedback_generation{0}, _feedback_last_sample{0};
+	std::atomic<unsigned> _feedback_bias_revision{0}, _feedback_raw_revision{0};
 	std::atomic<bool> _power_publishing{true};
+	std::atomic<uint64_t> _power_window{0}, _power_last{0}, _power_previous{0}, _power_published{0};
+	std::atomic<uint64_t> _power_maximum_gap{0}, _power_gap_start{0}, _power_gap_end{0}, _edf_first_terminal{0};
+	std::atomic<unsigned> _power_regressions{0};
+	uint64_t _edf_watched_session{}, _power_last_status_time{}; // Run queue only.
+	unsigned _power_last_status_entry{}, _power_last_status_power{};
 };
 
 static int nativeSelectedCommand(const char *operation)
@@ -5720,7 +7114,8 @@ static int nativeSelectedCommand(const char *operation)
 
 	const char *operations[] = {"stop", "resume", "neutral", "offset", "throttle-high", "invalid-state", "wrong-source", "replace",
 				    "power-valid", "power-drop", "power-disconnected", "power-warning", "power-fault", "power-off",
-				    "power-low", "power-high", "power-id", "power-source", "power-replace"
+				    "power-low", "power-high", "power-id", "power-source", "power-replace", "estimator-only",
+				    "feedback-valid", "feedback-hold", "feedback-bias-replace", "feedback-raw-replace"
 				   };
 
 	for (unsigned i = 0; i < sizeof(operations) / sizeof(operations[0]); ++i) {
@@ -5740,6 +7135,7 @@ public:
 	void start() { _running.store(true); ScheduleOnInterval(20000); }
 	void stop() { _running.store(false); ScheduleClear(); }
 	unsigned writes() const { return _writes.load(); }
+	unsigned handledWrites() const { return _handled_writes.load(); }
 	unsigned nonzeroWrites() const { return _nonzero.load(); }
 	void Run() override
 	{
@@ -5767,6 +7163,7 @@ public:
 		_denied_permission = denied;
 	}
 	float lastOutput(unsigned channel) const { return _last_output[channel]; }
+	float lastHandledOutput(unsigned channel) const { return _last_handled_output[channel]; }
 	unsigned lastCount() const { return _last_count; }
 	uint64_t lastWriteTime() const { return _last_write_time; }
 	bool prematureAcknowledgment() const { return _premature_ack; }
@@ -5795,6 +7192,12 @@ public:
 
 		const bool success = !_fail_next;
 		_fail_next = false;
+
+		if (success) {
+			memcpy(_last_handled_output, outputs, sizeof(_last_handled_output));
+			++_handled_writes;
+		}
+
 		return success;
 	}
 private:
@@ -5803,11 +7206,12 @@ private:
 	uORB::Publication<slaaps_manual_permission_s> *_revoke_publisher{};
 	slaaps_manual_permission_s _denied_permission{};
 	float _last_output[MAX_ACTUATORS] {};
+	float _last_handled_output[MAX_ACTUATORS] {};
 	uint64_t _last_write_time{}, _expected_session{}, _expected_sequence{};
 	unsigned _last_count{};
 	bool _premature_ack{}, _fail_next{}, _trace_pending{};
 	std::atomic<bool> _running{false};
-	std::atomic<unsigned> _writes{0}, _nonzero{0};
+	std::atomic<unsigned> _writes{0}, _handled_writes{0}, _nonzero{0};
 };
 
 static void installNativeMixerConfiguration(const VehicleConfiguration &c)
@@ -5818,6 +7222,15 @@ static void installNativeMixerConfiguration(const VehicleConfiguration &c)
 #include <lib/slaaps/VehicleParameters.def>
 #undef SLAAPS_INT
 #undef SLAAPS_FLOAT
+	const char *imu_parameters[kAxes] {"EKF2_IMU_POS_X", "EKF2_IMU_POS_Y", "EKF2_IMU_POS_Z"};
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		check(param_set(param_find(imu_parameters[axis]), &c.feedback.imu_position[axis]) == 0,
+		      "install explicit synthetic native CG-to-IMU position intent");
+	}
+
+	check(param_set(param_find("IMU_ACCEL_CUTOFF"), &c.feedback.cutoff_hz) == 0,
+	      "install explicit synthetic native filter intent rather than assume its default");
 	const auto inventory = routingFixture();
 
 	for (unsigned bank = 0; bank < 2; ++bank) {
@@ -5854,9 +7267,54 @@ static void installNativeMixerConfiguration(const VehicleConfiguration &c)
 #if !defined(SLAAPS_SUPERVISOR_TEST_ACCESS)
 #error The isolated supervisor fixture requires its target-private test seam
 #endif
+class SlaapsNativeTestSubject;
+struct NativeBenchCancelRecord {
+	uint64_t now{}, session{}, first_deadline{}, total_deadline{}, handled{}, routing_time{}, configuration{};
+	uint64_t reported[2] {}, driver[2] {};
+	unsigned scenario{}, line{}, requested{}, entry{}, worker{}, preparation{}, inventory{}, routing{}, channels{};
+	unsigned publisher[2] {};
+	int32_t apply{}, use{};
+	bool normal_stop{}, candidate{}, eligible{}, active{}, activation_owned{}, pending{}, power_valid{}, power_bound{};
+	bool arming_authorized{}, edf_granted{}, input_bound{};
+	slaaps::EdfPermission permission{};
+	slaaps::PowerSample power{};
+	research_stabilized_manual::ManualSample raw{};
+	slaaps::ManualPreparationRequest request{};
+};
+// One supervisor-queue writer. Published entries are immutable; the fixture
+// thread reads only the prefix exposed by the release/acquire count.
+static NativeBenchCancelRecord native_bench_cancels[16] {};
+static std::atomic<unsigned> native_bench_cancel_count{0}, native_bench_cancel_overflow{0};
+static std::atomic<unsigned> native_bench_cancel_scenario{UINT32_MAX};
+struct NativeManualDisarmInjection {
+	uORB::Publication<vehicle_status_s> *vehicle{};
+	uORB::Publication<actuator_armed_s> *armed{};
+	std::atomic<unsigned> requested{0}, completed{0}; // 1 vehicle first, 2 actuator first.
+	std::atomic<bool> at_capture{false};
+	uint64_t injected_us{};
+	bool original_both_armed{}, published{};
+};
+// Installed before scheduling and cleared after final subject destruction.
+// Only the request/result handshake changes during the scheduled lifetime.
+static NativeManualDisarmInjection *native_manual_disarm{};
+struct NativeAccelerationCapture {
+	uint64_t source{}, session{}, sequence{}, configuration{}, captured_us{}, observed_us{};
+	uint64_t producer_created{}, producer_expiry{}, mapped_created{}, mapped_expiry{}, evidence_deadline{};
+};
+// One supervisor-queue writer; published records never change. The fixture
+// reads only the prefix released through the count, never mutable owner data.
+static NativeAccelerationCapture native_acceleration_captures[4] {};
+static std::atomic<unsigned> native_acceleration_capture_count{0}, native_acceleration_capture_overflow{0};
 struct SlaapsNativeTest {
 	static std::atomic<bool> admitted;
 	static void companionTransportTests();
+	static void companionEntryTests();
+	static void beforeBenchCancel(const SlaapsNativeTestSubject &, hrt_abstime, uint8_t, bool, unsigned);
+	static void printBenchCancels();
+	static void beforeManualPermission();
+	static void beforeAccelerationCapture();
+	static void afterAccelerationCapture(const slaaps::AccelerationControlInput &input);
+	static void injectOrdinaryDisarm(bool at_capture);
 	static void supplyPermission(hrt_abstime, slaaps::EdfPermission &permission)
 	{
 		const bool allow = admitted.load() && permission.armed && !permission.kill
@@ -5870,6 +7328,782 @@ std::atomic<bool> SlaapsNativeTest::admitted{false};
 #include "../../../src/modules/slaaps/Slaaps.cpp"
 #undef slaaps_main
 #undef Slaaps
+
+void SlaapsNativeTest::beforeManualPermission()
+{
+	injectOrdinaryDisarm(false);
+}
+
+void SlaapsNativeTest::beforeAccelerationCapture()
+{
+	injectOrdinaryDisarm(true);
+}
+
+void SlaapsNativeTest::afterAccelerationCapture(const slaaps::AccelerationControlInput &input)
+{
+	if (input.request.session != 7303 || input.request.acceleration_frd_m_s2(1) <= .5F) { return; }
+
+	const unsigned index = native_acceleration_capture_count.load(std::memory_order_relaxed);
+
+	if (index >= sizeof(native_acceleration_captures) / sizeof(native_acceleration_captures[0])) {
+		native_acceleration_capture_overflow.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
+
+	auto &record = native_acceleration_captures[index];
+	record.source = input.request.source;
+	record.session = input.request.session;
+	record.sequence = input.request.sequence;
+	record.configuration = input.configuration;
+	record.captured_us = input.now_us;
+	record.observed_us = input.context.validator_receive_time_us;
+	record.producer_created = input.request.producer_monotonic_us;
+	record.producer_expiry = input.request.producer_expiry_monotonic_us;
+	record.mapped_created = input.request.producer_time_in_validator_domain_us;
+	record.mapped_expiry = input.request.expiry_time_in_validator_domain_us;
+	record.evidence_deadline = input.evidence_deadline_us;
+	native_acceleration_capture_count.store(index + 1, std::memory_order_release);
+}
+
+void SlaapsNativeTest::injectOrdinaryDisarm(bool at_capture)
+{
+	auto *injection = native_manual_disarm;
+
+	if (!injection) { return; }
+
+	const unsigned requested = injection->requested.load(std::memory_order_acquire);
+
+	if (!requested || injection->completed.load(std::memory_order_acquire)
+	    || injection->at_capture.load(std::memory_order_acquire) != at_capture) { return; }
+
+	uORB::Subscription vehicle_sub{ORB_ID(vehicle_status)}, armed_sub{ORB_ID(actuator_armed)};
+	vehicle_status_s vehicle{};
+	actuator_armed_s armed{};
+	const bool copied = vehicle_sub.copy(&vehicle) && armed_sub.copy(&armed);
+	injection->original_both_armed = copied && vehicle.arming_state == vehicle_status_s::ARMING_STATE_ARMED && armed.armed;
+	injection->injected_us = hrt_absolute_time();
+	vehicle.timestamp = armed.timestamp = injection->injected_us;
+
+	if (requested == 1) { vehicle.arming_state = vehicle_status_s::ARMING_STATE_DISARMED; }
+
+	else { armed.armed = false; }
+
+	injection->published = copied && injection->vehicle->publish(vehicle) && injection->armed->publish(armed);
+	// Pump publishes no authority while this is pending. Once released it can
+	// publish only this same partial-disarm tuple until the fixture completes it.
+	injection->completed.store(requested, std::memory_order_release);
+}
+
+void SlaapsNativeTest::beforeBenchCancel(const SlaapsNativeTestSubject &subject, hrt_abstime now, uint8_t requested,
+		bool normal_stop, unsigned line)
+{
+	if (subject._prepared_request.mode != slaaps::ControlMode::EdfBench || !subject._preparation_session) { return; }
+
+	const unsigned index = native_bench_cancel_count.load(std::memory_order_relaxed);
+
+	if (index && native_bench_cancels[index - 1].session == subject._preparation_session) { return; }
+
+	if (index >= sizeof(native_bench_cancels) / sizeof(native_bench_cancels[0])) { ++native_bench_cancel_overflow; return; }
+
+	auto &record = native_bench_cancels[index];
+	record.now = now; record.session = subject._preparation_session; record.line = line; record.requested = requested;
+	record.scenario = native_bench_cancel_scenario.load(std::memory_order_acquire);
+	record.normal_stop = normal_stop; record.entry = subject._bench_entry_status;
+	record.worker = static_cast<unsigned>(subject._manual_status); record.preparation = static_cast<unsigned>(subject._preparation_status);
+	record.candidate = subject._configuration.hasCandidate(); record.eligible = subject._configuration.eligible();
+	record.configuration = subject._configuration.identity(); record.apply = subject._last_apply; record.use = subject._selected_use;
+	record.active = subject._manual.active(); record.handled = subject._manual.handledSequence();
+	record.activation_owned = subject._manual_activation_owned; record.pending = subject._preparation_pending;
+	record.arming_authorized = subject._bench_arming_authorized; record.edf_granted = subject._bench_edf_granted;
+	record.input_bound = subject._bench_input_bound;
+	record.first_deadline = subject._manual_first_command_deadline; record.total_deadline = subject._bench_deadline;
+	record.inventory = static_cast<unsigned>(subject._inventory_fault); record.routing = static_cast<unsigned>(subject._routing_fault);
+	record.routing_time = subject._routing_snapshot.captured_us; record.channels = subject._routing_snapshot.inventory.count;
+	record.permission = subject._manual_permission; record.power = subject._power_sample;
+	record.power_valid = subject._power_valid; record.power_bound = subject._power_bound;
+	record.raw = subject._bench_sample; record.request = subject._prepared_request;
+
+	for (unsigned bank = 0; bank < 2; ++bank) {
+		record.reported[bank] = subject._routing_snapshot.reported_us[bank]; record.driver[bank] = subject._routing_snapshot.driver[bank];
+		record.publisher[bank] = subject._routing_snapshot.publisher_revision[bank];
+	}
+
+	native_bench_cancel_count.store(index + 1, std::memory_order_release);
+}
+
+void SlaapsNativeTest::printBenchCancels()
+{
+	const unsigned count = native_bench_cancel_count.load(std::memory_order_acquire);
+	const auto t = [](uint64_t value) { return static_cast<unsigned long long>(value); };
+	std::fprintf(stderr, "EDF_PRE_CANCEL records=%u overflow=%u supervisor_queue_before_cleanup=1\n", count,
+		     native_bench_cancel_overflow.load());
+
+	for (unsigned i = 0; i < count; ++i) {
+		const auto &r = native_bench_cancels[i];
+		std::fprintf(stderr,
+			     "EDF_PRE_CANCEL line=%u scenario=%u now=%llu session=%llu requested=%u normal_stop=%d entry=%u worker=%u active=%d handled=%llu\n",
+			     r.line, r.scenario, t(r.now), t(r.session), r.requested, r.normal_stop, r.entry, r.worker, r.active, t(r.handled));
+		std::fprintf(stderr,
+			     "EDF_PRE_CANCEL candidate=%d eligible=%d identity=%llu use=%d apply=%d preparation=%u pending=%d activation=%d authorized=%d granted=%d input_bound=%d first_deadline=%llu total=%llu\n",
+			     r.candidate, r.eligible, t(r.configuration), r.use, r.apply, r.preparation, r.pending, r.activation_owned,
+			     r.arming_authorized, r.edf_granted, r.input_bound, t(r.first_deadline), t(r.total_deadline));
+		std::fprintf(stderr,
+			     "EDF_PRE_CANCEL inventory=%u routing=%u captured=%llu channels=%u reports=%llu/%llu drivers=%llu/%llu publishers=%u/%u\n",
+			     r.inventory, r.routing, t(r.routing_time), r.channels, t(r.reported[0]), t(r.reported[1]), t(r.driver[0]), t(r.driver[1]), r.publisher[0],
+			     r.publisher[1]);
+		std::fprintf(stderr,
+			     "EDF_PRE_CANCEL permission=%llu/%llu armed=%d healthy=%d commissioning=%d power_valid=%d bound=%d power=%llu/%llu/%.6f raw=%llu/%llu/%.6f request=%llu/%llu\n",
+			     t(r.permission.timestamp_us), t(r.permission.deadline_us), r.permission.armed, r.permission.healthy, r.permission.commissioning_admitted,
+			     r.power_valid, r.power_bound, t(r.power.timestamp_us), t(r.power.deadline_us), static_cast<double>(r.power.voltage_v),
+			     t(r.raw.timestamp_us), t(r.raw.timestamp_sample_us), static_cast<double>(r.raw.axes[3]), t(r.request.timestamp_us),
+			     t(r.request.deadline_us));
+	}
+}
+
+void SlaapsNativeTest::companionEntryTests()
+{
+	// This runs only in the isolated synthetic-authority supervisor process.
+	// The actual-Commander loopback process never publishes this fixture witness.
+	using namespace research_acceleration;
+	struct InputBytes { unsigned char value[sizeof(AccelerationControlInput)]; };
+	auto objectBytes = [](const AccelerationControlInput & input) {
+		InputBytes bytes{};
+		std::memcpy(bytes.value, &input, sizeof(input));
+		return bytes;
+	};
+	uORB::Publication<slaaps_vehicle_state_s> witness_pub{ORB_ID(slaaps_vehicle_state)};
+	uORB::Publication<vehicle_attitude_s> attitude_pub{ORB_ID(vehicle_attitude)};
+	uORB::Publication<vehicle_angular_velocity_s> rates_pub{ORB_ID(vehicle_angular_velocity)};
+	uORB::Publication<estimator_status_s> estimator_pub{ORB_ID(estimator_status)};
+	uORB::Publication<estimator_status_flags_s> flags_pub{ORB_ID(estimator_status_flags)};
+	uORB::Publication<sensor_selection_s> selection_pub{ORB_ID(sensor_selection)};
+	uORB::Publication<actuator_armed_s> armed_pub{ORB_ID(actuator_armed)};
+	uORB::PublicationMulti<sensor_accel_s> raw_pub{ORB_ID(sensor_accel)};
+	uORB::PublicationMulti<estimator_sensor_bias_s> bias_pub{ORB_ID(estimator_sensor_bias)};
+	uORB::Publication<vehicle_acceleration_s> acceleration_pub{ORB_ID(vehicle_acceleration)};
+	uORB::ResearchSubscription raw_lifetime{ORB_ID(sensor_accel)};
+	uORB::ResearchSubscription bias_lifetime{ORB_ID(estimator_sensor_bias)};
+	auto c = fixture();
+	c.state_age_ms = 500;
+	c.selected_status_age_us = c.actuator_permission_age_us = 1000000;
+	c.companion = {1, 3, 42, 191, 16777217, 500000};
+	c.companion.admission_enabled = 1;
+	c.companion.disarmed_policy = 2;
+	c.companion.acceleration_norm_max = 8.F;
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		c.companion.acceleration_minimum[axis] = -5.F;
+		c.companion.acceleration_maximum[axis] = 5.F;
+	}
+
+	c.companion.minimum_validity_us = 1000;
+	c.companion.maximum_validity_us = c.companion.maximum_command_age_us = 1000000;
+	c.companion.maximum_future_skew_us = 500000;
+	c.companion.maximum_clock_uncertainty_us = 10000;
+	c.companion.maximum_relative_drift_ppm = 1;
+	c.companion.timestamp_uncertainty_us = 1;
+	c.companion.maximum_round_trip_us = 10000;
+	c.companion.map_interval_us = 500000; // Explicit short synthetic renewal interval.
+	const SessionIngressVerdict ingress{true, true, true, true};
+
+	for (unsigned scenario = 0; scenario < 26; ++scenario) {
+		const bool feedback_case = scenario >= 12;
+
+		if (feedback_case) {
+			c.feedback.enabled = 1;
+			c.feedback.maximum_age_us = c.feedback.maximum_bias_age_us = 100000;
+			c.feedback.latency_bound_us = c.feedback.settling_us = 1000;
+			c.feedback.maximum_specific_force_m_s2 = 50.F;
+			c.feedback.maximum_acceleration_m_s2 = 20.F;
+			c.feedback.gravity_m_s2 = 9.8F;
+			c.state_skew_ms = 500; // Isolate original feedback expiry from combined raw/state skew.
+		}
+
+		bool feedback_hold = false;
+		auto subject = std::make_unique<SlaapsNativeTestSubject>();
+		check(subject->_configuration.commit(c, ConfigurationUse::StabilizedManual).valid(),
+		      "isolated companion entry uses an accepted flight-scope synthetic profile");
+		subject->_selected_use = 1;
+		subject->_last_apply = 1;
+		subject->_modes[0].id = vehicle_status_s::NAVIGATION_STATE_EXTERNAL1;
+		subject->_modes[1].id = vehicle_status_s::NAVIGATION_STATE_EXTERNAL2;
+		subject->_modes[0].configured = true;
+		subject->_modes[1].configured = scenario != 2;
+		auto &owner = subject->_companion_protocol;
+		check(owner.initialize(1000 + scenario), "isolated owner has a distinct synthetic controller lifetime");
+		slaaps_vehicle_state_s witness{};
+		witness.transition = 1;
+		witness.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
+		witness.nav_state = subject->_modes[scenario == 0 || scenario == 10 || scenario == 13 ? 1 : 0].id;
+		vehicle_attitude_s attitude{};
+		attitude.q[0] = 1.F;
+		vehicle_angular_velocity_s rates{};
+		estimator_status_s estimator{};
+		estimator_status_flags_s flags{};
+		sensor_selection_s selection{};
+		actuator_armed_s armed{};
+		estimator.gyro_device_id = selection.gyro_device_id = 123;
+		estimator.accel_device_id = selection.accel_device_id = 456;
+		flags.cs_tilt_align = flags.cs_yaw_align = true;
+		auto publish_state = [&]() {
+			const uint64_t now = hrt_absolute_time();
+
+			if (feedback_case) {
+				// Real native topic lifetimes and applied metadata; explicitly
+				// synthetic sensor values, never a feedback-ready boolean bypass.
+				sensor_accel_s raw{};
+				raw.timestamp = raw.timestamp_sample = now;
+				raw.device_id = 456; raw.z = -9.8F;
+				estimator_sensor_bias_s bias{};
+				bias.timestamp = bias.timestamp_sample = now;
+				bias.accel_device_id = 456; bias.accel_bias_valid = true;
+				check(raw_pub.publish(raw) && bias_pub.publish(bias)
+				      && raw_pub.get_instance() == 0 && bias_pub.get_instance() == 0
+				      && raw_lifetime.revision() && bias_lifetime.revision(), "capture fixture binds actual raw and bias publishers");
+
+				if (!feedback_hold) {
+					vehicle_acceleration_s acceleration{};
+					acceleration.timestamp = acceleration.timestamp_sample = now;
+					acceleration.xyz[2] = -9.8F;
+					acceleration.device_id = 456; acceleration.calibrated = true; acceleration.source_generation = 1;
+					acceleration.bias_valid = true;
+					acceleration.bias_timestamp = acceleration.bias_timestamp_sample = now;
+					acceleration.bias_publisher_revision = bias_lifetime.revision();
+					acceleration.raw_publisher_revision = raw_lifetime.revision();
+					check(acceleration_pub.publish(acceleration), "publish original selected applied acceleration metadata");
+				}
+			}
+
+			witness.timestamp = attitude.timestamp = attitude.timestamp_sample = rates.timestamp = rates.timestamp_sample = now;
+			estimator.timestamp = flags.timestamp = selection.timestamp = armed.timestamp = now;
+			armed.armed = witness.armed;
+			armed.prearmed = witness.prearmed;
+			check(witness_pub.publish(witness) && attitude_pub.publish(attitude) && rates_pub.publish(rates)
+			      && estimator_pub.publish(estimator) && flags_pub.publish(flags) && selection_pub.publish(selection)
+			      && armed_pub.publish(armed), "publish coherent isolated state without a pilot or actuator command");
+		};
+		publish_state();
+		subject->updateCompanion(hrt_absolute_time());
+		check(owner._configured && owner._allow_entry_transitions == (scenario != 2),
+		      "production caller explicitly permits protocol entry only with accepted profile and registered modes");
+
+		if (feedback_case) {
+			const uint64_t settle_end = hrt_absolute_time() + static_cast<uint64_t>(c.feedback.maximum_age_us);
+
+			while (owner._feedback_result != AccelerationFeedbackResult::Ready && hrt_absolute_time() < settle_end) {
+				px4_usleep(1000);
+				publish_state();
+				uint64_t observation = hrt_absolute_time();
+				(void)owner.observe(observation);
+			}
+
+			check(owner._feedback_required && owner._feedback_result == AccelerationFeedbackResult::Ready,
+			      "actual selected feedback reaches Ready only after configured settling and fresh samples");
+		}
+
+		auto observe = [&]() {
+			publish_state();
+			uint64_t now = hrt_absolute_time();
+			check(owner.observe(now) && owner._state.request_guard_context.required_state_valid,
+			      "actual owner observes the current isolated Commander and selected-state publications");
+		};
+		owner._connection_deadline = hrt_absolute_time() + 1000000;
+		observe();
+		uint64_t now = hrt_absolute_time();
+		// Trusted clock/session staging is synthetic here; signed ingress and
+		// matched TIMESYNC are independently covered by the existing wire test.
+		owner._prepared = true;
+		owner._prepared_session = 7000 + scenario;
+		owner._state.map = {true, static_cast<uint64_t>(c.companion.source_id), owner._prepared_session,
+				    owner._identity, 1, 0, 10, now - 1000, now + (scenario == 9 ? 50000 : c.companion.map_interval_us)
+				   };
+		owner._map_epoch = owner._state.map.map_epoch;
+		owner._map_deadline = owner._state.map.valid_until_producer_us - owner._state.map.uncertainty_us;
+		owner._signing_generation = 7;
+		observe();
+		owner._proposal = {owner._identity, owner._snapshot.transition_epoch, owner._state.map.map_epoch,
+				   owner._state.map.source, owner._state.map.session, 1, 0, 0, kWireProtocolVersionV1, 1, 1, 1, 0, {}
+				  };
+		owner._proposal_ingress = ingress;
+		owner._proposal_deadline = hrt_absolute_time() + 1000000;
+		now = hrt_absolute_time();
+		owner.action(2, now);
+		check(owner._status.action_result == 1 && owner._adapter->sessionSnapshot().gate == SessionGate::Established
+		      && owner._entry_authorized == (scenario != 2), "actual disarmed Grant binds one-use entry preauthorization");
+		const auto original_map = owner._state.map;
+		const uint64_t original_deadline = owner._map_deadline;
+		uint64_t wire_operation = 1;
+
+		if (scenario == 0) {
+			// Exercise the actual owner publishers without a timing/sleep seam:
+			// ordinary correlated report traffic overruns its eight slots while
+			// the separately published exact barrier must remain available.
+			uORB::ResearchSubscription priority{ORB_ID::slaaps_companion_barrier}, ordinary{ORB_ID::slaaps_companion_tx};
+			uint8_t expected_payload[106] {};
+			check(owner._have_barrier && encodeStatusV1Payload(owner._barrier, expected_payload) == StatusEncodeCode::Ok
+			      && owner.send(owner._barrier, hrt_absolute_time(), true), "publish the exact retained core barrier on its isolated alias");
+			const uint64_t first_operation = wire_operation + 1;
+
+			for (unsigned report = 0; report < slaaps_companion_tx_s::ORB_QUEUE_LENGTH + 3; ++report) {
+				auto repeated = owner._proposal;
+				repeated.transition_epoch = owner._snapshot.transition_epoch;
+				repeated.operation_sequence = ++wire_operation;
+				const auto result = owner._adapter->processSession(owner._state, repeated, ingress, nullptr);
+				check(result.code != AdminCode::Completed && result.report_count,
+				      "ordinary burst uses genuine correlated rejected SESSION reports");
+				owner.reports(result, hrt_absolute_time());
+			}
+
+			slaaps_companion_tx_s barrier_envelope{}, ordinary_envelope{};
+			unsigned barrier_revision{}, ordinary_revision{}, barriers{}, operations{};
+
+			for (unsigned report = 0; report < slaaps_companion_tx_s::ORB_QUEUE_LENGTH
+			     && priority.copyQueuedBound(&barrier_envelope, barrier_revision); ++report) { ++barriers; }
+
+			check(barriers && barrier_revision == priority.revision()
+			      && std::memcmp(barrier_envelope.payload, expected_payload, sizeof(expected_payload)) == 0,
+			      "ordinary queue overrun cannot overwrite or reconstruct the exact retained barrier payload");
+
+			for (unsigned report = 0; report < slaaps_companion_tx_s::ORB_QUEUE_LENGTH
+			     && ordinary.copyQueuedBound(&ordinary_envelope, ordinary_revision); ++report) {
+				mavlink_message_t encoded{};
+				encoded.msgid = MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS;
+				encoded.len = sizeof(ordinary_envelope.payload);
+				std::memcpy(_MAV_PAYLOAD_NON_CONST(&encoded), ordinary_envelope.payload, sizeof(ordinary_envelope.payload));
+				const auto correlation = mavlink_msg_research_acceleration_status_get_correlation_sequence(&encoded);
+				check(mavlink_msg_research_acceleration_status_get_status_class(&encoded) == 2
+				      && correlation >= first_operation && correlation <= wire_operation,
+				      "isolating barriers preserves the bounded ordinary correlated-rejection queue");
+				++operations;
+			}
+
+			check(operations == slaaps_companion_tx_s::ORB_QUEUE_LENGTH && ordinary_revision == ordinary.revision(),
+			      "the last eight correlated operation reports remain available independently of the priority alias");
+		}
+
+		DecodedSessionV1 old_ack{};
+		auto acknowledge = [&]() {
+			uint64_t producer{};
+
+			do { producer = hrt_absolute_time(); } while (producer <= owner._snapshot.barrier_validator_time_us + 2 * owner._state.map.uncertainty_us);
+
+			observe();
+			DecodedSessionV1 ack{owner._identity, owner._snapshot.transition_epoch, owner._state.map.map_epoch,
+					     owner._state.map.source, owner._state.map.session, ++wire_operation, producer,
+					     owner._snapshot.barrier_report_sequence, kWireProtocolVersionV1, 1, 1, 3, 0, {}};
+			const auto result = owner._adapter->processAcknowledgement(owner._state, ack, ingress);
+			owner.reports(result, owner._state.request_guard_context.validator_receive_time_us);
+			check(result.code == IngressCode::Completed && result.admission.acknowledgement_current,
+			      "same real adapter accepts only a fresh exact current-epoch ACK");
+			old_ack = ack;
+		};
+		acknowledge();
+		auto preserved = [&](uint64_t previous_epoch) {
+			check(owner._state.map.valid && owner._map_deadline == original_deadline
+			      && owner._state.map.source == original_map.source && owner._state.map.session == original_map.session
+			      && owner._state.map.map_epoch == original_map.map_epoch && owner._state.map.valid_until_producer_us == original_map.valid_until_producer_us
+			      && owner._snapshot.transition_epoch == previous_epoch + 1
+			      && owner._adapter->sessionSnapshot().gate == SessionGate::Established
+			      && !owner._status.acknowledgement_current,
+			      "expected entry preserves original session/map deadline but invalidates the prior epoch ACK");
+			const auto replay = owner._adapter->processAcknowledgement(owner._state, old_ack, ingress);
+			check(replay.code != IngressCode::Completed && !replay.admission.acknowledgement_current,
+			      "prior epoch ACK cannot reopen entry after a genuine Commander transition");
+
+			if (scenario == 13 && witness.armed && witness.nav_state == subject->_modes[1].id) {
+				AccelerationControlInput sentinel{};
+				sentinel.previous_handled_us = 123;
+				const auto before = objectBytes(sentinel);
+				check(owner._feedback_result == AccelerationFeedbackResult::Ready
+				      && !owner.captureControlInput(fingerprint(c), sentinel)
+				      && owner.awaitingControlInput()
+				      && std::memcmp(&sentinel, before.value, sizeof(sentinel)) == 0,
+				      "old ACK cannot capture a full command despite selected mode and actual ready feedback");
+			}
+		};
+
+		if (scenario == 1) {
+			const uint64_t epoch = owner._snapshot.transition_epoch;
+			witness.prearmed = true;
+			++witness.transition;
+			observe();
+			preserved(epoch);
+			acknowledge();
+		}
+
+		uint64_t epoch = owner._snapshot.transition_epoch;
+		witness.armed = true;
+		witness.arming_state = vehicle_status_s::ARMING_STATE_ARMED;
+		++witness.transition;
+
+		if (scenario == 4) { witness.kill = true; }
+
+		if (scenario == 5) { ++witness.transition; }
+
+		if (scenario == 6) { witness.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL; }
+
+		if (scenario == 7) { ++attitude.quat_reset_counter; }
+
+		if (scenario == 8) {
+			subject->_modes[1].configured = false;
+			publish_state();
+			subject->updateCompanion(hrt_absolute_time());
+
+		} else if (scenario == 9) {
+			while (hrt_absolute_time() < original_deadline) { px4_usleep(100); }
+		}
+
+		publish_state();
+		now = hrt_absolute_time();
+		(void)owner.observe(now);
+
+		if (scenario == 3) {
+			preserved(epoch);
+			witness.armed = false;
+			witness.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
+			++witness.transition;
+			observe();
+		}
+
+		if (scenario >= 2 && scenario <= 9) {
+			check(!owner._state.map.valid && !owner._entry_authorized && !owner._prepared
+			      && owner._adapter->sessionSnapshot().gate != SessionGate::Established,
+			      "unauthorized, unhealthy, skipped, exited, replaced or expired entry revokes rather than reviving");
+			continue;
+		}
+
+		preserved(epoch);
+		acknowledge();
+
+		if (scenario == 11) {
+			const uint64_t administration = owner._admin_sequence;
+			now = hrt_absolute_time();
+			owner.action(2, now);
+			check(owner._status.action_result == 2 && owner._admin_sequence == administration,
+			      "armed Establish remains rejected without consuming a fresh administrative event");
+		}
+
+		if (witness.nav_state != subject->_modes[1].id) {
+			epoch = owner._snapshot.transition_epoch;
+			witness.nav_state = subject->_modes[1].id;
+			++witness.transition;
+			observe();
+			preserved(epoch);
+			acknowledge();
+		}
+
+		uint64_t creation{};
+		do { creation = hrt_absolute_time(); } while (creation <= old_ack.producer_acknowledgement_monotonic_us + 2 *
+				owner._state.map.uncertainty_us);
+
+		observe();
+		DecodedRequestV1 request{};
+		request.target_system = request.target_component = 1;
+		request.wire = {original_map.source, original_map.session, 1, creation, creation + 375000,
+				owner._identity, owner._snapshot.transition_epoch, original_map.map_epoch,
+				0.F, 0.F, 0.F, kWireProtocolVersionV1, kWireFrameFrdV1, kWireQuantityInertialAccelerationV1, kWireReferencePointCgV1
+			       };
+
+		if (feedback_case) {
+			request.wire.protocol_version = kWireProtocolVersionV2;
+			request.flags = kWireFullCommandFlagsV2;
+			request.wire.desired_attitude_ned_from_body[0] = 1.F;
+		}
+
+		const auto accepted = owner._adapter->processRequest(owner._state, request, ingress);
+		CanonicalRequest eligible{};
+		const auto accessed = owner._adapter->getEligibleRequest(owner._state, eligible);
+		check(accepted.code == IngressCode::Completed && accessed.code == AdapterCode::EligibleRequest
+		      && eligible.session == original_map.session && eligible.producer_monotonic_us == creation,
+		      "only the new post-entry ACK and request become eligible without any output grant");
+
+		if (feedback_case) {
+			AccelerationControlInput captured{};
+			check(owner.captureControlInput(fingerprint(c), captured)
+			      && !owner.awaitingControlInput()
+			      && captured.request.protocol_version == kWireProtocolVersionV2
+			      && captured.request.command_kind == CommandKind::AccelerationAndAttitude
+			      && near(captured.request.desired_attitude_ned_from_body(0), 1.F)
+			      && captured.feedback.state_source_epoch == captured.selected_state.source_epoch
+			      && captured.feedback.attitude_reset_counter == captured.selected_state.attitude_reset_counter
+			      && captured.feedback.publisher_revision && captured.feedback.source_generation
+			      && captured.evidence_deadline_us > captured.now_us
+			      && captured.evidence_deadline_us <= original_deadline
+			      && captured.previous_handled_us == 0 && captured.actual_edf_deadline_us == 0,
+			      "production full-v2 capture copies actual coherent selected feedback without inventing worker history");
+
+			if (scenario == 12) {
+				using Binding = research_stabilized_manual::PublisherBinding;
+				research_stabilized_manual::SelectedStateObservation independent;
+				publish_state();
+				auto expected = independent.captureState(static_cast<uint64_t>(c.selected_status_age_us),
+						static_cast<uint64_t>(c.actuator_permission_age_us));
+				check(expected.state.valid && expected.permission_fresh
+				      && (expected.required_topics & Binding::kStateTopicsMask) == Binding::kStateTopicsMask,
+				      "second real state-only observer captures the same selected native publishers");
+				// Observer-local counters need not have the same observation history.
+				// Alter only this local counter; every real revision/device/reset stays intact.
+				expected.state.source_epoch = owner._previous_state.source_epoch == UINT32_MAX
+							      ? 1U : owner._previous_state.source_epoch + 1U;
+				check(expected.state.source_epoch != owner._previous_state.source_epoch
+				      && owner.captureControlInput(fingerprint(c), expected, captured)
+				      && !owner.awaitingControlInput()
+				      && captured.selected_state.source_epoch == owner._previous_state.source_epoch
+				      && captured.feedback.state_source_epoch == captured.selected_state.source_epoch,
+				      "coherent publisher binding accepts unequal observer-local epochs and returns owner-local provenance");
+
+				for (unsigned mismatch = 0; mismatch < Binding::kTopics + 3; ++mismatch) {
+					if (mismatch < Binding::kTopics && !(Binding::kStateTopicsMask & (1U << mismatch))) { continue; }
+
+					auto wrong = expected;
+
+					if (mismatch < Binding::kTopics) {
+						wrong.revisions[mismatch] = wrong.revisions[mismatch] == std::numeric_limits<unsigned>::max()
+									    ? wrong.revisions[mismatch] - 1U : wrong.revisions[mismatch] + 1U;
+
+					} else if (mismatch == Binding::kTopics) { wrong.gyro ^= 1U; }
+
+					else if (mismatch == Binding::kTopics + 1) { wrong.accel ^= 1U; }
+
+					else { wrong.state.attitude_reset_counter ^= 1U; }
+
+					publish_state();
+					const auto before = objectBytes(captured);
+					check(!owner.captureControlInput(fingerprint(c), wrong, captured)
+					      && !owner.awaitingControlInput()
+					      && std::memcmp(&captured, before.value, sizeof(captured)) == 0,
+					      "inconsistent real publisher revision device or reset binding rejects capture without changing output");
+				}
+
+				publish_state();
+				check(owner.captureControlInput(fingerprint(c), expected, captured) && !owner.awaitingControlInput(),
+				      "rejected cross-observer bindings never replace or consume the valid full command");
+			}
+
+			if (scenario == 14) {
+				witness.nav_state = subject->_modes[0].id; ++witness.transition;
+				publish_state();
+				const auto before = objectBytes(captured);
+				check(!owner.captureControlInput(fingerprint(c), captured) && std::memcmp(&captured, before.value, sizeof(captured)) == 0
+				      && !owner.awaitingControlInput()
+				      && owner._state.request_guard_context.mode_state == ResearchModeState::NotSelected,
+				      "actual mode exit rejects full capture and preserves caller output");
+				continue;
+			}
+
+			if (scenario == 15) {
+				const uint64_t feedback_deadline = owner._feedback_sample.deadline_us;
+				check(original_deadline > feedback_deadline
+				      && request.wire.producer_expiry_monotonic_us - owner._state.map.uncertainty_us > feedback_deadline,
+				      "original map and request outlast the isolated applied-feedback expiry");
+				feedback_hold = true;
+
+				while (hrt_absolute_time() < feedback_deadline) { px4_usleep(1000); publish_state(); }
+
+				publish_state();
+				const auto before = objectBytes(captured);
+				check(!owner.captureControlInput(fingerprint(c), captured) && std::memcmp(&captured, before.value, sizeof(captured)) == 0
+				      && !owner.awaitingControlInput()
+				      && owner._feedback_result == AccelerationFeedbackResult::Stale
+				      && owner._state.request_guard_context.mode_state == ResearchModeState::Selected
+				      && hrt_absolute_time() < original_deadline,
+				      "held applied feedback expires while actual raw bias state and mode stay fresh");
+				continue;
+			}
+
+			if (scenario >= 16) {
+				uORB::Publication<slaaps_companion_packet_s> receiver{ORB_ID(slaaps_companion_packet_3)};
+				check(receiver.advertise(), "ordinary-disarm capture pins a real receiver lifetime");
+				owner._receiver_revision = owner._input[3].revision();
+				owner._receiver_system = owner._receiver_component = 1;
+				using Binding = research_stabilized_manual::PublisherBinding;
+				research_stabilized_manual::SelectedStateObservation independent;
+				bool supplied_new_source = false;
+
+				if (scenario == 17 || scenario == 20 || scenario == 25) {
+					if (scenario == 25) { witness.nav_state = subject->_modes[0].id; ++witness.transition; }
+
+					publish_state();
+					armed.armed = false; // Actuator publication arrives before the atomic witness.
+					armed.kill = scenario == 20;
+					check(armed_pub.publish(armed), "publish first actual actuator disarm independently of the held Commander witness");
+
+				} else {
+					witness.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
+
+					if (scenario != 16) { witness.armed = false; }
+
+					++witness.transition;
+					publish_state();
+				}
+
+				if (scenario == 19) {
+					witness.timestamp = hrt_absolute_time() - static_cast<uint64_t>(c.actuator_permission_age_us) - 1;
+					check(witness_pub.publish(witness), "publish stale disarm authority alongside fresh selected state");
+				}
+
+				if (scenario == 21) {
+					using AttitudePublication = uORB::Publication<vehicle_attitude_s>;
+					attitude_pub.~AttitudePublication();
+					new (&attitude_pub) AttitudePublication{ORB_ID(vehicle_attitude)};
+					attitude.timestamp = attitude.timestamp_sample = hrt_absolute_time();
+					check(attitude_pub.publish(attitude), "replace the attitude publisher concurrently with ordinary disarm");
+					supplied_new_source = true;
+				}
+
+				auto selected = independent.captureState(c.selected_status_age_us, c.actuator_permission_age_us);
+				check(selected.state.valid && selected.permission_fresh
+				      && (!supplied_new_source || selected.revisions[0] != owner._state_revisions[0])
+				      && (selected.required_topics & Binding::kStateTopicsMask) == Binding::kStateTopicsMask,
+				      "disarm capture receives a fresh actual selected snapshot, including the replacement source when requested");
+
+				if (scenario == 22) { owner._connection_deadline = hrt_absolute_time(); }
+
+				if (scenario == 24) { owner._continuity_fault = true; }
+
+				const auto before = objectBytes(captured);
+				const uint64_t configuration = scenario == 23 ? fingerprint(c) ^ 1U : fingerprint(c);
+				const bool capture_accepted = owner.captureControlInput(configuration, selected, captured);
+				const bool unchanged = std::memcmp(&captured, before.value, sizeof(captured)) == 0;
+				const bool pending = owner.awaitingControlInput();
+
+				if (capture_accepted || !unchanged || pending) {
+					const auto &diagnostic = owner.status();
+					std::fprintf(stderr,
+						     "CAPTURE_DISARM_DIAGNOSTIC scenario=%u accepted=%d unchanged=%d pending=%d ordinary=%d phase=%u decision=%u map=%d session=%d state=%d feedback=%d continuity=%d\n",
+						     scenario, capture_accepted, unchanged, pending, owner.observedOrdinaryDisarm(hrt_absolute_time()),
+						     static_cast<unsigned>(diagnostic.phase), static_cast<unsigned>(diagnostic.decision_code), diagnostic.map_valid,
+						     diagnostic.session_established, diagnostic.required_state_valid, diagnostic.feedback_valid, diagnostic.continuity_fault);
+				}
+
+				check(!capture_accepted && unchanged && !pending,
+				      "same-observation disarm or fault rejects control capture without returning a reusable command");
+				check(owner.observedOrdinaryDisarm(hrt_absolute_time()) == (scenario <= 18),
+				      "only fresh source-continuous ordinary disarm is a stop outcome; stale, inhibit, source, expiry, config and prior faults remain faults");
+
+				if (scenario <= 18) {
+					check(!owner._state.map.valid && !owner._entry_authorized && !owner.observedOrdinaryDisarm(original_deadline),
+					      "ordinary-disarm capture revokes its map and cannot extend the original evidence deadline");
+					check(!owner.captureControlInput(fingerprint(c) ^ 1U, captured) && !owner.observedOrdinaryDisarm(hrt_absolute_time()),
+					      "another failed capture cannot reuse the preceding ordinary-disarm outcome");
+				}
+
+				continue;
+			}
+		}
+
+		if (scenario == 0) {
+			uORB::Publication<slaaps_companion_packet_s> receiver{ORB_ID(slaaps_companion_packet_3)};
+			check(receiver.advertise(), "advertise isolated receiver lifetime for matched authenticated clock evidence");
+			owner._receiver_revision = owner._input[3].revision();
+			owner._receiver_system = owner._receiver_component = 1;
+			// Explicit synthetic post-parser evidence; signature verification and
+			// the challenge ledger are exercised by the signed wire scenario.
+			auto clock_reply = [&](uint64_t remote_override = 0, bool wrong_key = false) {
+				slaaps_companion_packet_s packet{};
+				packet.clock_sent_us = hrt_absolute_time();
+				do { packet.timestamp = hrt_absolute_time(); } while (packet.timestamp <= packet.clock_sent_us);
+
+				const uint64_t midpoint = packet.clock_sent_us + (packet.timestamp - packet.clock_sent_us) / 2;
+				mavlink_timesync_t payload{};
+				payload.ts1 = static_cast<int64_t>(packet.clock_sent_us * 1000);
+				payload.tc1 = static_cast<int64_t>((remote_override ? remote_override : midpoint) * 1000);
+				payload.target_system = payload.target_component = 1;
+				mavlink_message_t message{};
+				mavlink_msg_timesync_encode(42, 191, &message, &payload);
+				packet.message_id = message.msgid;
+				packet.payload_length = message.len;
+				std::memcpy(packet.payload, _MAV_PAYLOAD(&message), message.len);
+				packet.event = slaaps_companion_packet_s::EVENT_CLOCK_SAMPLE;
+				packet.control_binding_id = owner._binding;
+				packet.controller_instance_id = owner._identity;
+				packet.configuration_identity = owner._configuration_identity;
+				packet.signing_generation = wrong_key ? 8 : 7;
+				packet.mavlink_instance = 3;
+				packet.source_system = 42;
+				packet.source_component = 191;
+				packet.receiver_system = packet.receiver_component = 1;
+				packet.mavlink2 = packet.signing_active = packet.signature_verified = true;
+				return owner.freezeMap(packet, hrt_absolute_time());
+			};
+			const uint64_t before_renewal_epoch = owner._snapshot.transition_epoch;
+			check(!clock_reply() && owner._map_deadline == original_deadline && owner._state.map.map_epoch == original_map.map_epoch,
+			      "authenticated clock replies before the bounded renewal window cannot repeatedly invalidate demand");
+			const uint64_t renewal_start = original_deadline - static_cast<uint64_t>(c.companion.map_interval_us) / 2;
+
+			while (hrt_absolute_time() <= renewal_start + 1000) { px4_usleep(100); }
+
+			observe();
+			check(!clock_reply(original_map.valid_from_producer_us - 1) && !clock_reply(hrt_absolute_time() - 100000)
+			      && !clock_reply(0, true) && owner._map_deadline == original_deadline
+			      && owner._state.map.map_epoch == original_map.map_epoch && owner._snapshot.transition_epoch == before_renewal_epoch,
+			      "backward, nonoverlapping or mismatched-key evidence cannot replace the retained map");
+			check(clock_reply(), "same-session authenticated matched clock renews before the original map expires");
+			observe();
+			const uint64_t renewed_deadline = owner._map_deadline;
+			check(renewed_deadline > original_deadline && owner._state.map.map_epoch == original_map.map_epoch + 1
+			      && owner._state.map.source == original_map.source && owner._state.map.session == original_map.session
+			      && owner._snapshot.transition_epoch == before_renewal_epoch + 1
+			      && owner._adapter->sessionSnapshot().gate == SessionGate::Established && !owner._status.acknowledgement_current
+			      && owner._adapter->getEligibleRequest(owner._state, eligible).code != AdapterCode::EligibleRequest
+			      && request.wire.producer_expiry_monotonic_us == creation + 375000,
+			      "renewal advances only the map/barrier while revoking the still-fresh old request and ACK");
+			check(!clock_reply() && owner._map_deadline == renewed_deadline,
+			      "the renewed map starts a new bounded interval and cannot renew again immediately");
+			acknowledge();
+			do { creation = hrt_absolute_time(); } while (creation <= old_ack.producer_acknowledgement_monotonic_us + 2 *
+					owner._state.map.uncertainty_us);
+
+			observe();
+			request.wire.transition_epoch = owner._snapshot.transition_epoch;
+			request.wire.clock_mapping_epoch = owner._state.map.map_epoch;
+			request.wire.producer_monotonic_us = creation;
+			request.wire.producer_expiry_monotonic_us = creation + 20000;
+			const auto duplicate = owner._adapter->processRequest(owner._state, request, ingress);
+			check(duplicate.code == IngressCode::S1Rejected && duplicate.operation_s1_decision.code == DecisionCode::DuplicateSequence,
+			      "map renewal retains the original request replay floor after a fresh ACK");
+			request.wire.sequence = 2;
+			check(owner._adapter->processRequest(owner._state, request, ingress).code == IngressCode::Completed
+			      && owner._adapter->getEligibleRequest(owner._state, eligible).code == AdapterCode::EligibleRequest,
+			      "a genuinely new post-renewal ACK/request pair restores eligibility under the same session");
+
+			while (hrt_absolute_time() <= original_deadline + 1000) { px4_usleep(100); }
+
+			observe();
+			creation = owner._state.request_guard_context.validator_receive_time_us - 2 * owner._state.map.uncertainty_us;
+			request.wire.sequence = 3;
+			request.wire.producer_monotonic_us = creation;
+			request.wire.producer_expiry_monotonic_us = creation + 20000;
+			check(owner._adapter->processRequest(owner._state, request, ingress).code == IngressCode::Completed
+			      && owner._adapter->getEligibleRequest(owner._state, eligible).code == AdapterCode::EligibleRequest
+			      && owner._map_deadline == renewed_deadline,
+			      "fresh demand remains eligible beyond the prior map expiry without re-establishment or output admission");
+
+			while (hrt_absolute_time() < renewed_deadline) { px4_usleep(100); }
+
+			observe();
+			check(!owner._state.map.valid && !clock_reply() && !owner._entry_authorized
+			      && owner._adapter->sessionSnapshot().gate != SessionGate::Established,
+			      "missing the renewed original deadline closes authority and a late authentic reply cannot revive it");
+		}
+
+		if (scenario == 0 || scenario == 1) {
+			witness.armed = false;
+			witness.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
+
+		} else { witness.nav_state = subject->_modes[0].id; }
+
+		++witness.transition;
+		observe();
+		check(!owner._state.map.valid && !owner._entry_authorized
+		      && owner._adapter->sessionSnapshot().gate != SessionGate::Established,
+		      "ordinary disarm or reverse Acceleration-to-Manual exit revokes the preauthorized session");
+	}
+
+	const bool raw_retired = raw_pub.unadvertise();
+	const bool bias_retired = bias_pub.unadvertise();
+	check(raw_retired && bias_retired, "explicitly retire queued feedback source lifetimes");
+}
 
 void SlaapsNativeTest::companionTransportTests()
 {
@@ -6142,9 +8376,52 @@ void SlaapsNativeTest::companionTransportTests()
 // No Commander or normal supervisor runs during this isolated command. Topic
 // authority and registration replies are explicitly synthetic; both PWM-bank
 // endpoints use the real mixer and capture-only updateOutputs callback above.
-static int nativeSupervisorOrchestrationTests()
+static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 {
 	checks = 0;
+	native_acceleration_capture_count.store(0, std::memory_order_relaxed);
+	native_acceleration_capture_overflow.store(0, std::memory_order_relaxed);
+	{
+		vehicle_status_s vehicle{};
+		actuator_armed_s armed{};
+		vehicle.timestamp = armed.timestamp = 1000;
+		vehicle.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
+		armed.armed = true;
+		check(ordinaryFlightDisarm(1000, 100, vehicle, armed), "fresh vehicle-first disarm is an ordinary output stop");
+		vehicle.arming_state = vehicle_status_s::ARMING_STATE_ARMED;
+		armed.armed = false;
+		check(ordinaryFlightDisarm(1000, 100, vehicle, armed), "fresh actuator-first disarm is an ordinary output stop");
+
+		for (unsigned fault = 0; fault < 10; ++fault) {
+			auto bad_vehicle = vehicle;
+			auto bad_armed = armed;
+
+			switch (fault) {
+			case 0: bad_armed.kill = true; break;
+
+			case 1: bad_armed.lockdown = true; break;
+
+			case 2: bad_armed.termination = true; break;
+
+			case 3: bad_armed.in_esc_calibration_mode = true; break;
+
+			case 4: bad_vehicle.timestamp = 0; break;
+
+			case 5: bad_armed.timestamp = 0; break;
+
+			case 6: bad_vehicle.timestamp = 1001; break;
+
+			case 7: bad_vehicle.timestamp = 899; break;
+
+			case 8: bad_armed.timestamp = 899; break;
+
+			default: bad_armed.armed = true; break;
+			}
+
+			check(!ordinaryFlightDisarm(1000, 100, bad_vehicle, bad_armed),
+			      "inhibited, absent, stale, future or still-armed authority cannot be classified as ordinary disarm");
+		}
+	}
 	auto c = fixture();
 	c.cycle_min_us = 10000;
 	c.cycle_max_us = 200000;
@@ -6161,6 +8438,8 @@ static int nativeSupervisorOrchestrationTests()
 		      "isolated supervisor selects synthetic single-estimator metadata");
 	}
 
+	SlaapsNativeTest::companionEntryTests();
+
 	const int32_t scope = 1, apply = 300;
 	check(param_set(param_find("SLA_CFG_KIND"), &scope) == 0
 	      && param_set(param_find("SLA_CFG_APPLY"), &apply) == 0,
@@ -6170,9 +8449,58 @@ static int nativeSupervisorOrchestrationTests()
 	uint32_t capture_duration{};
 	check(parameters.initialize() && parameters.capture(profile, capture_duration) && parameters.remember(profile),
 	      "isolated supervisor uses actual accepted-profile restore path");
+	{
+		ParameterSnapshot captured{}, scratch{};
+		check(parameters.capture(captured, capture_duration, scratch)
+		      && equal(captured.configuration, profile.configuration) && captured.apply_counter == profile.apply_counter
+		      && captured.use == profile.use && Px4ConfigurationSource::remembered(captured),
+		      "caller-owned workspace captures the complete coherent accepted profile");
+		const ParameterSnapshot before = captured;
+		check(!parameters.capture(captured, capture_duration, captured)
+		      && std::memcmp(&before, &captured, sizeof(captured)) == 0,
+		      "aliasing capture workspace is rejected without modifying the destination");
+		Px4ConfigurationSource uninitialized;
+		check(!uninitialized.capture(captured, capture_duration, scratch)
+		      && std::memcmp(&before, &captured, sizeof(captured)) == 0,
+		      "failed caller-workspace capture preserves the complete previous destination");
+		const char *imu_parameters[kAxes] {"EKF2_IMU_POS_X", "EKF2_IMU_POS_Y", "EKF2_IMU_POS_Z"};
+		const float native_position[kAxes] {.12F, -.03F, .04F};
+		const float native_cutoff = 42.F;
+		const float separate_cg = .7F;
+
+		for (unsigned axis = 0; axis < kAxes; ++axis) {
+			check(param_set(param_find(imu_parameters[axis]), &native_position[axis]) == 0,
+			      "set exact native IMU offset for atomic typed snapshot regression");
+		}
+
+		check(param_set(param_find("SLA_CG_X"), &separate_cg) == 0
+		      && param_set(param_find("IMU_ACCEL_CUTOFF"), &native_cutoff) == 0
+		      && parameters.capture(captured, capture_duration, scratch), "real atomic source captures changed native filter/offset intent");
+		check(sameFloatBits(captured.configuration.cg[0], separate_cg), "external offset test uses a distinct nonzero SLAAPS CG coordinate");
+
+		for (unsigned axis = 0; axis < kAxes; ++axis) {
+			check(sameFloatBits(captured.configuration.feedback.imu_position[axis], native_position[axis]),
+			      "native CG-to-IMU coordinates are copied verbatim, without subtracting a second CG reference");
+			check(param_set(param_find(imu_parameters[axis]), &profile.configuration.feedback.imu_position[axis]) == 0,
+			      "restore exact native position intent after focused capture regression");
+		}
+
+		check(sameFloatBits(captured.configuration.feedback.cutoff_hz, native_cutoff)
+		      && !equal(captured.configuration, profile.configuration) && !Px4ConfigurationSource::remembered(captured),
+		      "native intent mutation changes typed identity and cannot inherit saved acceptance markers");
+		check(param_set(param_find("SLA_CG_X"), &profile.configuration.cg[0]) == 0
+		      && param_set(param_find("IMU_ACCEL_CUTOFF"), &profile.configuration.feedback.cutoff_hz) == 0
+		      && parameters.capture(captured, capture_duration, scratch) && equal(captured.configuration, profile.configuration)
+		      && Px4ConfigurationSource::remembered(captured),
+		      "restoring exact external intent restores original identity without inventing producer-applied state");
+	}
 	NativeSlaapsOutput main("PWM_MAIN"), aux("PWM_AUX");
 	uORB::Publication<vehicle_status_s> vehicle_pub{ORB_ID(vehicle_status)};
 	uORB::Publication<actuator_armed_s> armed_pub{ORB_ID(actuator_armed)};
+	NativeManualDisarmInjection disarm_injection{};
+	disarm_injection.vehicle = &vehicle_pub;
+	disarm_injection.armed = &armed_pub;
+	native_manual_disarm = &disarm_injection;
 	uORB::Publication<vehicle_attitude_s> attitude_pub{ORB_ID(vehicle_attitude)};
 	uORB::Publication<vehicle_angular_velocity_s> rates_pub{ORB_ID(vehicle_angular_velocity)};
 	uORB::Publication<estimator_status_s> estimator_pub{ORB_ID(estimator_status)};
@@ -6184,6 +8512,17 @@ static int nativeSupervisorOrchestrationTests()
 	uORB::Publication<vehicle_air_data_s> condition_air_data_pub{ORB_ID(vehicle_air_data)};
 	uORB::Publication<battery_status_s> power_pub{ORB_ID(battery_status)};
 	uORB::Publication<setpoint_config_reply_s> setpoint_pub{ORB_ID(setpoint_config_reply)};
+	uORB::Publication<slaaps_vehicle_state_s> flight_witness_pub{ORB_ID(slaaps_vehicle_state)};
+	uORB::PublicationMulti<sensor_accel_s> flight_raw_pub{ORB_ID(sensor_accel)};
+	uORB::PublicationMulti<estimator_sensor_bias_s> flight_bias_pub{ORB_ID(estimator_sensor_bias)};
+	uORB::Publication<vehicle_acceleration_s> flight_acceleration_pub{ORB_ID(vehicle_acceleration)};
+	uORB::Publication<slaaps_companion_packet_s> flight_packet_pub{ORB_ID(slaaps_companion_packet_3)};
+	uORB::ResearchSubscription flight_signed_packets{ORB_ID::slaaps_companion_packet_0};
+	uORB::ResearchSubscription flight_injected_lifetime{ORB_ID::slaaps_companion_packet_3};
+	uORB::ResearchSubscription flight_raw_lifetime{ORB_ID::sensor_accel}, flight_bias_lifetime{ORB_ID::estimator_sensor_bias};
+	uORB::Subscription flight_control_sub{ORB_ID(slaaps_companion_control)}, flight_protocol_sub{ORB_ID(slaaps_companion_status)};
+	uORB::Subscription control_detail_sub{ORB_ID(slaaps_acceleration_status)};
+	slaaps_acceleration_status_s control_detail{};
 	uORB::Subscription registration{ORB_ID(register_ext_component_request)};
 	uORB::Subscription setpoint{ORB_ID(setpoint_config)};
 	uORB::Subscription status_sub{ORB_ID(slaaps_status)};
@@ -6198,20 +8537,422 @@ static int nativeSupervisorOrchestrationTests()
 	vehicle_status_s vehicle{};
 	actuator_armed_s armed{};
 	vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
-	bool publish_inputs = true, publish_estimates = true, pump_aux = true, vehicle_armed = false;
+	bool publish_inputs = true, publish_estimates = true, publish_manual = true, pump_aux = true, vehicle_armed = false;
 	bool publish_conditions = false;
 	bool publish_power = true;
+	bool publish_flight = false, flight_keepalive = false, flight_stream_requests = false, flight_renew_clock = false;
+	bool flight_expect_session = false, flight_auto_ack = false;
+	bool flight_single_request{};
+	float flight_lateral_request{};
+	uint64_t flight_rejected_request{}, flight_rejected_receipt{};
+	uint64_t flight_companion_session{7301};
+	VehicleConfiguration flight_profile = slaapsFlightTransferConfiguration(c);
+	slaaps_vehicle_state_s flight_witness{};
+	slaaps_companion_control_s flight_control{};
+	slaaps_companion_status_s flight_protocol{};
+	uint64_t flight_event_sequence{}, flight_operation{}, flight_request_sequence{}, flight_last_request{}, flight_last_session{},
+		 flight_ack_producer{};
+	uint64_t flight_ack_epoch{}, flight_last_clock{}, flight_last_clock_event{}, flight_renewal_lead{};
+	bool flight_clock_pending{};
+	unsigned flight_receiver_revision{}, flight_signing_generation{}, flight_verified_clocks{}, flight_verified_requests{};
+	unsigned flight_injected_revision{}, flight_injected_generation{};
+	auto flight_injection_unchanged = [&]() {
+		return !flight_packet_pub.advertised() && flight_injected_lifetime.revision() == flight_injected_revision
+		       && flight_injected_lifetime.get_last_generation() == flight_injected_generation && !flight_injected_lifetime.updated();
+	};
+	struct FlightSessionDiagnostic {
+		uint64_t observed{}, protocol_time{}, witness_time{}, witness_transition{}, observed_transition{}, epoch{};
+		uint64_t map_epoch{}, map_deadline{}, connection_deadline{}, barrier_time{};
+		uint8_t nav{}, arming{}, phase{}, entry{}, worker{}, feedback{};
+		uint16_t decision{};
+		bool vehicle_armed{}, actuator_armed{}, witness_armed{}, session{}, map{}, state{}, acknowledgement{}, continuity{};
+	};
+	// Fixture-thread-only sampled evidence: prior healthy protocol publication
+	// and first observed loss. These topics are not one atomic transaction.
+	auto flight_diagnostics = std::make_unique<FlightSessionDiagnostic[]>(2);
+	// A single bounded/flushed line asks the independent Python UDP producer to
+	// act. These local values select a test transaction; they never substitute
+	// for a producer timestamp, a verifier verdict or an injected packet.
+	auto flight_instruction = [&](const char *kind, unsigned operation = 0) {
+		char line[768] {};
+		const int prefix = std::snprintf(line, sizeof(line),
+						 "SLAAPS_SIGNED_FLIGHT kind=%s controller=%llu binding=%llu epoch=%llu map=%llu session=%llu offset=%lld uncertainty=%llu deadline=%llu",
+						 kind, static_cast<unsigned long long>(flight_protocol.controller_instance_id),
+						 static_cast<unsigned long long>(flight_control.binding_id), static_cast<unsigned long long>(flight_protocol.transition_epoch),
+						 static_cast<unsigned long long>(flight_protocol.map_epoch), static_cast<unsigned long long>(flight_companion_session),
+						 static_cast<long long>(flight_protocol.map_offset_us), static_cast<unsigned long long>(flight_protocol.map_uncertainty_us),
+						 static_cast<unsigned long long>(flight_protocol.map_deadline));
+		check(prefix > 0 && static_cast<size_t>(prefix) < sizeof(line), "signed-flight instruction prefix fits its fixed buffer");
+		int suffix{};
+
+		if (std::strcmp(kind, "session") == 0) {
+			suffix = std::snprintf(line + prefix, sizeof(line) - prefix, " operation=%u barrier=%llu barrier_time=%llu\n", operation,
+					       static_cast<unsigned long long>(flight_protocol.barrier_sequence), static_cast<unsigned long long>(flight_protocol.barrier_time));
+
+		} else if (std::strcmp(kind, "request") == 0) {
+			suffix = std::snprintf(line + prefix, sizeof(line) - prefix, " ax=5 ay=%.9g az=%.9g minimum_validity=%d maximum_validity=%d\n",
+					       static_cast<double>(flight_lateral_request), static_cast<double>(flight_profile.feedback.gravity_m_s2),
+					       flight_profile.companion.minimum_validity_us,
+					       flight_profile.companion.maximum_validity_us);
+
+		} else {
+			suffix = std::snprintf(line + prefix, sizeof(line) - prefix, "\n");
+		}
+
+		check(suffix > 0 && static_cast<size_t>(suffix) < sizeof(line) - prefix,
+		      "signed-flight instruction suffix fits its fixed buffer");
+		check(std::fputs(line, stdout) >= 0 && std::fflush(stdout) == 0, "flush one complete signed-flight instruction");
+	};
+	auto flight_packet = [&](const mavlink_message_t &message, uint8_t event, uint64_t sent = 0, uint64_t receipt = 0) {
+		check(!signed_flight, "the signed active path cannot inject a companion packet topic");
+		slaaps_companion_packet_s packet{};
+		packet.timestamp = receipt ? receipt : hrt_absolute_time();
+		packet.sequence = ++flight_event_sequence;
+		packet.control_binding_id = flight_control.binding_id;
+		packet.controller_instance_id = flight_control.controller_instance_id;
+		packet.configuration_identity = flight_control.configuration_identity;
+		packet.clock_sent_us = sent;
+		packet.signing_generation = 7;
+		packet.message_id = message.msgid;
+		packet.mavlink_instance = 3;
+		packet.source_system = 42;
+		packet.source_component = 191;
+		packet.receiver_system = packet.receiver_component = 1;
+		packet.payload_length = message.len;
+		packet.event = event;
+		packet.mavlink2 = packet.signing_active = packet.signature_verified = true;
+		std::memcpy(packet.payload, _MAV_PAYLOAD(&message), message.len);
+		check(flight_packet_pub.publish(packet), "isolated post-parser companion evidence publication succeeds (not signature qualification)");
+	};
+	auto flight_session = [&](bool acknowledgement) {
+		if (signed_flight) {
+			flight_instruction("session", acknowledgement ? 3 : 1);
+			flight_last_session = hrt_absolute_time();
+
+			if (acknowledgement) {
+				// This is local instruction time only. Python owns the original
+				// remote ACK time and waits for the real signed wire barrier.
+				flight_ack_producer = flight_last_session;
+				flight_ack_epoch = flight_protocol.transition_epoch;
+			}
+
+			return;
+		}
+
+		mavlink_research_acceleration_session_t payload{};
+		payload.source_id = static_cast<uint64_t>(flight_profile.companion.source_id);
+		payload.session_id = flight_companion_session;
+		payload.controller_instance_id = flight_protocol.controller_instance_id;
+		payload.transition_epoch = flight_protocol.transition_epoch;
+		payload.clock_mapping_epoch = flight_protocol.map_epoch ? flight_protocol.map_epoch : 1;
+		payload.operation_sequence = ++flight_operation;
+		payload.protocol_version = research_acceleration::kWireProtocolVersionV1;
+		payload.target_system = payload.target_component = 1;
+		payload.operation = acknowledgement ? 3 : 1;
+
+		if (acknowledgement) {
+			flight_ack_producer = hrt_absolute_time();
+			flight_ack_epoch = flight_protocol.transition_epoch;
+			payload.acknowledged_status_sequence = flight_protocol.barrier_sequence;
+			payload.producer_acknowledgement_monotonic_us = flight_ack_producer;
+		}
+
+		mavlink_message_t message{};
+		mavlink_msg_research_acceleration_session_encode(42, 191, &message, &payload);
+		flight_packet(message, slaaps_companion_packet_s::EVENT_FRAME);
+		flight_last_session = hrt_absolute_time();
+	};
+	auto flight_clock = [&]() {
+		if (signed_flight) {
+			flight_instruction("clock");
+			flight_clock_pending = true;
+			flight_last_clock = hrt_absolute_time();
+			return;
+		}
+
+		const uint64_t receipt = hrt_absolute_time(), sent = receipt - 2000;
+		mavlink_timesync_t clock{};
+		clock.tc1 = static_cast<int64_t>((sent + (receipt - sent) / 2) * 1000);
+		clock.ts1 = static_cast<int64_t>(sent * 1000);
+		clock.target_system = clock.target_component = 1;
+		mavlink_message_t message{};
+		mavlink_msg_timesync_encode(42, 191, &message, &clock);
+		flight_packet(message, slaaps_companion_packet_s::EVENT_CLOCK_SAMPLE, sent, receipt);
+		flight_last_clock = receipt;
+		flight_last_clock_event = flight_event_sequence;
+	};
+	auto flight_request = [&]() {
+		const uint64_t now = hrt_absolute_time();
+		const uint64_t remaining = flight_protocol.map_deadline > now ? flight_protocol.map_deadline - now : 0;
+
+		if (remaining < static_cast<uint64_t>(flight_profile.companion.minimum_validity_us)) { return; }
+
+		if (signed_flight) {
+			flight_instruction("request");
+			flight_last_request = now;
+
+			if (flight_single_request) { flight_stream_requests = false; }
+
+			return;
+		}
+
+		mavlink_research_acceleration_request_t payload{};
+		payload.source_id = static_cast<uint64_t>(flight_profile.companion.source_id);
+		payload.session_id = flight_companion_session;
+		payload.sequence = ++flight_request_sequence;
+		payload.producer_monotonic_us = now;
+		payload.producer_expiry_monotonic_us = now + math::min(remaining, static_cast<uint64_t>(flight_profile.companion.maximum_validity_us));
+		payload.controller_instance_id = flight_protocol.controller_instance_id;
+		payload.transition_epoch = flight_protocol.transition_epoch;
+		payload.clock_mapping_epoch = flight_protocol.map_epoch;
+		payload.acceleration_x_frd_m_s2 = 5.F;
+		payload.acceleration_y_frd_m_s2 = flight_lateral_request;
+		payload.acceleration_z_frd_m_s2 = flight_profile.feedback.gravity_m_s2;
+		payload.desired_attitude_ned_from_body[0] = 1.F;
+		payload.protocol_version = research_acceleration::kWireProtocolVersionV2;
+		payload.target_system = payload.target_component = 1;
+		payload.frame = payload.quantity = payload.reference_point = 1;
+		payload.flags = 1;
+		mavlink_message_t message{};
+		mavlink_msg_research_acceleration_request_encode(42, 191, &message, &payload);
+		flight_packet(message, slaaps_companion_packet_s::EVENT_FRAME);
+		flight_last_request = now;
+
+		if (flight_single_request) {
+			flight_stream_requests = false;
+			flight_rejected_request = payload.sequence;
+			flight_rejected_receipt = now;
+		}
+	};
 	unsigned power_scenario{};
 	float condition_airspeed = 20.F;
 	float roll = 0.F, throttle = -1.F;
 	slaaps_status_s status{};
+	// Keep the first observable anomaly and preceding good evidence in this
+	// native fixture. No supervisor-private mutable state is read here, and no
+	// diagnostic output delays the active scenario unless an assertion fails.
+	struct EdfDiagnosticSample {
+		uint64_t observed{}, pump_started{}, previous_pump{}, maximum_gap{}, session{}, phase_started{};
+		unsigned scenario{}, phase{}, reasons{}, writes[2] {}, driver_status[2] {};
+		bool expected_vehicle_armed{}, expected_actuator_armed{}, pump_aux{}, publish_inputs{}, publish_power{};
+		float expected_throttle{};
+		slaaps_status_s status{};
+		vehicle_status_s vehicle{};
+		actuator_armed_s armed{};
+		manual_control_setpoint_s raw{};
+		battery_status_s power{};
+		slaaps_manual_permission_s permission{};
+		slaaps_manual_command_s command{};
+		slaaps_manual_ack_s handled[2] {};
+		slaaps_manual_preparation_s ready[2] {};
+		slaaps_manual_activation_s activation[2] {};
+		slaaps_output_bank_s bank[2] {};
+	};
+	auto edf_diagnostics = std::make_unique<EdfDiagnosticSample[]>(3); // Prior good, first anomaly, latest.
+	uORB::Subscription diagnostic_vehicle{ORB_ID(vehicle_status)}, diagnostic_armed{ORB_ID(actuator_armed)};
+	uORB::Subscription diagnostic_raw{ORB_ID(manual_control_setpoint)}, diagnostic_power{ORB_ID(battery_status)};
+	uORB::Subscription diagnostic_permission{ORB_ID(slaaps_manual_permission)}, diagnostic_command{ORB_ID(slaaps_manual_command)};
+	uORB::Subscription diagnostic_handled[2] {{ORB_ID(slaaps_manual_ack_main)}, {ORB_ID(slaaps_manual_ack_aux)}};
+	uORB::Subscription diagnostic_ready[2] {{ORB_ID(slaaps_manual_ready_main)}, {ORB_ID(slaaps_manual_ready_aux)}};
+	uORB::Subscription diagnostic_activation[2] {{ORB_ID(slaaps_manual_active_main)}, {ORB_ID(slaaps_manual_active_aux)}};
+	uORB::Subscription diagnostic_bank[2] {{ORB_ID(slaaps_output_bank), 0}, {ORB_ID(slaaps_output_bank), 1}};
+	unsigned diagnostic_phase{}, diagnostic_scenario{}, diagnostic_baseline_writes{};
+	uint64_t diagnostic_session{}, diagnostic_phase_started{}, diagnostic_previous_pump{}, diagnostic_maximum_gap{};
+	bool diagnostic_latched{};
+	auto capture_edf_diagnostic = [&](uint64_t pump_started, uint64_t previous_pump) {
+		auto &sample = edf_diagnostics[2];
+		sample = {};
+		sample.pump_started = pump_started;
+		sample.previous_pump = previous_pump;
+		sample.maximum_gap = diagnostic_maximum_gap;
+		sample.session = diagnostic_session;
+		sample.phase_started = diagnostic_phase_started;
+		sample.scenario = diagnostic_scenario;
+		sample.phase = diagnostic_phase;
+		sample.expected_vehicle_armed = vehicle_armed;
+		sample.expected_actuator_armed = armed.armed;
+		sample.expected_throttle = throttle;
+		sample.pump_aux = pump_aux;
+		sample.publish_inputs = publish_inputs;
+		sample.publish_power = publish_power;
+		sample.status = status;
+		diagnostic_vehicle.copy(&sample.vehicle);
+		diagnostic_armed.copy(&sample.armed);
+		diagnostic_raw.copy(&sample.raw);
+		diagnostic_power.copy(&sample.power);
+		diagnostic_permission.copy(&sample.permission);
+		diagnostic_command.copy(&sample.command);
+
+		for (unsigned bank = 0; bank < 2; ++bank) {
+			diagnostic_handled[bank].copy(&sample.handled[bank]);
+			diagnostic_ready[bank].copy(&sample.ready[bank]);
+			diagnostic_activation[bank].copy(&sample.activation[bank]);
+			diagnostic_bank[bank].copy(&sample.bank[bank]);
+		}
+
+		sample.writes[0] = main.writes(); sample.writes[1] = aux.writes();
+		sample.driver_status[0] = static_cast<unsigned>(main.mixing().slaapsOutputStatus());
+		sample.driver_status[1] = static_cast<unsigned>(aux.mixing().slaapsOutputStatus());
+		sample.observed = hrt_absolute_time();
+		const bool fresh_status = status.timestamp >= diagnostic_phase_started;
+		const bool waiting = diagnostic_phase <= 2;
+		const bool running = diagnostic_phase == 4;
+		sample.reasons = fresh_status && status.manual_preparation_session != diagnostic_session ? 1U : 0U;
+		const bool terminal = status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_REJECTED
+				      || status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_DISARM
+				      || status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_DISARM_FAILED;
+
+		if (fresh_status && (terminal || (waiting && status.bench_entry_status != slaaps_status_s::BENCH_ENTRY_WAIT_ARM)
+				     || (running && status.bench_entry_status != slaaps_status_s::BENCH_ENTRY_EDF_RUNNING))) { sample.reasons |= 2U; }
+
+		if (fresh_status && ((waiting && status.bench_worker_active) || (running && !status.bench_worker_active))) { sample.reasons |= 4U; }
+
+		if (fresh_status && (!status.configuration_valid || !status.routing_snapshot_valid)) { sample.reasons |= 8U; }
+
+		if (waiting && sample.writes[0] + sample.writes[1] != diagnostic_baseline_writes) { sample.reasons |= 16U; }
+
+		for (unsigned bank = 0; bank < 2; ++bank) {
+			if (sample.driver_status[bank] >= static_cast<unsigned>(SlaapsOutputStatus::Inhibited)) { sample.reasons |= 32U << bank; }
+		}
+
+		if (sample.reasons && !diagnostic_latched) { edf_diagnostics[1] = sample; diagnostic_latched = true; }
+
+		if (!sample.reasons && !diagnostic_latched) { edf_diagnostics[0] = sample; }
+	};
+	auto print_edf_diagnostic = [&](const char *assertion) {
+		SlaapsNativeTest::printBenchCancels();
+
+		if (!diagnostic_phase) { return; }
+
+		capture_edf_diagnostic(hrt_absolute_time(), diagnostic_previous_pump);
+		std::fprintf(stderr,
+			     "EDF_CAUSAL assertion=%s first_retained=%u phases=1disarmed/2partial/3activation/4running reasons=1session/2entry/4worker/8config-routing/16writes/32main/64aux\n",
+			     assertion, diagnostic_latched ? 1U : 0U);
+		const char *labels[] {"prior_good", "first_anomaly", "failure"};
+		const auto t = [](uint64_t value) { return static_cast<unsigned long long>(value); };
+
+		for (unsigned i = 0; i < 3; ++i) {
+			const auto &s = edf_diagnostics[i];
+			std::fprintf(stderr,
+				     "EDF_CAUSAL %s scenario=%u phase=%u reasons=%u now=%llu start=%llu pump=%llu previous=%llu maxgap=%llu expected_session=%llu\n",
+				     labels[i], s.scenario, s.phase, s.reasons, t(s.observed), t(s.phase_started), t(s.pump_started), t(s.previous_pump), t(s.maximum_gap),
+				     t(s.session));
+			std::fprintf(stderr,
+				     "EDF_CAUSAL status time=%llu entry=%u active=%d worker=%u prep=%u session=%llu prep_deadline=%llu total=%llu ready_deadline=%llu masks=%u/%u power=%u/%llu routing=%d/%u/%u\n",
+				     t(s.status.timestamp), s.status.bench_entry_status, s.status.bench_worker_active, s.status.manual_worker_status,
+				     s.status.manual_preparation_status, t(s.status.manual_preparation_session), t(s.status.manual_preparation_deadline),
+				     t(s.status.bench_session_deadline), t(s.status.bench_commissioning_ready_deadline), s.status.can_arm_mask, s.status.can_run_mask,
+				     s.status.power_status, t(s.status.power_deadline), s.status.routing_snapshot_valid, s.status.inventory_fault, s.status.routing_fault);
+			std::fprintf(stderr,
+				     "EDF_CAUSAL authority expected=%d/%d actual=%u/%d timestamps=%llu/%llu nav=%u/%u prearm=%d inhibits=%d/%d/%d fixture_inputs=%d power=%d aux=%d throttle=%.6f\n",
+				     s.expected_vehicle_armed, s.expected_actuator_armed, s.vehicle.arming_state, s.armed.armed, t(s.vehicle.timestamp), t(s.armed.timestamp),
+				     s.vehicle.nav_state, s.vehicle.nav_state_user_intention, s.armed.prearmed, s.armed.kill, s.armed.lockdown, s.armed.termination,
+				     s.publish_inputs, s.publish_power, s.pump_aux, static_cast<double>(s.expected_throttle));
+			std::fprintf(stderr,
+				     "EDF_CAUSAL permission time=%llu original=%llu deadline=%llu session=%llu seq=%llu armed=%d healthy=%d commission=%d mode=%u raw=%llu/%llu/%.6f power=%llu/%.6f/%u\n",
+				     t(s.permission.timestamp), t(s.permission.timestamp_sample), t(s.permission.deadline), t(s.permission.session), t(s.permission.sequence),
+				     s.permission.armed, s.permission.healthy, s.permission.commissioning_admitted, s.permission.mode,
+				     t(s.raw.timestamp), t(s.raw.timestamp_sample), static_cast<double>(s.raw.throttle), t(s.power.timestamp),
+				     static_cast<double>(s.power.voltage_v), s.power.faults);
+			std::fprintf(stderr,
+				     "EDF_CAUSAL command session=%llu seq=%llu published=%llu calculated=%llu deadline=%llu edf=%.6f raw_seq=%llu raw_time=%llu raw_deadline=%llu mode=%u disposition=%u\n",
+				     t(s.command.session), t(s.command.sequence), t(s.command.timestamp), t(s.command.timestamp_sample), t(s.command.deadline),
+				     static_cast<double>(s.command.edf),
+				     t(s.command.edf_sequence), t(s.command.edf_request_timestamp), t(s.command.edf_deadline), s.command.mode, s.command.edf_disposition);
+
+			for (unsigned bank = 0; bank < 2; ++bank) {
+				std::fprintf(stderr,
+					     "EDF_CAUSAL bank=%u state=%u writes=%u report=%llu/%d/%llu ready=%llu/%llu/%llu/%llu activation=%llu/%llu/%llu ack=%llu/%llu/%llu/%llu/%llu\n",
+					     bank, s.driver_status[bank], s.writes[bank], t(s.bank[bank].timestamp), s.bank[bank].ready, t(s.bank[bank].driver_instance),
+					     t(s.ready[bank].timestamp), t(s.ready[bank].session), t(s.ready[bank].prepared), t(s.ready[bank].deadline),
+					     t(s.activation[bank].session), t(s.activation[bank].timestamp_sample), t(s.activation[bank].first_command_deadline),
+					     t(s.handled[bank].session), t(s.handled[bank].sequence), t(s.handled[bank].timestamp), t(s.handled[bank].timestamp_sample),
+					     t(s.handled[bank].accepted));
+			}
+		}
+	};
 	const uint64_t started = hrt_absolute_time();
 	SlaapsNativeTest::admitted.store(true);
 	auto pump = [&]() {
 		const auto now = hrt_absolute_time();
+		const auto previous_pump = diagnostic_previous_pump;
+		diagnostic_previous_pump = now;
+
+		if (diagnostic_phase && previous_pump && now - previous_pump > diagnostic_maximum_gap) { diagnostic_maximum_gap = now - previous_pump; }
+
 		vehicle.timestamp = armed.timestamp = now;
 		vehicle.arming_state = vehicle_armed ? vehicle_status_s::ARMING_STATE_ARMED : vehicle_status_s::ARMING_STATE_DISARMED;
-		bool published = vehicle_pub.publish(vehicle) && armed_pub.publish(armed);
+
+		if (publish_flight && (!flight_witness.transition || flight_witness.nav_state != vehicle.nav_state)) {
+			vehicle.nav_state_timestamp = now;
+		}
+
+		const unsigned requested_disarm = disarm_injection.requested.load(std::memory_order_acquire);
+		const unsigned completed_disarm = disarm_injection.completed.load(std::memory_order_acquire);
+		bool published = true;
+
+		if (!requested_disarm) { published = vehicle_pub.publish(vehicle) && armed_pub.publish(armed); }
+
+		else if (completed_disarm) {
+			auto disarmed_vehicle = vehicle;
+			auto disarmed_actuator = armed;
+
+			if (requested_disarm == 1) { disarmed_vehicle.arming_state = vehicle_status_s::ARMING_STATE_DISARMED; }
+
+			else { disarmed_actuator.armed = false; }
+
+			published = vehicle_pub.publish(disarmed_vehicle) && armed_pub.publish(disarmed_actuator);
+		}
+
+		if (publish_flight) {
+			const bool changed = !flight_witness.transition || flight_witness.nav_state != vehicle.nav_state
+					     || flight_witness.arming_state != vehicle.arming_state || flight_witness.armed != armed.armed
+					     || flight_witness.prearmed != armed.prearmed || flight_witness.kill != armed.kill
+					     || flight_witness.lockdown != armed.lockdown || flight_witness.termination != armed.termination;
+
+			if (changed) { ++flight_witness.transition; }
+
+			flight_witness.timestamp = hrt_absolute_time();
+			flight_witness.nav_state = vehicle.nav_state;
+			flight_witness.arming_state = vehicle.arming_state;
+			flight_witness.armed = armed.armed;
+			flight_witness.prearmed = armed.prearmed;
+			flight_witness.kill = armed.kill;
+			flight_witness.lockdown = armed.lockdown;
+			flight_witness.termination = armed.termination;
+
+			// Mirror Commander: VehicleStatus is published before its atomic
+			// witness. This process is explicitly synthetic authority only.
+			// The capture-disarm injection holds the last actual witness while
+			// the first actuator disarm publication is being consumed.
+			if (!requested_disarm) { published &= flight_witness_pub.publish(flight_witness); }
+
+			const float pulse = aux.lastOutput(3);
+			const float normalized = pulse >= 1000.F && pulse <= 2000.F ? (pulse - 1000.F) * .001F : 0.F;
+			float modeled_thrust{};
+			published &= commandToThrust(flight_profile, normalized, modeled_thrust);
+			sensor_accel_s raw{};
+			raw.timestamp = raw.timestamp_sample = now;
+			raw.device_id = 456;
+			raw.x = modeled_thrust;
+			estimator_sensor_bias_s bias{};
+			bias.timestamp = bias.timestamp_sample = now;
+			bias.accel_device_id = 456;
+			bias.accel_bias_valid = true;
+			published &= flight_raw_pub.publish(raw) && flight_bias_pub.publish(bias);
+			vehicle_acceleration_s acceleration{};
+			acceleration.timestamp = acceleration.timestamp_sample = now;
+			acceleration.device_id = 456;
+			acceleration.source_generation = 1;
+			acceleration.calibrated = acceleration.bias_valid = true;
+			acceleration.raw_publisher_revision = flight_raw_lifetime.revision();
+			acceleration.bias_publisher_revision = flight_bias_lifetime.revision();
+			acceleration.bias_timestamp = acceleration.bias_timestamp_sample = now;
+			acceleration.xyz[0] = modeled_thrust;
+			// Ideal test feedback follows the capture callback's shared EDF
+			// curve. It is not measured thrust or calibration qualification.
+			published &= flight_acceleration_pub.publish(acceleration);
+		}
 
 		if (publish_power) {
 			// One synthetic battery supplies both propulsion and optional schedule observations.
@@ -6260,7 +9001,7 @@ static int nativeSupervisorOrchestrationTests()
 			manual.roll = roll;
 			manual.throttle = throttle;
 			manual.sticks_moving = roll > 0.F;
-			published &= manual_pub.publish(manual);
+			published &= !publish_manual || manual_pub.publish(manual);
 
 			if (publish_estimates) {
 				published &= attitude_pub.publish(attitude) && rates_pub.publish(rates) && estimator_pub.publish(estimator)
@@ -6320,6 +9061,131 @@ static int nativeSupervisorOrchestrationTests()
 		if (pump_aux) { aux.pump(); }
 
 		status_sub.copy(&status);
+		control_detail_sub.copy(&control_detail);
+
+		if (publish_flight) {
+			flight_control_sub.copy(&flight_control);
+			flight_protocol_sub.copy(&flight_protocol);
+
+			if (signed_flight) {
+				for (unsigned unread = 0; unread < slaaps_companion_packet_s::ORB_QUEUE_LENGTH; ++unread) {
+					slaaps_companion_packet_s packet{};
+					unsigned revision{};
+
+					if (!flight_signed_packets.copyQueuedBound(&packet, revision)) { break; }
+
+					if (packet.event == slaaps_companion_packet_s::EVENT_LINK_STATE) { continue; }
+
+					check(revision && packet.mavlink_instance == 0 && packet.source_system == 42 && packet.source_component == 191
+					      && packet.receiver_system == 1 && packet.receiver_component == 1 && packet.mavlink2
+					      && packet.signing_active && packet.signature_verified && packet.signing_generation,
+					      "actual selected receiver supplies verifier-backed signed source evidence");
+
+					if (!flight_receiver_revision) {
+						flight_receiver_revision = revision;
+						flight_signing_generation = packet.signing_generation;
+					}
+
+					check(revision == flight_receiver_revision && packet.signing_generation == flight_signing_generation,
+					      "signed active ingress retains one actual receiver and signing-key lifetime");
+
+					if (packet.event == slaaps_companion_packet_s::EVENT_CLOCK_SAMPLE
+					    && packet.control_binding_id == flight_control.binding_id
+					    && packet.controller_instance_id == flight_control.controller_instance_id
+					    && packet.configuration_identity == flight_control.configuration_identity) {
+						check(packet.clock_sent_us && packet.timestamp > packet.clock_sent_us,
+						      "signed map evidence retains the real matching challenge send and receive times");
+						++flight_verified_clocks;
+						flight_last_clock = packet.timestamp;
+						flight_last_clock_event = packet.sequence;
+
+						if (flight_clock_pending) {
+							flight_clock_pending = false;
+							flight_instruction("clock_done");
+						}
+					}
+
+					if (packet.message_id == MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST) {
+						mavlink_message_t encoded{};
+						check(packet.payload_length >= MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST_MIN_LEN
+						      && packet.payload_length <= MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST_LEN,
+						      "signed full command preserves its actual bounded MAVLink extension length");
+						encoded.len = packet.payload_length;
+						std::memcpy(_MAV_PAYLOAD_NON_CONST(&encoded), packet.payload, packet.payload_length);
+						check(mavlink_msg_research_acceleration_request_get_protocol_version(&encoded) == research_acceleration::kWireProtocolVersionV2
+						      && mavlink_msg_research_acceleration_request_get_flags(&encoded) == 1
+						      && mavlink_msg_research_acceleration_request_get_source_id(&encoded) == 1,
+						      "actual signed receiver payload is the explicit full-v2 logical source command");
+						++flight_verified_requests;
+
+						if (mavlink_msg_research_acceleration_request_get_session_id(&encoded) == 7303
+						    && mavlink_msg_research_acceleration_request_get_acceleration_y_frd_m_s2(&encoded) > .5F) {
+							check(!flight_rejected_request, "lateral allocation case sends exactly one signed request");
+							flight_rejected_request = mavlink_msg_research_acceleration_request_get_sequence(&encoded);
+							flight_rejected_receipt = packet.timestamp;
+						}
+					}
+				}
+			}
+
+			if (flight_expect_session && !flight_diagnostics[1].observed) {
+				const bool healthy = flight_protocol.session_established && flight_protocol.map_valid
+						     && flight_protocol.required_state_valid && flight_protocol.feedback_valid && !flight_protocol.continuity_fault;
+				auto &sample = flight_diagnostics[healthy ? 0 : 1];
+
+				if (healthy || !sample.observed) {
+					sample.observed = hrt_absolute_time();
+					sample.protocol_time = flight_protocol.timestamp;
+					sample.witness_time = flight_witness.timestamp;
+					sample.witness_transition = flight_witness.transition;
+					sample.observed_transition = flight_protocol.commander_transition;
+					sample.epoch = flight_protocol.transition_epoch;
+					sample.map_epoch = flight_protocol.map_epoch;
+					sample.map_deadline = flight_protocol.map_deadline;
+					sample.connection_deadline = flight_protocol.connection_deadline;
+					sample.barrier_time = flight_protocol.barrier_time;
+					sample.nav = flight_witness.nav_state;
+					sample.arming = flight_witness.arming_state;
+					sample.phase = flight_protocol.phase;
+					sample.entry = status.manual_entry_status;
+					sample.worker = status.manual_worker_status;
+					sample.feedback = flight_protocol.feedback_result;
+					sample.decision = flight_protocol.decision_code;
+					sample.vehicle_armed = vehicle_armed;
+					sample.actuator_armed = armed.armed;
+					sample.witness_armed = flight_witness.armed;
+					sample.session = flight_protocol.session_established;
+					sample.map = flight_protocol.map_valid;
+					sample.state = flight_protocol.required_state_valid;
+					sample.acknowledgement = flight_protocol.acknowledgement_current;
+					sample.continuity = flight_protocol.continuity_fault;
+				}
+			}
+
+			if (flight_keepalive && flight_protocol.controller_instance_id && now - flight_last_session >= 20000) { flight_session(false); }
+
+			if (flight_renew_clock && flight_protocol.session_established) {
+				if (flight_protocol.map_valid && flight_protocol.map_deadline > now
+				    && flight_protocol.map_deadline - now <= flight_renewal_lead && now - flight_last_clock >= 20000) { flight_clock(); }
+			}
+
+			if (flight_auto_ack && flight_protocol.session_established && !flight_protocol.acknowledgement_current
+			    && flight_protocol.transition_epoch != flight_ack_epoch
+			    && now > flight_protocol.barrier_time + 2 * flight_protocol.map_uncertainty_us) { flight_session(true); }
+
+			if (flight_stream_requests && flight_protocol.acknowledgement_current
+			    && now > flight_ack_producer + 2 * flight_protocol.map_uncertainty_us
+			    && now - flight_last_request >= 20000) { flight_request(); }
+		}
+
+		if (diagnostic_phase) {
+			const auto &last = edf_diagnostics[2];
+
+			if (last.phase != diagnostic_phase || last.status.timestamp != status.timestamp
+			    || last.driver_status[0] != static_cast<unsigned>(main.mixing().slaapsOutputStatus())
+			    || last.driver_status[1] != static_cast<unsigned>(aux.mixing().slaapsOutputStatus())
+			    || last.writes[0] != main.writes() || last.writes[1] != aux.writes()) { capture_edf_diagnostic(now, previous_pump); }
+		}
 	};
 	auto wait = [&](auto predicate, uint64_t timeout, const char *message) {
 		const auto deadline = hrt_absolute_time() + timeout;
@@ -6334,6 +9200,7 @@ static int nativeSupervisorOrchestrationTests()
 		} while (!complete && hrt_absolute_time() < deadline);
 
 		if (!complete) {
+			print_edf_diagnostic(message);
 			PX4_ERR("supervisor fixture entry=%u worker=%u active=%u preparation=%u session=%llu",
 				status.manual_entry_status, status.manual_worker_status, status.manual_worker_active,
 				status.manual_preparation_status, static_cast<unsigned long long>(status.manual_preparation_session));
@@ -6342,6 +9209,8 @@ static int nativeSupervisorOrchestrationTests()
 				static_cast<unsigned long long>(status.bench_session_deadline));
 			PX4_ERR("supervisor fixture routing=%u inventory_fault=%u routing_fault=%u configured=%u",
 				status.routing_snapshot_valid, status.inventory_fault, status.routing_fault, status.direct_actuator_modes_configured);
+			PX4_ERR("supervisor fixture schedule enabled=%u inputs=%u status=%u",
+				status.schedule_enabled, status.schedule_inputs_valid, status.schedule_status);
 			const ORB_ID topics[] {ORB_ID::slaaps_manual_ready_main, ORB_ID::slaaps_manual_ready_aux,
 					       ORB_ID::slaaps_manual_ack_main, ORB_ID::slaaps_manual_ack_aux,
 					       ORB_ID::slaaps_manual_active_main, ORB_ID::slaaps_manual_active_aux
@@ -6355,6 +9224,29 @@ static int nativeSupervisorOrchestrationTests()
 
 			PX4_ERR("supervisor fixture reply revisions ready=%u/%u handled=%u/%u activation=%u/%u",
 				revisions[0], revisions[1], revisions[2], revisions[3], revisions[4], revisions[5]);
+
+			if (publish_flight) {
+				for (unsigned i = 0; i < 2; ++i) {
+					const auto &s = flight_diagnostics[i];
+					std::fprintf(stderr,
+						     "FLIGHT_SESSION_SAMPLE index=%u sampled=%llu protocol=%llu witness=%llu transition=%llu/%llu nav=%u arming=%u armed=%d/%d/%d\n",
+						     i, static_cast<unsigned long long>(s.observed), static_cast<unsigned long long>(s.protocol_time),
+						     static_cast<unsigned long long>(s.witness_time), static_cast<unsigned long long>(s.observed_transition),
+						     static_cast<unsigned long long>(s.witness_transition), s.nav, s.arming, s.vehicle_armed, s.actuator_armed, s.witness_armed);
+					std::fprintf(stderr,
+						     "FLIGHT_SESSION_SAMPLE index=%u epoch=%llu map_epoch=%llu map_deadline=%llu connection=%llu barrier=%llu phase=%u entry=%u worker=%u feedback=%u decision=%u session=%d map=%d state=%d ack=%d continuity=%d\n",
+						     i, static_cast<unsigned long long>(s.epoch), static_cast<unsigned long long>(s.map_epoch),
+						     static_cast<unsigned long long>(s.map_deadline), static_cast<unsigned long long>(s.connection_deadline),
+						     static_cast<unsigned long long>(s.barrier_time), s.phase, s.entry, s.worker, s.feedback, s.decision,
+						     s.session, s.map, s.state, s.acknowledgement, s.continuity);
+				}
+
+				PX4_ERR("flight fixture phase=%u action=%u result=%u epoch=%llu map=%llu session=%d ack=%d state=%d feedback=%u code=%u",
+					flight_protocol.phase, flight_protocol.action, flight_protocol.action_result,
+					static_cast<unsigned long long>(flight_protocol.transition_epoch), static_cast<unsigned long long>(flight_protocol.map_epoch),
+					flight_protocol.session_established, flight_protocol.acknowledgement_current, flight_protocol.required_state_valid,
+					flight_protocol.feedback_result, flight_protocol.decision_code);
+			}
 		}
 
 		check(complete, message);
@@ -6372,7 +9264,7 @@ static int nativeSupervisorOrchestrationTests()
 	      "isolated synthetic authority does not change production mode availability masks");
 	uint64_t previous_session{};
 
-	for (unsigned scenario = 0; scenario < 4; ++scenario) {
+	for (unsigned scenario = 0; scenario < 5; ++scenario) {
 		vehicle_armed = armed.armed = false;
 		vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 		publish_inputs = pump_aux = true;
@@ -6464,7 +9356,12 @@ static int nativeSupervisorOrchestrationTests()
 
 			if (scenario == 0) { publish_inputs = false; }
 
-			else if (scenario == 3) { vehicle_armed = armed.armed = false; }
+			else if (scenario >= 3) {
+				// Stop fixture-thread authority publications, then let the actual
+				// permission call publish either first disarm after its caller has
+				// already observed both armed. No supervisor state is fabricated.
+				disarm_injection.requested.store(scenario - 2, std::memory_order_release);
+			}
 
 			else { SlaapsNativeTest::admitted.store(false); }
 
@@ -6473,6 +9370,12 @@ static int nativeSupervisorOrchestrationTests()
 				       && !status.manual_worker_active;
 			}, 300000,
 			"actual supervisor stops on ordinary disarm or cancels on current input or admission loss");
+
+			if (scenario >= 3) {
+				check(disarm_injection.completed.load(std::memory_order_acquire) == scenario - 2
+				      && disarm_injection.original_both_armed && disarm_injection.published && disarm_injection.injected_us,
+				      "real authority publication between armed caller observation and permission copies exercises either disarm order");
+			}
 		}
 
 		publish_inputs = true;
@@ -6488,8 +9391,10 @@ static int nativeSupervisorOrchestrationTests()
 		      && main.nonzeroWrites() + aux.nonzeroWrites() == stopped_writes,
 		      "restored authority and fresh inputs cannot revive rejected supervisor session");
 		vehicle_armed = armed.armed = false;
+		disarm_injection.requested.store(0, std::memory_order_release);
+		disarm_injection.completed.store(0, std::memory_order_release);
 
-		if (scenario != 3) {
+		if (scenario < 3) {
 			pump();
 			const int32_t reapply = 301 + scenario;
 			check(param_set(param_find("SLA_CFG_APPLY"), &reapply) == 0,
@@ -6611,6 +9516,16 @@ static int nativeSupervisorOrchestrationTests()
 		       && status.io_index == 13 && status.io_bank == 1 && status.io_channel == 6
 		       && aux6_log_count == 1;
 	}, 1500000, "latest same-fault physical channel emits after the existing bounded routing-report interval");
+
+	if (!(aux8_log_count == 1 && aux6_log_time >= aux8_log_time + 1000000)) {
+		const bool ordered = aux6_log_time >= aux8_log_time;
+		const uint64_t delta = ordered ? aux6_log_time - aux8_log_time : aux8_log_time - aux6_log_time;
+		std::fprintf(stderr,
+			     "ROUTING_DIAGNOSTIC_FAILURE aux8_count=%u aux6_count=%u aux8_time=%llu aux6_time=%llu delta_us=%c%llu minimum_us=1000000\n",
+			     aux8_log_count, aux6_log_count, static_cast<unsigned long long>(aux8_log_time),
+			     static_cast<unsigned long long>(aux6_log_time), ordered ? '+' : '-', static_cast<unsigned long long>(delta));
+	}
+
 	check(aux8_log_count == 1 && aux6_log_time >= aux8_log_time + 1000000,
 	      "routing message channel updates neither repeat the old pin nor bypass the one-second reporting bound");
 	check(param_set(second_center_parameter, &correct_center) == 0, "restore actual AUX6 calibration without a new ownership session");
@@ -6713,6 +9628,66 @@ static int nativeSupervisorOrchestrationTests()
 	"scheduled readiness scenario deliberately leaves before supervisor shutdown");
 	publish_conditions = false;
 
+	// Synthetic operator declarations exercise the same inactive apply and
+	// accepted markers; neither this record ID nor its assessment is evidence
+	// of a physical measurement, qualification review or flight permission.
+	const param_t record_parameter = param_find("SLA_DATA_REC"), assessment_parameter = param_find("SLA_DATA_STATE");
+	const int32_t missing_record = 0, calibrated = 1, qualified = 2, synthetic_record = 4242, calibrated_revision = 17;
+	int32_t provenance_apply = 308;
+	check(param_set(record_parameter, &missing_record) == 0 && param_set(assessment_parameter, &calibrated) == 0
+	      && param_set(param_find("SLA_CFG_APPLY"), &provenance_apply) == 0,
+	      "submit an operator calibrated declaration without a measurement-record ID through native parameters");
+	wait([&]() {
+		return !status.configuration_valid && status.apply_counter == provenance_apply
+		       && status.configuration_fault == static_cast<uint8_t>(ConfigurationFault::MissingRecord)
+		       && std::strcmp(status.cfg_param, "SLA_DATA_REC") == 0;
+	}, 1000000, "actual inactive apply rejects missing provenance with the exact actionable record parameter");
+	auto declared_configuration = scheduled;
+	declared_configuration.data_schema_version = 1;
+	declared_configuration.data_record_id = synthetic_record;
+	declared_configuration.data_revision = calibrated_revision;
+	declared_configuration.data_assessment = calibrated;
+	provenance_apply = 309;
+	check(param_set(record_parameter, &synthetic_record) == 0
+	      && param_set(param_find("SLA_DATA_REV"), &calibrated_revision) == 0
+	      && param_set(param_find("SLA_CFG_APPLY"), &provenance_apply) == 0,
+	      "explicitly apply a labeled synthetic calibrated record and revision while inactive");
+	wait([&]() {
+		return status.configuration_valid && status.apply_counter == provenance_apply
+		       && status.configuration_identity == fingerprint(declared_configuration);
+	}, 1000000, "accepted identity binds numerical configuration and the operator-declared provenance tuple together");
+	check(parameters.capture(profile, capture_duration) && Px4ConfigurationSource::remembered(profile)
+	      && profile.configuration.data_schema_version == 1 && profile.configuration.data_record_id == synthetic_record
+	      && profile.configuration.data_revision == calibrated_revision && profile.configuration.data_assessment == calibrated,
+	      "actual coherent capture and saved acceptance markers retain schema, record, revision and declared assessment");
+	const int32_t edited_record = synthetic_record + 1;
+	check(param_set(record_parameter, &edited_record) == 0, "edit provenance without a new apply");
+	wait([&]() { return !status.configuration_valid; }, 1000000, "a provenance edit revokes the previously accepted claim");
+	const uint64_t invalidated_claim = status.timestamp;
+	check(param_set(record_parameter, &synthetic_record) == 0, "restore the old record ID without approving it again");
+	wait([&]() { return status.timestamp > invalidated_claim && !status.configuration_valid; }, 1000000,
+	"restoring a record ID cannot automatically restore an invalidated accepted declaration");
+	const int32_t qualified_revision = calibrated_revision + 1;
+	const uint64_t qualified_started = hrt_absolute_time();
+	declared_configuration.data_record_id = edited_record;
+	declared_configuration.data_revision = qualified_revision;
+	declared_configuration.data_assessment = qualified;
+	provenance_apply = 310;
+	check(param_set(record_parameter, &edited_record) == 0 && param_set(assessment_parameter, &qualified) == 0
+	      && param_set(param_find("SLA_DATA_REV"), &qualified_revision) == 0
+	      && param_set(param_find("SLA_CFG_APPLY"), &provenance_apply) == 0,
+	      "explicitly apply a synthetic operator Qualified declaration without a controller or output grant");
+	wait([&]() {
+		return status.configuration_valid && status.apply_counter == provenance_apply
+		       && status.configuration_identity == fingerprint(declared_configuration);
+	}, 1000000, "operator Qualified is recorded as accepted profile data independently of mode admission");
+	slaaps_manual_command_s provenance_command{};
+	check(!status.can_run_mask && !status.can_arm_mask && !status.manual_worker_active && !status.bench_worker_active
+	      && !status.manual_preparation_session
+	      && (!command_sub.copy(&provenance_command) || provenance_command.timestamp < qualified_started),
+	      "a Qualified declaration cannot select a flight mode, begin preparation, start a worker or publish a new output command");
+	PX4_INFO("SLAAPS_PROVENANCE_TEST_PASS native_apply=1 synthetic_declared_record=1 flight_permission=0");
+
 	SlaapsNativeTest::admitted.store(false);
 	auto *subject = ModuleBase::get_instance<SlaapsNativeTestSubject>(SlaapsNativeTestSubject::desc);
 	check(subject != nullptr, "isolated supervisor retains its actual module descriptor");
@@ -6720,7 +9695,568 @@ static int nativeSupervisorOrchestrationTests()
 	wait([&]() { return SlaapsNativeTestSubject::desc.object.load() == nullptr; }, 1000000,
 	"actual supervisor unregisters and destroys its isolated source-linked instance");
 
-	// This second real module instance exercises the native QGC parameter path.
+	// A separate actual Run-queue instance exercises the connected flight caller.
+	// Its authority witness, model and post-parser evidence are synthetic; both
+	// real mixer callbacks still capture only, and no ordinary health/flight
+	// qualification follows from this isolated process.
+	flight_profile.companion.mavlink_instance = signed_flight ? 0 : 3;
+
+	if (signed_flight) {
+		// PublicationBase deliberately retains queued advertisements on
+		// destruction. Earlier isolated packet_3 fixtures have finished, but
+		// their node/history can remain. Consume at most the retained queue;
+		// these discarded ordinary copies are never authentication evidence.
+		for (unsigned old = 0; old < slaaps_companion_packet_s::ORB_QUEUE_LENGTH && flight_injected_lifetime.updated(); ++old) {
+			slaaps_companion_packet_s historical{};
+			check(flight_injected_lifetime.update(&historical), "drain only retained pre-flight packet history");
+		}
+
+		flight_injected_revision = flight_injected_lifetime.revision();
+		flight_injected_generation = flight_injected_lifetime.get_last_generation();
+		check(flight_injection_unchanged(), "signed active scenario pins old packet history without advertising its injection publisher");
+	}
+
+	installNativeMixerConfiguration(flight_profile);
+	const int32_t flight_apply = 311, no_action = 0;
+	const float no_offset = 0.F;
+	const char *flight_positions[kAxes] {"EKF2_IMU_POS_X", "EKF2_IMU_POS_Y", "EKF2_IMU_POS_Z"};
+
+	for (const char *position : flight_positions) {
+		check(param_set(param_find(position), &no_offset) == 0, "synthetic flight feedback uses native zero CG-to-IMU offset");
+	}
+
+	check(companionClockRenewalConfigured(flight_profile.companion, flight_renewal_lead)
+	      && param_set(param_find("IMU_ACCEL_CUTOFF"), &no_offset) == 0
+	      && param_set(param_find("SLA_CFG_KIND"), &scope) == 0
+	      && param_set(param_find("SLA_CFG_APPLY"), &flight_apply) == 0
+	      && param_set(param_find("SLA_CMP_ACT"), &no_action) == 0
+	      && parameters.capture(profile, capture_duration) && parameters.remember(profile)
+	      && parameters.capture(profile, capture_duration) && Px4ConfigurationSource::remembered(profile)
+	      && equal(profile.configuration, flight_profile),
+	      "scheduled flight-transfer fixture binds its explicit shared synthetic model through coherent accepted parameters");
+	check(flight_raw_pub.advertise() && flight_bias_pub.advertise()
+	      && flight_raw_pub.get_instance() == 0 && flight_bias_pub.get_instance() == 0,
+	      "flight-transfer feedback uses actual selected raw and bias instance-zero publisher lifetimes");
+	publish_flight = publish_conditions = publish_inputs = publish_estimates = publish_manual = publish_power = true;
+	pump_aux = true;
+	vehicle_armed = armed.armed = armed.prearmed = false;
+	vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+	roll = 0.F;
+	throttle = -1.F;
+	pump();
+	const auto flight_started = hrt_absolute_time();
+	check(SlaapsNativeTestSubject::task_spawn(1, nullptr) == PX4_OK,
+	      "isolated scheduled supervisor starts the real flight caller without direct private owner mutation");
+	wait([&]() {
+		return status.timestamp >= flight_started && status.configuration_valid
+		       && status.configuration_identity == fingerprint(flight_profile) && status.direct_actuator_modes_configured
+		       && flight_control.enabled && flight_protocol.configuration_identity == status.configuration_identity
+		       && flight_protocol.required_state_valid && flight_protocol.feedback_valid;
+	}, 3000000, "scheduled companion owner observes fresh synthetic authority and actual selected feedback provenance");
+	auto flight_establish_session = [&]() {
+		flight_keepalive = true;
+		wait([&]() {
+			return flight_protocol.transport_connected && flight_protocol.proposal_session == flight_companion_session
+			       && flight_protocol.proposal_deadline > flight_protocol.timestamp;
+		}, 500000, "configured session proposal proves the selected test ingress without granting an output owner");
+		const int32_t prepare_action = 1, grant_action = 2;
+		check(param_set(param_find("SLA_CMP_ACT"), &prepare_action) == 0,
+		      "operator deliberately prepares the scheduled companion owner while disarmed");
+		wait([&]() { return flight_protocol.action == 1 && flight_protocol.action_result == 1 && flight_protocol.prepared; }, 500000,
+		"actual serialized Prepare establishes only the mapping transaction");
+		flight_clock();
+		wait([&]() { return flight_protocol.map_valid && flight_protocol.map_session == flight_companion_session; }, 500000,
+		"matched synthetic clock evidence freezes an original bounded map through the actual owner");
+		const auto initial_flight_map_epoch = flight_protocol.map_epoch;
+		const auto pre_map_proposal_deadline = flight_protocol.proposal_deadline;
+		flight_session(false);
+		wait([&]() {
+			return flight_protocol.proposal_session == flight_companion_session && flight_protocol.proposal_deadline > pre_map_proposal_deadline
+			       && flight_protocol.proposal_deadline > flight_protocol.timestamp
+			       && flight_protocol.transition_epoch && flight_protocol.map_epoch == initial_flight_map_epoch;
+		}, 500000, "fresh post-map proposal reaches the scheduled owner");
+		check(param_set(param_find("SLA_CMP_ACT"), &grant_action) == 0, "operator explicitly grants the same disarmed mapped session");
+		wait([&]() {
+			return flight_protocol.action == 2 && flight_protocol.action_result == 1 && flight_protocol.session_established
+			       && !flight_protocol.acknowledgement_current;
+		}, 500000, "scheduled Grant authorizes protocol entry without active outputs or a reused acknowledgement");
+		flight_expect_session = true;
+		// The same established owner must renew while the real banks prepare too;
+		// preparation is not guaranteed to fit inside the first clock-map interval.
+		// ACKs remain explicit until the post-arm barrier is deliberately accepted.
+		flight_renew_clock = true;
+	};
+	flight_establish_session();
+	SlaapsNativeTest::admitted.store(true); // Existing isolated synthetic-authority seam only.
+	vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kManualMode];
+	wait([&]() {
+		return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED
+		       && flight_protocol.commander_transition == flight_witness.transition
+		       && flight_protocol.timestamp >= vehicle.nav_state_timestamp && flight_protocol.session_established
+		       && flight_protocol.map_valid && flight_protocol.required_state_valid && flight_protocol.feedback_valid;
+	}, 500000, "actual Manual preparation and protocol both observe the disarmed entry before synthetic arming");
+	const auto flight_session_id = status.manual_preparation_session;
+	vehicle_armed = armed.armed = true;
+	wait([&]() {
+		return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING
+		       && flight_protocol.session_established && flight_protocol.required_state_valid
+		       && flight_protocol.commander_transition == flight_witness.transition;
+	}, 500000, "Manual first command reaches exact handling on both real callback adapters");
+	flight_renew_clock = false;
+	wait([&]() {
+		return !flight_clock_pending && status.companion_event_sequence >= flight_last_clock_event
+		       && flight_protocol.timestamp >= flight_last_clock;
+	}, 100000, "the owner consumes any queued renewal before the explicit post-arm acknowledgement");
+	wait([&]() { return hrt_absolute_time() > flight_protocol.barrier_time + 2 * flight_protocol.map_uncertainty_us; }, 100000,
+	"new armed protocol barrier precedes its producer acknowledgement");
+	flight_session(true);
+	wait([&]() { return flight_protocol.acknowledgement_current; }, 100000,
+	"fresh exact post-arm acknowledgement belongs to the established session");
+	flight_renew_clock = flight_auto_ack = true;
+	flight_stream_requests = true; // Manual requests remain ModeNotSelected, but prove link liveness.
+	throttle = -.5F;
+	slaaps_manual_command_s outgoing{};
+	slaaps_manual_ack_s flight_ack[2] {};
+	auto flight_handled = [&](const slaaps_manual_command_s & frame) {
+		return main_ack_sub.copy(&flight_ack[0]) && aux_ack_sub.copy(&flight_ack[1])
+		       && flight_ack[0].session == frame.session && flight_ack[1].session == frame.session
+		       && flight_ack[0].sequence == frame.sequence && flight_ack[1].sequence == frame.sequence;
+	};
+	wait([&]() {
+		return command_sub.copy(&outgoing) && outgoing.session == flight_session_id && outgoing.mode == slaaps_manual_command_s::MANUAL
+		       && std::fabs(outgoing.edf - .25F) < .001F && flight_handled(outgoing);
+	}, 200000, "actual Manual calculation and both callbacks reach the synthetic five-newton EDF operating point");
+	flight_renew_clock = false;
+	wait([&]() {
+		return !flight_clock_pending && status.companion_event_sequence >= flight_last_clock_event && flight_protocol.timestamp >= flight_last_clock
+		       && flight_protocol.acknowledgement_current;
+	}, 100000, "Manual drains its last renewal and exact ACK before the deliberate forward handoff");
+	flight_auto_ack = false;
+	const auto flight_map_epoch = flight_protocol.map_epoch, flight_map_deadline = flight_protocol.map_deadline;
+	const auto before_flight_transition = outgoing;
+	flight_stream_requests = false;
+	vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kAccelerationMode];
+	pump();
+	const auto forward_edge = vehicle.nav_state_timestamp;
+	wait([&]() {
+		return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_ACTIVATING
+		       && flight_protocol.session_established && !flight_protocol.acknowledgement_current
+		       && flight_protocol.commander_transition == flight_witness.transition;
+	}, 50000, "actual Manual-to-Acceleration edge waits for the new epoch acknowledgement and request");
+	slaaps_manual_command_s waiting_command{};
+	check(command_sub.copy(&waiting_command) && waiting_command.mode == slaaps_manual_command_s::MANUAL
+	      && waiting_command.timestamp_sample <= forward_edge && waiting_command.deadline >= hrt_absolute_time()
+	      && flight_protocol.map_epoch == flight_map_epoch && flight_protocol.map_deadline == flight_map_deadline,
+	      "handoff wait emits no post-edge Manual calculation and does not renew the original map");
+	const auto waiting_sequence = waiting_command.sequence, waiting_deadline = waiting_command.deadline;
+	const uint64_t waiting_until = hrt_absolute_time() + 10000;
+
+	while (hrt_absolute_time() < waiting_until) { pump(); px4_usleep(1000); }
+
+	check(command_sub.copy(&waiting_command) && waiting_command.sequence == waiting_sequence && waiting_command.deadline == waiting_deadline
+	      && status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_ACTIVATING,
+	      "withholding target evidence preserves the exact outgoing command and its expiry without another calculation");
+	wait([&]() { return hrt_absolute_time() > flight_protocol.barrier_time + 2 * flight_protocol.map_uncertainty_us; }, 50000,
+	"target-mode epoch barrier precedes the new exact acknowledgement");
+	flight_session(true);
+	wait([&]() { return flight_protocol.acknowledgement_current; }, 50000,
+	"Acceleration entry accepts only the fresh target-epoch acknowledgement");
+	pump_aux = false;
+	flight_stream_requests = true;
+	slaaps_manual_command_s acceleration_command{};
+	const uint64_t acceleration_handling_deadline = hrt_absolute_time() + 50000;
+	wait([&]() {
+		return command_sub.copy(&acceleration_command) && acceleration_command.session == flight_session_id
+		       && acceleration_command.mode == slaaps_manual_command_s::ACCELERATION && acceleration_command.transition == forward_edge
+		       && acceleration_command.previous_handled_sequence && control_detail.calculated_sequence == acceleration_command.sequence
+		       && control_detail.state == slaaps_acceleration_status_s::CALCULATED;
+	}, 50000, "calculated Acceleration status is visible before the withheld AUX callback");
+	const auto pending_control_detail = control_detail;
+	check(!pending_control_detail.handled_sequence && pending_control_detail.calculated_deadline == acceleration_command.deadline
+	      && pending_control_detail.active && !flight_handled(acceleration_command),
+	      "a calculated command and one bank cannot be presented as all-bank handled saturation");
+	pump_aux = true;
+	const auto handling_now = hrt_absolute_time();
+	wait([&]() {
+		return flight_handled(acceleration_command) && control_detail.handled_sequence == acceleration_command.sequence
+		       && control_detail.handled_us >= acceleration_command.timestamp_sample
+		       && control_detail.handled_deadline == acceleration_command.deadline;
+	}, handling_now < acceleration_handling_deadline ? acceleration_handling_deadline - handling_now : 0,
+	"all required callbacks promote handled diagnostics inside the unchanged first50ms observation budget");
+	check(control_detail.handled_moment_mask == pending_control_detail.calculated_moment_mask
+	      && control_detail.handled_canard_mask == pending_control_detail.calculated_canard_mask
+	      && hrt_absolute_time() < acceleration_handling_deadline,
+	      "handled modeled limits are copied from the exact all-bank acknowledged calculation");
+
+	if (signed_flight) {
+		check(flight_receiver_revision && flight_signing_generation && flight_verified_clocks && flight_verified_requests
+		      && flight_protocol.receiver_revision == flight_receiver_revision && flight_protocol.signing_generation == flight_signing_generation
+		      && flight_signed_packets.revision() == flight_receiver_revision && flight_injection_unchanged(),
+		      "active Acceleration and both handled banks bind the actual signed receiver without packet-topic injection");
+	}
+
+	check(acceleration_command.configuration == before_flight_transition.configuration
+	      && acceleration_command.source == before_flight_transition.source && acceleration_command.routing == before_flight_transition.routing
+	      && acceleration_command.driver[0] == before_flight_transition.driver[0]
+	      && acceleration_command.driver[1] == before_flight_transition.driver[1]
+	      && acceleration_command.sequence > waiting_sequence && acceleration_command.edf_sequence > before_flight_transition.edf_sequence
+	      && acceleration_command.previous_deadline == waiting_deadline && acceleration_command.deadline <= waiting_deadline
+	      && std::fabs(acceleration_command.edf - .25F) < .001F,
+	      "forward transfer preserves exact same-session ownership, handled boundary, current EDF and original outgoing lease");
+	wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING; }, 50000,
+	"Acceleration is Running only after both target-mode commands are exactly handled");
+	// Keep the factory's original 500 ms map. Ongoing control renews only
+	// through clock evidence and a fresh exact barrier ACK/request.
+	flight_renew_clock = flight_auto_ack = true;
+	const auto acceleration_sequence = acceleration_command.sequence;
+	publish_manual = false;
+	const auto pilot_hold_started = hrt_absolute_time();
+	const auto pilot_hold_until = pilot_hold_started + static_cast<uint64_t>(flight_profile.manual_age_ms) * 1000 + 10000;
+
+	while (hrt_absolute_time() < pilot_hold_until) { pump(); px4_usleep(1000); }
+
+	const bool have_pilot_expiry_command = command_sub.copy(&acceleration_command)
+					       && acceleration_command.mode == slaaps_manual_command_s::ACCELERATION;
+	const auto pilot_expiry_sequence = acceleration_command.sequence;
+	const auto pilot_expiry_deadline = acceleration_command.deadline;
+	bool ongoing_acceleration = false;
+
+	// Renewal invalidates the prior ACK/request and can leave the real caller
+	// ACTIVATING at this arbitrary observation boundary. Require fresh post-pilot
+	// expiry handling within the captured ORIGINAL command lease, never a new
+	// timeout or success based solely on that intermediate state.
+	while (have_pilot_expiry_command && hrt_absolute_time() < pilot_expiry_deadline) {
+		pump();
+
+		if (!status.manual_worker_active || !flight_protocol.session_established || !flight_protocol.map_valid
+		    || !flight_protocol.required_state_valid || !flight_protocol.feedback_valid
+		    || (status.manual_entry_status != slaaps_status_s::MANUAL_ENTRY_RUNNING
+			&& status.manual_entry_status != slaaps_status_s::MANUAL_ENTRY_ACTIVATING)) { break; }
+
+		if (command_sub.copy(&acceleration_command) && acceleration_command.mode == slaaps_manual_command_s::ACCELERATION
+		    && acceleration_command.sequence > pilot_expiry_sequence && acceleration_command.sequence > acceleration_sequence
+		    && acceleration_command.timestamp_sample >= pilot_hold_until && flight_handled(acceleration_command)
+		    && control_detail.handled_sequence == acceleration_command.sequence
+		    && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING && hrt_absolute_time() < pilot_expiry_deadline) {
+			ongoing_acceleration = true;
+			break;
+		}
+
+		px4_usleep(1000);
+	}
+
+	if (!ongoing_acceleration) {
+		const auto observed = hrt_absolute_time();
+		uORB::Subscription acceleration_detail_sub{ORB_ID(slaaps_acceleration_status)};
+		slaaps_acceleration_status_s detail{};
+		const bool have_detail = acceleration_detail_sub.copy(&detail);
+		std::fprintf(stderr,
+			     "ACCEL_ONGOING_FAILURE now=%llu status=%llu entry=%u worker=%u active=%d config=%d original_deadline=%llu\n",
+			     static_cast<unsigned long long>(observed), static_cast<unsigned long long>(status.timestamp),
+			     static_cast<unsigned>(status.manual_entry_status), static_cast<unsigned>(status.manual_worker_status),
+			     status.manual_worker_active, status.configuration_valid, static_cast<unsigned long long>(pilot_expiry_deadline));
+		std::fprintf(stderr,
+			     "ACCEL_ONGOING_FAILURE protocol=%llu epoch=%llu map=%llu map_deadline=%llu link_deadline=%llu state=%d feedback=%d feedback_deadline=%llu ack=%d decision=%u\n",
+			     static_cast<unsigned long long>(flight_protocol.timestamp), static_cast<unsigned long long>(flight_protocol.transition_epoch),
+			     static_cast<unsigned long long>(flight_protocol.map_epoch), static_cast<unsigned long long>(flight_protocol.map_deadline),
+			     static_cast<unsigned long long>(flight_protocol.connection_deadline), flight_protocol.required_state_valid,
+			     flight_protocol.feedback_valid, static_cast<unsigned long long>(flight_protocol.feedback_deadline),
+			     flight_protocol.acknowledgement_current, static_cast<unsigned>(flight_protocol.decision_code));
+		std::fprintf(stderr,
+			     "ACCEL_ONGOING_FAILURE command session=%llu seq=%llu mode=%u sample=%llu deadline=%llu\n",
+			     static_cast<unsigned long long>(acceleration_command.session), static_cast<unsigned long long>(acceleration_command.sequence),
+			     static_cast<unsigned>(acceleration_command.mode), static_cast<unsigned long long>(acceleration_command.timestamp_sample),
+			     static_cast<unsigned long long>(acceleration_command.deadline));
+		std::fprintf(stderr,
+			     "ACCEL_ONGOING_FAILURE detail=%d at=%llu state=%u fault=%u stage=%u solver=%u worker=%u fault_time=%llu request=%llu/%llu/%llu\n",
+			     have_detail, static_cast<unsigned long long>(detail.timestamp), static_cast<unsigned>(detail.state),
+			     static_cast<unsigned>(detail.control_fault), static_cast<unsigned>(detail.allocation_stage),
+			     static_cast<unsigned>(detail.allocation_result), static_cast<unsigned>(detail.worker_status),
+			     static_cast<unsigned long long>(detail.fault_observed_us), static_cast<unsigned long long>(detail.request_source),
+			     static_cast<unsigned long long>(detail.request_session), static_cast<unsigned long long>(detail.request_sequence));
+		std::fprintf(stderr,
+			     "ACCEL_ONGOING_FAILURE calculated=%llu deadline=%llu handled=%llu at=%llu deadline=%llu\n",
+			     static_cast<unsigned long long>(detail.calculated_sequence), static_cast<unsigned long long>(detail.calculated_deadline),
+			     static_cast<unsigned long long>(detail.handled_sequence), static_cast<unsigned long long>(detail.handled_us),
+			     static_cast<unsigned long long>(detail.handled_deadline));
+	}
+
+	check(ongoing_acceleration,
+	      "ongoing Acceleration uses fresh selected state and companion evidence after the untouched pilot sample expires");
+	flight_stream_requests = flight_renew_clock = flight_auto_ack = false;
+	flight_expect_session = false; // Reverse intentionally revokes companion authority.
+	vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kManualMode];
+	pump();
+	const auto reverse_edge = vehicle.nav_state_timestamp;
+	wait([&]() { return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_ACTIVATING; }, 50000,
+	"reverse flight edge waits without reusing the pre-edge pilot sample");
+	slaaps_manual_command_s reverse_wait{};
+	check(command_sub.copy(&reverse_wait) && reverse_wait.mode == slaaps_manual_command_s::ACCELERATION
+	      && reverse_wait.timestamp_sample <= reverse_edge,
+	      "reverse handoff cannot calculate a new Manual command before genuine post-edge pilot input");
+	publish_manual = true;
+	slaaps_manual_command_s reverse_command{};
+	wait([&]() {
+		return command_sub.copy(&reverse_command) && reverse_command.mode == slaaps_manual_command_s::MANUAL
+		       && reverse_command.transition == reverse_edge && reverse_command.previous_handled_sequence
+		       && flight_handled(reverse_command);
+	}, 50000, "fresh raw pilot input transfers the same worker and both banks back to Manual");
+	check(reverse_command.session == flight_session_id && reverse_command.configuration == before_flight_transition.configuration
+	      && reverse_command.source == before_flight_transition.source && reverse_command.routing == before_flight_transition.routing
+	      && reverse_command.sequence > reverse_wait.sequence && reverse_command.edf_sequence > acceleration_command.edf_sequence
+	      && reverse_command.previous_deadline == reverse_wait.deadline && reverse_command.deadline <= reverse_wait.deadline
+	      && std::fabs(reverse_command.edf - acceleration_command.edf) < .001F
+	      && !main.prematureAcknowledgment() && !aux.prematureAcknowledgment(),
+	      "reverse transfer retains continuous EDF/output history and exact prior handled expiry without a new owner");
+	wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING && !flight_protocol.session_established; }, 50000,
+	"reverse Manual operation needs exact handling and revokes the old companion session");
+	vehicle_armed = armed.armed = false;
+	wait([&]() { return !status.manual_worker_active && status.configuration_valid; }, 500000,
+	"ordinary disarm stops the shared flight worker and revalidates the unchanged accepted profile");
+
+	// A new deliberate session proves the remaining capture boundary, after
+	// preserving the full bidirectional handoff above. The first actuator disarm
+	// is published on the supervisor queue after its armed checks but before the
+	// protocol copies authority; the atomic witness is still the actual prior one.
+	flight_keepalive = false;
+	vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+	throttle = -1.F;
+	wait([&]() {
+		return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE && status.configuration_valid
+		       && flight_protocol.required_state_valid && flight_protocol.feedback_valid && !flight_protocol.session_established;
+	}, 1000000, "capture-disarm regression deliberately leaves disarmed before creating another companion session");
+	flight_companion_session = 7302;
+	flight_establish_session();
+	uint64_t previous_flight_output_session = flight_session_id;
+	auto flight_enter_acceleration = [&]() {
+		flight_single_request = false;
+		flight_lateral_request = 0.F;
+		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kManualMode];
+		wait([&]() {
+			return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED && flight_protocol.session_established
+			       && flight_protocol.commander_transition == flight_witness.transition;
+		}, 500000, "new actual Manual preparation observes its own fresh protocol entry before arming");
+		const auto capture_session = status.manual_preparation_session;
+		check(capture_session > previous_flight_output_session, "deliberate reentry owns a genuinely new output session");
+		vehicle_armed = armed.armed = true;
+		wait([&]() {
+			return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING
+			       && flight_protocol.session_established && flight_protocol.commander_transition == flight_witness.transition;
+		}, 500000, "new actual Manual worker begins only after both real callback adapters handle its initial output");
+		flight_renew_clock = false;
+		wait([&]() {
+			return !flight_clock_pending && status.companion_event_sequence >= flight_last_clock_event && flight_protocol.timestamp >= flight_last_clock
+			       && hrt_absolute_time() > flight_protocol.barrier_time + 2 * flight_protocol.map_uncertainty_us;
+		}, 100000, "new explicit post-arm ACK follows consumed clock evidence and its actual epoch barrier");
+		flight_session(true);
+		wait([&]() { return flight_protocol.acknowledgement_current; }, 100000, "new armed session accepts its own exact current ACK");
+		flight_renew_clock = flight_auto_ack = flight_stream_requests = true;
+		throttle = -.5F;
+		wait([&]() {
+			return command_sub.copy(&outgoing) && outgoing.session == capture_session && outgoing.mode == slaaps_manual_command_s::MANUAL
+			       && std::fabs(outgoing.edf - .25F) < .001F && flight_handled(outgoing);
+		}, 200000, "new Manual session reaches the same explicitly feasible synthetic transfer operating point");
+		flight_renew_clock = false;
+		wait([&]() {
+			return !flight_clock_pending && status.companion_event_sequence >= flight_last_clock_event && flight_protocol.timestamp >= flight_last_clock
+			       && flight_protocol.acknowledgement_current;
+		}, 100000, "new forward handoff drains clock renewal before withholding its target ACK");
+		flight_auto_ack = flight_stream_requests = false;
+		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kAccelerationMode];
+		pump();
+		const auto capture_edge = vehicle.nav_state_timestamp;
+		wait([&]() {
+			return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_ACTIVATING
+			       && !flight_protocol.acknowledgement_current && flight_protocol.commander_transition == flight_witness.transition
+			       && hrt_absolute_time() > flight_protocol.barrier_time + 2 * flight_protocol.map_uncertainty_us;
+		}, 50000, "new forward handoff requires a new exact target-mode epoch ACK");
+		slaaps_manual_command_s held_before_ack{};
+		slaaps_manual_permission_s original_permission{};
+		check(command_sub.copy(&held_before_ack) && held_before_ack.session == capture_session
+		      && held_before_ack.mode == slaaps_manual_command_s::MANUAL && held_before_ack.timestamp_sample <= capture_edge
+		      && scheduled_permission_sub.copy(&original_permission) && original_permission.session == capture_session,
+		      "target ACK wait captures the real outgoing command and original permission bound");
+		const uint64_t handoff_deadline = math::min(held_before_ack.deadline, math::min(original_permission.deadline,
+						   math::min(flight_protocol.map_deadline, flight_protocol.connection_deadline)));
+		const auto target_epoch = flight_protocol.transition_epoch, target_map = flight_protocol.map_epoch;
+		auto handoff_remaining = [&]() {
+			const auto current = hrt_absolute_time();
+			return current < handoff_deadline ? handoff_deadline - current : 0;
+		};
+		check(handoff_remaining(), "target ACK and first handled output share a live immutable original lease");
+		flight_session(true);
+		wait([&]() {
+			slaaps_manual_command_s held{};
+			check(command_sub.copy(&held) && held.sequence == held_before_ack.sequence && held.deadline == held_before_ack.deadline
+			      && held.timestamp_sample == held_before_ack.timestamp_sample && status.manual_worker_active
+			      && flight_protocol.transition_epoch == target_epoch && flight_protocol.map_epoch == target_map,
+			      "waiting for the wire ACK cannot calculate or renew the outgoing command or change the captured epoch");
+			return flight_protocol.acknowledgement_current && hrt_absolute_time() < handoff_deadline;
+		}, handoff_remaining(), "new Acceleration edge accepts only its own post-mode ACK inside the original lease");
+		flight_stream_requests = true;
+		wait([&]() {
+			return command_sub.copy(&acceleration_command) && acceleration_command.session == capture_session
+			       && acceleration_command.mode == slaaps_manual_command_s::ACCELERATION && acceleration_command.transition == capture_edge
+			       && flight_handled(acceleration_command) && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING;
+		}, handoff_remaining(), "actual supervisor reaches active Acceleration inside that same original lease");
+		check(hrt_absolute_time() < handoff_deadline,
+		      "ACK and first handled Acceleration output do not restart a second observation window");
+		previous_flight_output_session = capture_session;
+		return capture_session;
+	};
+	(void)flight_enter_acceleration();
+	flight_expect_session = false;
+	flight_stream_requests = false;
+	disarm_injection.at_capture.store(true, std::memory_order_release);
+	disarm_injection.requested.store(2, std::memory_order_release);
+	wait([&]() { return !status.manual_worker_active; }, 300000,
+	"fresh actuator-first disarm inside acceleration capture stops the actual shared worker");
+	check(disarm_injection.completed.load(std::memory_order_acquire) == 2 && disarm_injection.original_both_armed
+	      && disarm_injection.published && command_sub.copy(&outgoing) && outgoing.timestamp_sample <= disarm_injection.injected_us,
+	      "capture-disarm injection occurs after armed caller checks and produces no subsequent control calculation");
+	vehicle_armed = armed.armed = false;
+	disarm_injection.requested.store(0, std::memory_order_release);
+	disarm_injection.completed.store(0, std::memory_order_release);
+	disarm_injection.at_capture.store(false, std::memory_order_release);
+	wait([&]() { return !status.manual_worker_active && status.configuration_valid; }, 1000000,
+	"capture-observed ordinary disarm retains the exact accepted profile only after both actual authorities are freshly disarmed");
+	const auto capture_stopped_sequence = outgoing.sequence;
+	const auto no_revival_until = hrt_absolute_time() + 120000;
+
+	while (hrt_absolute_time() < no_revival_until) { pump(); px4_usleep(1000); }
+
+	check(!status.manual_worker_active && status.configuration_identity == fingerprint(flight_profile) && status.apply_counter == flight_apply
+	      && command_sub.copy(&outgoing) && outgoing.sequence == capture_stopped_sequence && !flight_protocol.session_established,
+	      "fresh restored sources and the old signed-session proposal cannot revive a disarmed Acceleration owner or renew its command");
+
+	// A final deliberate session preserves both successful lifecycles above.
+	// This synthetic model has no Y-force column or Y-force offset at any
+	// scheduled corner. A within-contract lateral demand therefore reaches the
+	// numerical allocator and exceeds its configured residual tolerance.
+	flight_keepalive = flight_renew_clock = flight_auto_ack = false;
+	vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+	throttle = -1.F;
+	wait([&]() {
+		return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE && status.configuration_valid
+		       && flight_protocol.required_state_valid && flight_protocol.feedback_valid && !flight_protocol.session_established;
+	}, 1000000, "allocator diagnostic requires a fresh deliberate disarmed reentry");
+	flight_companion_session = 7303;
+	flight_establish_session();
+	const auto rejection_session = flight_enter_acceleration();
+	check(control_detail.active && control_detail.control_fault == slaaps_acceleration_status_s::FAULT_NONE,
+	      "third session starts from real active Acceleration without a retained numerical rejection");
+	check(flight_profile.companion.acceleration_minimum[1] <= 1.F && flight_profile.companion.acceleration_maximum[1] >= 1.F
+	      && std::sqrt(26.F + flight_profile.feedback.gravity_m_s2 * flight_profile.feedback.gravity_m_s2)
+	      <= flight_profile.companion.acceleration_norm_max, "lateral diagnostic request lies inside the unchanged typed wire bounds");
+
+	for (unsigned speed = 0; speed < 2; ++speed) {
+		for (unsigned edf = 0; edf < 2; ++edf) {
+			const auto &corner = flight_profile.schedule.corner[speed][edf];
+			check(std::fabs(corner.trim_force[1]) < 1.e-6F && std::fabs(corner.edf_force_per_thrust[1]) < 1.e-6F,
+			      "synthetic scheduled model has no lateral EDF force or trim force");
+
+			for (unsigned canard = 0; canard < kCanards; ++canard) {
+				check(std::fabs(corner.force_derivative[1][canard]) < 1.e-6F,
+				      "synthetic canard columns cannot provide the requested lateral force");
+			}
+		}
+	}
+
+	flight_single_request = true;
+	flight_lateral_request = 1.F;
+	diagnostic_log_start = hrt_absolute_time();
+	unsigned allocation_log_count{};
+	auto collect_allocation_log = [&]() {
+		mavlink_log_s log{};
+
+		for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+			if (log.timestamp >= diagnostic_log_start && std::strcmp(log.text, "SLAAPS accel: target allocation rejected") == 0) {
+				++allocation_log_count;
+			}
+		}
+	};
+	flight_stream_requests = true;
+	wait([&]() {
+		collect_allocation_log();
+		return !status.manual_worker_active && control_detail.state == slaaps_acceleration_status_s::REJECTED
+		       && control_detail.request_session == flight_companion_session && flight_rejected_request
+		       && control_detail.request_sequence == flight_rejected_request;
+	}, 100000, "one fresh within-contract request reaches the allocator and reports its exact retained rejection");
+	const auto rejected_detail = control_detail;
+	const unsigned captures = native_acceleration_capture_count.load(std::memory_order_acquire);
+	check(captures && !native_acceleration_capture_overflow.load(std::memory_order_relaxed),
+	      "the real caller observes successful guarded capture before numerical rejection");
+	const auto &captured_rejection = native_acceleration_captures[captures - 1];
+	check(captured_rejection.source == rejected_detail.request_source && captured_rejection.session == rejected_detail.request_session
+	      && captured_rejection.sequence == rejected_detail.request_sequence && captured_rejection.configuration == rejected_detail.configuration_identity
+	      && captured_rejection.observed_us == rejected_detail.request_observed_us && captured_rejection.captured_us <= rejected_detail.fault_observed_us
+	      && captured_rejection.producer_created < captured_rejection.producer_expiry
+	      && captured_rejection.mapped_created < captured_rejection.mapped_expiry
+	      && captured_rejection.captured_us < captured_rejection.evidence_deadline,
+	      "successful capture and retained allocator fault refer to the same original validated canonical request and evidence");
+	slaaps_manual_command_s rejected_command{};
+	check(!control_detail.active && control_detail.control_fault == slaaps_acceleration_status_s::FAULT_ALLOCATION
+	      && control_detail.allocation_stage == slaaps_acceleration_status_s::ALLOCATION_FUTURE_TARGET
+	      && control_detail.allocation_result == slaaps_acceleration_status_s::SOLVER_RESIDUAL
+	      && control_detail.worker_status == static_cast<uint8_t>(ManualWorkerStatus::AccelerationRejected)
+	      && control_detail.output_session == rejection_session && control_detail.request_source == 1
+	      && control_detail.configuration_identity == fingerprint(flight_profile)
+	      && control_detail.fault_observed_us >= flight_rejected_receipt && control_detail.request_observed_us
+	      && control_detail.request_observed_us <= control_detail.fault_observed_us,
+	      "precise allocation stage and original request correlation survive worker and supervisor cleanup");
+	check(command_sub.copy(&rejected_command) && rejected_command.session == rejection_session
+	      && rejected_command.sequence == rejected_detail.calculated_sequence && rejected_command.sequence == rejected_detail.handled_sequence
+	      && rejected_command.timestamp_sample < rejected_detail.fault_observed_us
+	      && rejected_command.deadline == rejected_detail.calculated_deadline && rejected_command.deadline == rejected_detail.handled_deadline,
+	      "rejected calculation creates no output sequence or handling proof and preserves the last successful command expiry");
+	wait([&]() { collect_allocation_log(); return allocation_log_count == 1; }, 1500000,
+	"actual mavlink_log publishes the rate-bounded actionable allocator rejection");
+	const auto retained_until = hrt_absolute_time() + 120000;
+
+	while (hrt_absolute_time() < retained_until) { pump(); collect_allocation_log(); px4_usleep(1000); }
+
+	check(command_sub.copy(&outgoing) && outgoing.sequence == rejected_command.sequence && outgoing.deadline == rejected_command.deadline
+	      && !status.manual_worker_active && !status.can_run_mask && !status.can_arm_mask && allocation_log_count == 1
+	      && control_detail.fault_observed_us == rejected_detail.fault_observed_us
+	      && control_detail.handled_sequence == rejected_detail.handled_sequence && control_detail.handled_us == rejected_detail.handled_us
+	      && control_detail.handled_deadline == rejected_detail.handled_deadline,
+	      "retained diagnostic publication cannot renew a command create a new handled ACK or repeat the same QGC fault");
+	check(std::printf("SLAAPS_ACCEL_DIAGNOSTIC_TEST_PASS source=1 session=7303 request=%llu stage=1 solver=5 qgc_log=1 modeled_only=1 guarded_capture=1\n",
+			  static_cast<unsigned long long>(flight_rejected_request)) > 0 && std::fflush(stdout) == 0,
+	      "emit complete exact request correlation for the signed allocator diagnostic");
+	check(std::printf("SLAAPS_GUARDED_CAPTURE source=%llu session=%llu request=%llu config=%llu capture=%llu observed=%llu producer=%llu expiry=%llu\n",
+			  static_cast<unsigned long long>(captured_rejection.source), static_cast<unsigned long long>(captured_rejection.session),
+			  static_cast<unsigned long long>(captured_rejection.sequence), static_cast<unsigned long long>(captured_rejection.configuration),
+			  static_cast<unsigned long long>(captured_rejection.captured_us), static_cast<unsigned long long>(captured_rejection.observed_us),
+			  static_cast<unsigned long long>(captured_rejection.producer_created), static_cast<unsigned long long>(captured_rejection.producer_expiry)) > 0
+	      && std::fflush(stdout) == 0, "emit original capture metadata without relying on post-revocation wire status");
+	vehicle_armed = armed.armed = false; // Explicit operator disarm after the capture-only rejection.
+	SlaapsNativeTest::admitted.store(false);
+	flight_keepalive = flight_stream_requests = false;
+	subject = ModuleBase::get_instance<SlaapsNativeTestSubject>(SlaapsNativeTestSubject::desc);
+	check(subject != nullptr, "flight-transfer supervisor retains its actual module descriptor");
+	subject->request_stop();
+	wait([&]() { return SlaapsNativeTestSubject::desc.object.load() == nullptr; }, 1000000,
+	"flight-transfer source-linked supervisor stops through its normal module lifecycle");
+	publish_flight = publish_conditions = false;
+	flight_packet_pub.unadvertise();
+	flight_acceleration_pub.unadvertise();
+	flight_bias_pub.unadvertise();
+	flight_raw_pub.unadvertise();
+	flight_witness_pub.unadvertise();
+	PX4_INFO("SLAAPS_FLIGHT_HANDOFF_TEST_PASS actual_Run=1 both_banks=1 synthetic_authority=1 post_parser=%u flight_qualified=0",
+		 signed_flight ? 0U : 1U);
+
+	if (signed_flight) {
+		check(flight_verified_clocks >= 2 && flight_verified_requests >= 2 && flight_injection_unchanged()
+		      && flight_signed_packets.revision() == flight_receiver_revision,
+		      "both signed sessions retain actual receiver evidence without advertising the injected active source");
+		check(std::printf("SLAAPS_SIGNED_FLIGHT_TEST_PASS actual_parser=1 packet_injection=0 both_banks=1 receiver=%u signing=%u clocks=%u requests=%u\n",
+				  flight_receiver_revision, flight_signing_generation, flight_verified_clocks, flight_verified_requests) > 0
+		      && std::fflush(stdout) == 0, "emit the complete signed receiver proof without PX4 log truncation");
+	}
+
+	// This subsequent real module instance exercises the native QGC parameter path.
 	// Flight admission stays false, estimator publications stop, and the accepted
 	// profile contains only servo/input/timing data. No test seam grants Bench.
 	VehicleConfiguration bench{};
@@ -6966,6 +10502,7 @@ static int nativeSupervisorOrchestrationTests()
 	bench.edf_rise = 1.F;
 	bench.edf_fall = 2.F;
 	bench.power = c.power;
+	bench.power.maximum_age_us = 200000; // Covers the declared 60ms activation plus 80ms first-command reserve.
 	publish_power = true;
 	power_scenario = 0;
 	installNativeMixerConfiguration(bench);
@@ -7013,6 +10550,8 @@ static int nativeSupervisorOrchestrationTests()
 	uint64_t edf_previous_session{};
 
 	for (unsigned scenario = 0; scenario < 5; ++scenario) {
+		native_bench_cancel_scenario.store(scenario, std::memory_order_release);
+
 		if (scenario) {
 			vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 			throttle = -1.F;
@@ -7053,6 +10592,17 @@ static int nativeSupervisorOrchestrationTests()
 		const uint64_t session = status.manual_preparation_session, duration_deadline = status.bench_session_deadline;
 		edf_previous_session = session;
 		const auto before_arming_writes = main.writes() + aux.writes();
+		diagnostic_scenario = scenario;
+		diagnostic_phase = 1;
+		diagnostic_session = session;
+		diagnostic_phase_started = hrt_absolute_time();
+		diagnostic_baseline_writes = before_arming_writes;
+		diagnostic_maximum_gap = 0;
+		diagnostic_latched = false;
+
+		for (unsigned i = 0; i < 3; ++i) { edf_diagnostics[i] = {}; }
+
+		capture_edf_diagnostic(diagnostic_phase_started, diagnostic_previous_pump);
 		slaaps_manual_permission_s edf_permission{};
 		check(permission_sub.copy(&edf_permission) && edf_permission.session == session && !edf_permission.armed
 		      && !edf_permission.healthy && !edf_permission.commissioning_admitted && !edf_permission.flight_admitted
@@ -7063,6 +10613,44 @@ static int nativeSupervisorOrchestrationTests()
 		      "EDF arming readiness is capped by the pinned battery's original report expiry");
 
 		if (!scenario) {
+			manual_control_setpoint_s held_raw{}, observed_raw{};
+			check(diagnostic_raw.copy(&held_raw), "capture the exact raw pilot sample before pausing only its publisher");
+			uint64_t reserve{};
+			check(activationReserveUs(bench, reserve), "synthetic EDF profile supplies its explicit full activation reserve");
+			const uint64_t input_age_us = static_cast<uint64_t>(bench.manual_age_ms) * 1000;
+			const uint64_t raw_lease_us = std::min(input_age_us, static_cast<uint64_t>(bench.output_lease_ms) * 1000);
+			check(raw_lease_us > reserve && input_age_us > raw_lease_us,
+			      "held-raw regression distinguishes the shorter EDF lease from configured pilot age");
+			const uint64_t raw_expiry = held_raw.timestamp_sample + raw_lease_us;
+			const uint64_t readiness_expiry = raw_expiry - reserve;
+			publish_manual = false;
+			wait([&]() {
+				return status.timestamp >= readiness_expiry && !status.can_arm_mask && !status.bench_commissioning_ready;
+			}, raw_lease_us, "held pilot sample loses arming readiness at its original EDF lease minus activation reserve");
+			vehicle_status_s live_vehicle{};
+			actuator_armed_s live_armed{};
+			battery_status_s live_power{};
+			check(diagnostic_raw.copy(&observed_raw) && observed_raw.timestamp == held_raw.timestamp
+			      && observed_raw.timestamp_sample == held_raw.timestamp_sample && status.timestamp < raw_expiry
+			      && hrt_absolute_time() - held_raw.timestamp_sample <= input_age_us
+			      && status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_ARM
+			      && status.manual_preparation_session == session && status.bench_session_deadline == duration_deadline
+			      && status.can_run_mask == (1U << status.mode_id[kBenchMode]) && !status.bench_worker_active
+			      && status.power_ready && main.writes() + aux.writes() == before_arming_writes,
+			      "reserve readiness expires before both raw expiry and pilot-age limit without canceling or activating the prepared session");
+			check(diagnostic_vehicle.copy(&live_vehicle) && diagnostic_armed.copy(&live_armed) && diagnostic_power.copy(&live_power)
+			      && live_vehicle.timestamp > held_raw.timestamp && live_armed.timestamp > held_raw.timestamp
+			      && live_power.timestamp > held_raw.timestamp && !live_armed.armed
+			      && live_vehicle.arming_state == vehicle_status_s::ARMING_STATE_DISARMED,
+			      "only raw pilot publication is held while disarmed authority and selected power reports remain fresh");
+			publish_manual = true;
+			wait([&]() {
+				return status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_ARM && status.bench_commissioning_ready
+				       && status.can_arm_mask == (1U << status.mode_id[kBenchMode]);
+			}, raw_lease_us, "a genuinely fresh raw sample restores disarmed reserve readiness without another enable or activation");
+			check(status.manual_preparation_session == session && status.bench_session_deadline == duration_deadline
+			      && !status.bench_worker_active && main.writes() + aux.writes() == before_arming_writes,
+			      "fresh raw readiness preserves original session duration and performs no output callback");
 			const auto human_wait = hrt_absolute_time() + 1100000;
 
 			while (hrt_absolute_time() < human_wait) { pump(); px4_usleep(1000); }
@@ -7072,15 +10660,23 @@ static int nativeSupervisorOrchestrationTests()
 			      "operator arming may take more than one second without renewing original duration or producing any callback");
 		}
 
+		diagnostic_phase = 2;
+		diagnostic_phase_started = hrt_absolute_time();
 		vehicle_armed = scenario != 1;
 		armed.armed = scenario == 1;
 		const auto staggered = hrt_absolute_time() + 60000;
 
 		while (hrt_absolute_time() < staggered) { pump(); px4_usleep(1000); }
 
-		check(status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_ARM && !status.bench_worker_active
-		      && !status.can_arm_mask && main.writes() + aux.writes() == before_arming_writes,
+		const bool staggered_waited = status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_WAIT_ARM && !status.bench_worker_active
+					      && !status.can_arm_mask && main.writes() + aux.writes() == before_arming_writes;
+
+		if (!staggered_waited) { print_edf_diagnostic("staggered arming"); }
+
+		check(staggered_waited,
 		      "either staggered fresh arming order waits non-actuating until both actual publications agree");
+		diagnostic_phase = 3;
+		diagnostic_phase_started = hrt_absolute_time();
 		vehicle_armed = armed.armed = true;
 		slaaps_manual_activation_s edf_activation{};
 		wait([&]() { return aux_activation_sub.copy(&edf_activation) && edf_activation.session == session; }, 500000,
@@ -7098,6 +10694,8 @@ static int nativeSupervisorOrchestrationTests()
 		pump_aux = true;
 		wait([&]() { return status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_EDF_RUNNING && status.bench_worker_active; },
 		100000, "exact all-bank first-zero handling advances genuine commissioning supervisor to armed Running");
+		diagnostic_phase = 4;
+		diagnostic_phase_started = hrt_absolute_time();
 		wait([&]() {
 			return command_sub.copy(&commissioned) && commissioned.session == session && commissioned.sequence >= 5
 			       && commissioned.edf > 0.F;
@@ -7111,6 +10709,7 @@ static int nativeSupervisorOrchestrationTests()
 
 		for (float canard : commissioned.canards) { check(near(canard, 0.F), "armed commissioned EDF parks all four canards at physical zero"); }
 
+		diagnostic_phase = 0; // The following explicit fault/stop is intentional.
 		const unsigned disarms_before_stop = disarm_requests;
 
 		if (!scenario || scenario == 4) { check(param_set(enable_parameter, &disabled) == 0, "operator stops visibly armed EDF through native GUI enable zero"); }
@@ -7183,6 +10782,7 @@ static int nativeSupervisorOrchestrationTests()
 	subject->request_stop();
 	wait([&]() { return SlaapsNativeTestSubject::desc.object.load() == nullptr; }, 1000000,
 	"supervisor stops only after positive output revoked and genuine disarm observed");
+	native_manual_disarm = nullptr;
 	PX4_INFO("SLAAPS_SUPERVISOR_EDF_TEST_PASS production_predicate=1 synthetic_flight_admission=0 ordinary_disarm=1 physical_outputs=0");
 	PX4_INFO("SLAAPS_SUPERVISOR_TEST_PASS checks=%u actual_source=1 synthetic_authority=1 physical_outputs=0", checks);
 	return 0;
@@ -7363,7 +10963,7 @@ static int nativeMixingOutputTests()
 		stamp_condition(now);
 	};
 
-	for (unsigned session_index = 0; session_index < 10; ++session_index) {
+	for (unsigned session_index = 0; session_index < 11; ++session_index) {
 		publishState(false);
 		main.pump(); aux.pump();
 		const uint64_t start = hrt_absolute_time();
@@ -7458,7 +11058,7 @@ static int nativeMixingOutputTests()
 			pending_without_output();
 		}
 
-		if (session_index >= 3) {
+		if (session_index >= 3 && session_index < 10) {
 			if (session_index == 3) { px4_usleep(22000); }
 
 			if (session_index == 4) {
@@ -7647,20 +11247,61 @@ static int nativeMixingOutputTests()
 			}
 		}
 
-		if (session_index == 1) {
+		if (session_index == 1 || session_index == 10) {
 			const unsigned main_before = main.writes(), aux_before = aux.writes();
-			armed.armed = false;
-			armed.timestamp = hrt_absolute_time();
-			check(armed_pub.publish(armed), "publish armed disagreement after an independently accepted positive grant");
+			const unsigned main_stop_handled = main.handledWrites(), aux_stop_handled = aux.handledWrites();
+			const float previous_edf = aux.lastHandledOutput(3);
+			slaaps_manual_ack_s before_main{}, before_aux{}, after_main{}, after_aux{};
+			check(main_ack.copy(&before_main) && aux_ack.copy(&before_aux) && previous_edf > 1000.F,
+			      "ordinary disarm fixture has an actually successful positive EDF callback and exact prior ACKs");
+			const uint64_t disarm_time = hrt_absolute_time();
+
+			if (session_index == 1) {
+				armed.armed = false;
+				armed.timestamp = disarm_time;
+				check(armed_pub.publish(armed), "actuator disarm arrives while fresh VehicleStatus still reports armed");
+
+			} else {
+				vehicle.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
+				vehicle.timestamp = disarm_time;
+				check(vehicle_pub.publish(vehicle), "VehicleStatus disarm arrives while fresh actuator state still reports armed");
+				aux.failNextWrite();
+			}
+
 			main.pump(); aux.pump();
-			check(main.mixing().slaapsOutputStatus() == SlaapsOutputStatus::RecoveryRequired
-			      && aux.mixing().slaapsOutputStatus() == SlaapsOutputStatus::RecoveryRequired
-			      && main.writes() == main_before && aux.writes() == aux_before,
-			      "post-grant arming disagreement is terminal and grants no invented stop or replacement command");
+			check(main.writes() == main_before + 1 && aux.writes() == aux_before + 1
+			      && main.handledWrites() == main_stop_handled + 1
+			      && aux.handledWrites() == aux_stop_handled + (session_index == 1 ? 1U : 0U)
+			      && main.mixing().slaapsOutputStatus() == SlaapsOutputStatus::Inhibited
+			      && aux.mixing().slaapsOutputStatus() == (session_index == 1 ? SlaapsOutputStatus::Inhibited : SlaapsOutputStatus::HandlingRejected),
+			      "either fresh disarm publication immediately attempts the retained stop and completion requires callback success");
+			check(near(main.lastOutput(6), 0.F) && near(main.lastOutput(4), 0.F)
+			      && near(aux.lastOutput(7), 0.F) && near(aux.lastOutput(5), 0.F) && near(aux.lastOutput(3), 0.F)
+			      && near(main.lastHandledOutput(6), 0.F) && near(main.lastHandledOutput(4), 0.F),
+			      "actual MAIN and AUX callback arguments actively command the accepted disarmed values on every owned pin");
+
+			if (session_index == 10) {
+				check(near(aux.lastHandledOutput(3), previous_edf), "failed stop callback cannot claim the previous EDF output was replaced");
+				px4_usleep(static_cast<unsigned>(c.output_lease_ms) * 1000 + 1000);
+				vehicle.timestamp = armed.timestamp = supervisor.timestamp = 0;
+				check(vehicle_pub.publish(vehicle) && armed_pub.publish(armed) && supervisor_pub.publish(supervisor),
+				      "original inputs and commands expire and later authority is unavailable after explicit disarm");
+				main.pump(); aux.pump();
+				check(main.writes() == main_before + 1 && aux.writes() == aux_before + 2
+				      && aux.handledWrites() == aux_stop_handled + 1 && near(aux.lastHandledOutput(3), 0.F)
+				      && aux.mixing().slaapsOutputStatus() == SlaapsOutputStatus::Inhibited,
+				      "only the failed immutable off ticket retries after input expiry without waiting for fresh positive authority");
+			}
+
+			check(near(aux.lastHandledOutput(3), 0.F) && main_ack.copy(&after_main) && aux_ack.copy(&after_aux)
+			      && memcmp(&before_main, &after_main, sizeof(before_main)) == 0
+			      && memcmp(&before_aux, &after_aux, sizeof(before_aux)) == 0,
+			      "successful ordinary disarm actively replaces EDF PWM and never emits a flight-command ACK");
+			const unsigned stopped_main = main.writes(), stopped_aux = aux.writes();
 			publishState(true);
 			main.pump(); aux.pump();
-			check(main.writes() == main_before && aux.writes() == aux_before,
-			      "restoring armed agreement cannot revive a faulted output session");
+			check(main.writes() == stopped_main && aux.writes() == stopped_aux && near(aux.lastHandledOutput(3), 0.F),
+			      "restored armed state and retained positive permission cannot revive the disarmed output session");
 		}
 
 		const unsigned main_writes = main.writes(), aux_writes = aux.writes();
@@ -7683,15 +11324,17 @@ static int nativeMixingOutputTests()
 			check(main.writes() == main_writes + 1
 			      && main.mixing().slaapsOutputStatus() == SlaapsOutputStatus::HandlingRejected,
 			      "failed actual disarm callback reports rejection and retains pending stop");
-			// A retained pending stop is not authority to write with invalid state time.
+			// The observed explicit disarm minted an immutable off-only ticket.
+			// Later invalid authority cannot strand the failed stop attempt.
 			vehicle.timestamp = armed.timestamp = hrt_absolute_time() + 2000000;
 			check(vehicle_pub.publish(vehicle) && armed_pub.publish(armed), "publish invalid future stop authority");
 			main.pump();
-			check(main.writes() == main_writes + 1, "pending stop never retries using invalid authority timestamp");
+			check(main.writes() == main_writes + 2 && near(main.lastHandledOutput(6), 0.F)
+			      && near(main.lastHandledOutput(4), 0.F), "retained explicit-disarm ticket retries despite later invalid authority time");
 			publishState(false);
 			main.pump();
-			check(main.writes() == main_writes + 2 && near(main.lastOutput(6), 0.F)
-			      && near(main.lastOutput(4), 0.F), "fresh disarm retries failed physical stop with disarmed PWM");
+			check(main.writes() == main_writes + 2 && near(main.lastHandledOutput(6), 0.F)
+			      && near(main.lastHandledOutput(4), 0.F), "fresh authority cannot repeat a successfully handled disarm ticket");
 			check(main_ack.copy(&ack) == had_ack
 			      && (!had_ack || (ack.session == before_stop.session && ack.sequence == before_stop.sequence
 					       && ack.accepted == before_stop.accepted)), "stop handling never acknowledges a flight command");
@@ -8091,6 +11734,8 @@ int slaaps_control_test_main(int argc, char *argv[])
 	if (argc == 2 && strcmp(argv[1], "output") == 0) { return nativeMixingOutputTests(); }
 
 	if (argc == 2 && strcmp(argv[1], "supervisor") == 0) { return nativeSupervisorOrchestrationTests(); }
+
+	if (argc == 3 && strcmp(argv[1], "supervisor") == 0 && strcmp(argv[2], "signed") == 0) { return nativeSupervisorOrchestrationTests(true); }
 
 	if (argc == 2 && strcmp(argv[1], "endpoint") == 0) { return nativeSupervisorEndpointTest(); }
 

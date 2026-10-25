@@ -35,6 +35,8 @@ def main():
         *sorted((ROOT / "src/lib/research_actuator_command").glob("*pp")),
         ROOT / "src/lib/rate_control/rate_control.cpp",
         ROOT / "src/lib/rate_control/rate_control.hpp",
+        *[ROOT / "src/lib/research_acceleration" / name for name in
+          ("TrustedTimeMap.hpp", "RequestGuard.hpp", "DiagnosticBuildProfile.hpp", "FrameMath.hpp", "FrameMath.cpp")],
     ]
     hashes = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in inputs if p.is_file()}
@@ -69,16 +71,21 @@ def main():
                      ("SLA_CFG_SAVED", "SLA_CFG_SCOPE", "SLA_CFG_ID_LO", "SLA_CFG_ID_HI")})
     expected.update({name: {"default": 0} for name in
                      ("SLA_BENCH_EN", "SLA_BENCH_CH", "SLA_BENCH_SEC")})
+    expected.update(SLA_CMP_ACT={"default": 0})
     actual = {p.attrib["name"]: p for p in ET.parse(out / "parameters.xml").iter("parameter")}
     assert set(actual) == set(expected), (set(expected) - set(actual), set(actual) - set(expected))
     for name, item in expected.items():
         assert float(actual[name].attrib["default"]) == item["default"], name
     selector_values = {
+        "SLA_ACC_CTL_EN": {"0": "Disabled", "1": "Configured numerical controller"},
+        "SLA_DATA_STATE": {"0": "Incomplete", "1": "Calibrated", "2": "Qualified"},
         "SLA_IN_SOURCE": {"0": "Unconfigured", "1": "RC only", "2": "Pinned MAVLink only"},
         "SLA_CFG_KIND": {"0": "Servo bench", "1": "Stabilized manual", "2": "EDF commissioning"},
         "SLA_BENCH_EN": {"0": "Stop / disabled", "1": "Enable commissioning session"},
         "SLA_BENCH_CH": {"0": "Combined response", "1": "Canard 1", "2": "Canard 2",
                          "3": "Canard 3", "4": "Canard 4", "5": "EDF (deliberately armed)"},
+        "SLA_CMP_ACT": {"0": "None", "1": "Prepare staged authenticated session",
+                        "2": "Grant exact prepared session", "3": "Revoke session", "4": "Clear latched fault"},
         "SLA_SCH_EN": {"0": "Disabled", "1": "Empirical 2x2 table"},
         "SLA_PWR_INST": {"-1": "Unconfigured", **{str(i): f"Battery instance {i}" for i in range(3)}},
         "SLA_PWR_SRC": {"-1": "Unconfigured", "0": "Power module", "1": "External", "2": "ESC telemetry"},
@@ -92,6 +99,10 @@ def main():
         values = {value.attrib["code"]: value.text for value in actual[name].findall("values/value")}
         assert values == labels, (name, values)
     assert actual["SLA_BENCH_SEC"].findtext("min") == "0"
+    assert actual["SLA_DATA_VER"].findtext("min") == "1"
+    assert actual["SLA_DATA_VER"].findtext("max") == "1"
+    assert actual["SLA_DATA_REC"].findtext("min") == "0"
+    assert actual["SLA_DATA_REC"].findtext("max") == "2147483647"
     assert actual["SLA_BENCH_SEC"].findtext("max") == "60"
     assert actual["SLA_SCH_AGE"].findtext("min") == "0"
     assert actual["SLA_SCH_AGE"].findtext("max") == "1000000"

@@ -6,6 +6,9 @@
 #include <lib/research_stabilized_manual/SelectedStateObservation.hpp>
 #include <lib/slaaps/OperatingConditionObservation.hpp>
 #include <lib/slaaps/PowerObservation.hpp>
+#include <lib/slaaps/CompanionIdentity.hpp>
+#include <lib/slaaps/AccelerationControllerPort.hpp>
+#include "CompanionProtocol.hpp"
 #include <lib/research_stabilized_manual/StabilizedInputValidation.hpp>
 #include <lib/parameters/atomic_transaction.h>
 #include <systemlib/mavlink_log.h>
@@ -28,10 +31,14 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/slaaps_status.h>
+#include <uORB/topics/slaaps_acceleration_status.h>
 #include <uORB/topics/slaaps_companion_packet.h>
 #include <mavlink.h>
 #include <cmath>
 #include <cstring>
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+#include <atomic>
+#endif
 
 namespace
 {
@@ -43,11 +50,30 @@ constexpr hrt_abstime kIntervalUs = slaaps::kSupervisorIdleIntervalUs;
 constexpr hrt_abstime kRetryUs = 500000;
 constexpr hrt_abstime kMaximumStatusAgeUs = 1000000;
 constexpr hrt_abstime kRoutingDiagnosticIntervalUs = 1000000; // Telemetry rate bound, not output timing.
+constexpr hrt_abstime kAccelerationDiagnosticIntervalUs = 1000000; // Change-edge telemetry bound only.
 constexpr px4::wq_config_t kSupervisorQueue{"wq:slaaps", 6500, -5};
 constexpr const char *kModeNames[kModeCount] = {"SLAAPS Manual", "SLAAPS Acceleration", "SLAAPS Bench"};
 constexpr int32_t kMaximumBenchSeconds = 60; // Software command bound, not hardware qualification.
 constexpr unsigned kEdfBenchTarget = slaaps::kCanards + 1;
 constexpr unsigned kDisarmRequestAttempts = 3; // Bounded command delivery; output expiry is independent.
+static_assert(static_cast<uint8_t>(slaaps::AccelerationControlFault::AllocationRejected) == slaaps_acceleration_status_s::FAULT_ALLOCATION
+	      &&static_cast<uint8_t>(slaaps::AccelerationAllocationStage::CurrentOwnerThrust) ==
+	      slaaps_acceleration_status_s::ALLOCATION_CURRENT_OWNER_MODEL
+	      &&static_cast<uint8_t>(slaaps::WrenchAllocationResult::ResidualExceeded) == slaaps_acceleration_status_s::SOLVER_RESIDUAL
+	      &&static_cast<uint8_t>(slaaps::AccelerationDiagnosticState::Rejected) == slaaps_acceleration_status_s::REJECTED,
+	      "local acceleration diagnostic codes");
+
+// Either first explicit disarm publication stops flight output. Reuse of the
+// accepted profile still waits for both fresh publications to be disarmed.
+bool ordinaryFlightDisarm(hrt_abstime now, uint64_t maximum_age,
+			  const vehicle_status_s &vehicle, const actuator_armed_s &armed)
+{
+	return maximum_age && vehicle.timestamp && armed.timestamp && vehicle.timestamp <= now && armed.timestamp <= now
+	       && now - vehicle.timestamp <= maximum_age && now - armed.timestamp <= maximum_age
+	       && !(vehicle.arming_state == vehicle_status_s::ARMING_STATE_ARMED && armed.armed)
+	       && (vehicle.arming_state == vehicle_status_s::ARMING_STATE_DISARMED || !armed.armed)
+	       && !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode;
+}
 }
 
 // Native configuration, mode and shared-worker owner. Production flight
@@ -81,18 +107,39 @@ private:
 	void updatePreparation(hrt_abstime now);
 	void updateBench(hrt_abstime now);
 	bool observeBenchInput(hrt_abstime &now, bool centered, bool edf = false);
-	void cancelBench(hrt_abstime now, uint8_t status, bool normal_stop = false);
+	void cancelBench(hrt_abstime now, uint8_t status, bool normal_stop = false
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS) || defined(CONFIG_SLAAPS_ROUTING_TEST)
+			 , unsigned caller_line = __builtin_LINE()
+#endif
+			);
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+	uint64_t _native_cancel_session {}; // Supervisor queue only; retain the first call per session.
+	uint64_t _native_preparation_cancel_session{};
+	uint64_t _native_input_failure_session{};
+	std::atomic<unsigned> _native_cancel_line{0};
+#endif
 	void updateBenchDisarm(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool fresh);
 	bool resetBenchEnable();
 	bool restoreStoppedProfile(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool actuator_fresh);
 	void updateManualActivation(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh);
+	void updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh);
+	bool capturedOrdinaryFlightDisarm(hrt_abstime now);
 	bool observePrearmInput(hrt_abstime now, bool armed = false);
-	void cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm = false);
-	bool publishManualPermission(hrt_abstime now, bool *waiting = nullptr);
+	void cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm = false
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+			       , unsigned caller_line = __builtin_LINE()
+#endif
+			      );
+	bool publishManualPermission(hrt_abstime now, bool *waiting = nullptr,
+				     slaaps::ControlMode flight_mode = slaaps::ControlMode::None, uint64_t transition_us = 0,
+				     bool *normal_disarm = nullptr);
 	unsigned permissionRevision() { return _permission_revision && _permission_lifetime.revision() == _permission_revision ? _permission_revision : 0; }
 	void publishStatus(hrt_abstime now);
+	void publishAccelerationStatus(hrt_abstime now);
 	void updateSchedule();
 	void updateCompanion(hrt_abstime now);
+	uint64_t _companion_identity_seed{}; // Acquired before scheduling; never a software/time fallback.
+	slaaps::CompanionProtocol _companion_protocol{};
 	bool observePower(hrt_abstime &now, bool bind = false);
 	slaaps::PowerObservation _power{};
 	slaaps::PowerSample _power_sample{};
@@ -130,10 +177,18 @@ private:
 	slaaps::ManualPreparationRequest _prepared_request{};
 	unsigned _manual_activation_revisions[2] {};
 	uint64_t _manual_first_command_deadline{};
+	slaaps::ControlMode _flight_transfer_target{slaaps::ControlMode::None};
+	uint64_t _flight_transfer_us{}, _flight_transfer_deadline{};
+	slaaps::EdfPermission _flight_previous_permission{};
+	slaaps::AccelerationControlInput _acceleration_input{}; // Serialized scratch; never an eligible-demand cache.
+	research_stabilized_manual::SelectedStateObservation _acceleration_states{}; // Keep Manual's all-topic binding intact.
 	slaaps::ParameterSnapshot _stop_profile{};
+	slaaps::ParameterSnapshot _parameter_scratch{}; // Serialized owner only; CLI owns separate scratch.
 	bool _manual_entry_selected{};
 	bool _manual_entry_allowed{};
 	uint64_t _manual_entry_started{};
+	uint64_t _manual_entry_deadline{};
+	uint64_t _manual_preparation_response_deadline{};
 	uint8_t _manual_entry_status{slaaps_status_s::MANUAL_ENTRY_INACTIVE};
 	slaaps::SelectedManualInput _prearm_input{};
 	research_actuator_command::ManualControlInput _prearm_raw{};
@@ -212,6 +267,15 @@ private:
 	int32_t _configuration_rejection_use{};
 	int32_t _configuration_rejection_apply{};
 	orb_advert_t _diagnostic_log_pub{};
+	uORB::PublicationData<slaaps_acceleration_status_s> _acceleration_status{ORB_ID::slaaps_acceleration_status};
+	hrt_abstime _last_acceleration_diagnostic{}, _reported_acceleration_fault_us{};
+	uint64_t _reported_acceleration_session{}, _reported_acceleration_configuration{};
+	slaaps::AccelerationControlFault _reported_acceleration_fault{slaaps::AccelerationControlFault::None};
+	slaaps::AccelerationAllocationStage _reported_acceleration_stage{slaaps::AccelerationAllocationStage::None};
+	slaaps::WrenchAllocationResult _reported_acceleration_solver{slaaps::WrenchAllocationResult::Success};
+	slaaps::ManualWorkerStatus _reported_acceleration_worker{slaaps::ManualWorkerStatus::Inactive};
+	uint8_t _reported_acceleration_moment{}, _reported_acceleration_canard{};
+	bool _have_acceleration_report{}, _reported_acceleration_rejection{};
 	unsigned _stop_index{};
 	bool _registration_fault{};
 	bool _routing_valid{};
@@ -342,7 +406,7 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 		if (fresh && _bench_edf_authorized && _prepared_request.mode == slaaps::ControlMode::EdfBench) {
 			slaaps::ParameterSnapshot current{};
 
-			if (_parameters.capture(current, _snapshot_duration) && current.use == 2 && current.use == _selected_use
+			if (_parameters.capture(current, _snapshot_duration, _parameter_scratch) && current.use == 2 && current.use == _selected_use
 			    && current.apply_counter == _last_apply && slaaps::Px4ConfigurationSource::remembered(current)
 			    && slaaps::equal(current.configuration, _configuration.configuration())) { return; }
 		}
@@ -362,7 +426,7 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 
 	slaaps::ParameterSnapshot snapshot{};
 
-	if (!_parameters.capture(snapshot, _snapshot_duration)) {
+	if (!_parameters.capture(snapshot, _snapshot_duration, _parameter_scratch)) {
 		_configuration.invalidate();
 		_configuration_fault = slaaps::ConfigurationFault::ParameterRange;
 		_configuration_parameter = nullptr;
@@ -402,7 +466,8 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 
 	// Accepting a profile is separate from deliberate mode entry. An apply
 	// cannot renew a bound preparation or repair a rejected selected session.
-	if (_preparation_pending || _prearm_input.active() || _manual_activation_owned || _manual.active() || _bench_input_bound) {
+	if (_preparation_pending || _prearm_input.active() || _manual_activation_owned || _manual.active() || _bench_input_bound
+	    || _manual_entry_deadline) {
 		if (_bench_entry_selected) { cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); }
 
 		else { cancelPreparation(now, slaaps::PreparationStatus::Rejected); }
@@ -452,6 +517,13 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 		}
 
 		PX4_INFO("configuration %s; mode readiness checked separately", restoring ? "restored" : "applied");
+
+		if (snapshot.configuration.data_assessment > 0) {
+			const char *assessment = snapshot.configuration.data_assessment == static_cast<int32_t>(slaaps::DataAssessment::Calibrated) ?
+						 "calibrated" : "qualified";
+			mavlink_log_info(&_diagnostic_log_pub, "SLAAPS: declared %s record %ld", assessment,
+					 static_cast<long>(snapshot.configuration.data_record_id));
+		}
 	}
 }
 
@@ -530,7 +602,6 @@ void Slaaps::updateRouting(hrt_abstime now)
 	_routing_reported_index = _routing_fault_index;
 	_routing_reported_bank = _routing_fault_bank;
 	_routing_reported_channel = _routing_fault_channel;
-	_last_routing_diagnostic = now;
 
 	if (_routing_fault_bank <= static_cast<uint8_t>(slaaps::OutputBank::Aux) && _routing_fault_channel) {
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: check %s channel %u (routing %u)",
@@ -546,10 +617,31 @@ void Slaaps::updateRouting(hrt_abstime now)
 	} else {
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: check MAIN/AUX output inventory");
 	}
+
+	// Observation predates formatting/publication and may be preempted. Start
+	// the next reporting interval after emission, never from that earlier time.
+	_last_routing_diagnostic = hrt_absolute_time();
 }
 
-void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm)
+void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+			       , unsigned caller_line
+#endif
+			      )
 {
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+
+	if (_preparation_session && _native_preparation_cancel_session != _preparation_session) {
+		_native_preparation_cancel_session = _preparation_session;
+		PX4_WARN("native preparation cancel line=%u time=%llu status=%u normal=%d",
+			 caller_line, static_cast<unsigned long long>(now), static_cast<unsigned>(status), normal_disarm);
+		PX4_WARN("native preparation candidate=%d eligible=%d routing=%d inventory=%u fault=%u worker=%u",
+			 _configuration.hasCandidate(), _configuration.eligible(), _routing_valid,
+			 static_cast<unsigned>(_inventory_fault), static_cast<unsigned>(_routing_fault), static_cast<unsigned>(_manual_status));
+	}
+
+#endif
+
 	if (_manual_activation_owned) { _preparation.cancelActivation(now); }
 
 	else if (_preparation_pending) { _preparation.cancel(now); }
@@ -562,6 +654,11 @@ void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status
 	_aux_handled_wakeup.unregisterCallback();
 	_manual_activation_owned = false;
 	_manual_first_command_deadline = 0;
+	_flight_transfer_target = slaaps::ControlMode::None;
+	_flight_transfer_us = _flight_transfer_deadline = 0;
+	_flight_previous_permission = {};
+	_acceleration_input = {};
+	_manual_preparation_response_deadline = 0;
 	_manual_permission = {};
 	_power_bound = false;
 
@@ -586,6 +683,7 @@ void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status
 			       slaaps_status_s::MANUAL_ENTRY_REJECTED;
 
 	if (status == slaaps::PreparationStatus::Inactive) {
+		_manual_entry_deadline = 0;
 		_preparation_session = 0;
 		_preparation_deadline = 0;
 		_preparation_banks = 0;
@@ -617,7 +715,7 @@ bool Slaaps::restoreStoppedProfile(hrt_abstime now, const vehicle_status_s &vehi
 
 	// Reuse never repairs edits or acceptance changes and never resets either
 	// mode's deliberate entry latch. Command parameters are outside this profile.
-	if (_parameters.capture(_stop_profile, duration) && _stop_profile.use == _selected_use
+	if (_parameters.capture(_stop_profile, duration, _parameter_scratch) && _stop_profile.use == _selected_use
 	    && _stop_profile.use == static_cast<int32_t>(_configuration.use())
 	    && _stop_profile.apply_counter == _last_apply && slaaps::Px4ConfigurationSource::remembered(_stop_profile)
 	    && slaaps::equal(_stop_profile.configuration, retained)) {
@@ -642,8 +740,34 @@ bool Slaaps::resetBenchEnable()
 	return param_set(_bench_enable_parameter, &disabled) == 0;
 }
 
-void Slaaps::cancelBench(hrt_abstime now, uint8_t status, bool normal_stop)
+void Slaaps::cancelBench(hrt_abstime now, uint8_t status, bool normal_stop
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS) || defined(CONFIG_SLAAPS_ROUTING_TEST)
+			 , unsigned caller_line
+#endif
+			)
 {
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+
+	if (_preparation_session && _native_cancel_session != _preparation_session) {
+		_native_cancel_session = _preparation_session;
+		_native_cancel_line.store(caller_line);
+		// Retain the initiating state before cancellation invalidates the
+		// profile and the next observation overwrites the routing rejection.
+		PX4_WARN("native bench cancel line=%u candidate=%d eligible=%d routing=%d inventory=%u fault=%u",
+			 caller_line, _configuration.hasCandidate(), _configuration.eligible(), _routing_valid,
+			 static_cast<unsigned>(_inventory_fault), static_cast<unsigned>(_routing_fault));
+		PX4_WARN("native bench cancel time=%llu reports=%llu/%llu active=%d worker=%u",
+			 static_cast<unsigned long long>(now), static_cast<unsigned long long>(_routing_snapshot.reported_us[0]),
+			 static_cast<unsigned long long>(_routing_snapshot.reported_us[1]), _manual.active(),
+			 static_cast<unsigned>(_manual_status));
+	}
+
+#endif
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS)
+	// Capture the initiating branch on this queue before cleanup changes the
+	// configuration, routing and permission observed by the native fixture.
+	SlaapsNativeTest::beforeBenchCancel(*this, now, status, normal_stop, caller_line);
+#endif
 	const bool edf = _bench_edf_authorized;
 
 	if (normal_stop && _manual_configuration_active) {
@@ -833,7 +957,38 @@ bool Slaaps::observeBenchInput(hrt_abstime &now, bool centered, bool edf)
 bool Slaaps::observePrearmInput(hrt_abstime now, bool armed)
 {
 	const bool bound = _prearm_input.active();
-	auto fail = [&](uint8_t reason) {
+	auto fail = [&](uint8_t reason
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+			, unsigned caller_line = __builtin_LINE()
+#endif
+	) {
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+
+		if (_preparation_session && _native_input_failure_session != _preparation_session) {
+			_native_input_failure_session = _preparation_session;
+			const auto &sample = _input_observation;
+			unsigned changed{};
+
+			for (unsigned i = 0; i < research_stabilized_manual::PublisherBinding::kTopics; ++i) {
+				if (sample.revisions[i] != _prearm_previous_observation.revisions[i]) { changed |= 1U << i; }
+			}
+
+			PX4_WARN("native input failure line=%u reason=%u bound=%d state=%d permission=%d revisions=%u",
+				 caller_line, reason, bound, sample.state.valid, sample.permission_fresh, changed);
+			PX4_WARN("native input times now=%llu capture=%llu manual=%llu attitude=%llu rate=%llu",
+				 static_cast<unsigned long long>(now), static_cast<unsigned long long>(sample.now),
+				 static_cast<unsigned long long>(sample.manual.timestamp_sample_us),
+				 static_cast<unsigned long long>(sample.state.attitude_sample_us), static_cast<unsigned long long>(sample.state.rate_sample_us));
+			PX4_WARN("native input limits manual=%d state=%d status=%llu permission=%llu",
+				 _configuration.configuration().manual_age_ms, _configuration.configuration().state_age_ms,
+				 static_cast<unsigned long long>(_manual_input_policy.maximum_status_age_us),
+				 static_cast<unsigned long long>(_manual_input_policy.maximum_permission_age_us));
+			PX4_WARN("native input metadata estimator=%llu flags=%llu permission=%llu",
+				 static_cast<unsigned long long>(sample.estimator_time), static_cast<unsigned long long>(sample.flags_time),
+				 static_cast<unsigned long long>(sample.permission.timestamp));
+		}
+
+#endif
 		_manual_entry_status = reason;
 
 		if (!bound) { _prearm_input.stop(); }
@@ -989,15 +1144,23 @@ bool Slaaps::observePower(hrt_abstime &now, bool bind)
 	return true;
 }
 
-bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting)
+bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting, slaaps::ControlMode flight_mode,
+				     uint64_t transition_us, bool *normal_disarm)
 {
 	if (waiting) { *waiting = false; }
 
+	if (normal_disarm) { *normal_disarm = false; }
+
 	const bool bench = slaaps::ManualBankPreparation::commissioningMode(_prepared_request.mode);
 	const bool edf = _prepared_request.mode == slaaps::ControlMode::EdfBench;
+	const auto output_mode = bench ? _prepared_request.mode : flight_mode != slaaps::ControlMode::None ? flight_mode :
+				 (_manual.active() ? _manual.mode() : slaaps::ControlMode::Manual);
+	const uint64_t output_transition = bench ? 0 : flight_mode != slaaps::ControlMode::None ? transition_us :
+					   (_manual.active() ? _manual_permission.transition_us : 0);
 
 	if (!permissionRevision() || !_preparation_session || !_configuration.hasCandidate()
-	    || _selected_use != (edf ? 2 : bench ? 0 : 1) || _permission_sequence == UINT64_MAX) { return false; }
+	    || _selected_use != (edf ? 2 : bench ? 0 : 1) || _permission_sequence == UINT64_MAX
+	    || (!bench && !slaaps::ManualBankPreparation::flightMode(output_mode))) { return false; }
 
 	const auto &configuration = _configuration.configuration();
 	const uint64_t lease = static_cast<uint64_t>(configuration.output_lease_ms) * 1000;
@@ -1006,6 +1169,11 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting)
 
 	vehicle_status_s vehicle{};
 	actuator_armed_s armed{};
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS)
+
+	if (!bench && _manual.active()) { SlaapsNativeTest::beforeManualPermission(); }
+
+#endif
 	const bool have_vehicle = _vehicle_status.copy(&vehicle);
 	const bool have_armed = _actuator_armed.copy(&armed);
 	// Timestamp this decision after its live inputs have been copied.
@@ -1028,6 +1196,40 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting)
 
 	if (now > UINT64_MAX - lease) { return false; }
 
+	if (!bench && _manual.active()) {
+		const auto target_index = output_mode == slaaps::ControlMode::Acceleration ? kAccelerationMode : kManualMode;
+		const auto other_index = target_index == kAccelerationMode ? kManualMode : kAccelerationMode;
+		const bool both_armed = vehicle.arming_state == vehicle_status_s::ARMING_STATE_ARMED && armed.armed;
+		const bool selected = vehicle.nav_state == _modes[target_index].id && vehicle.nav_state_user_intention == _modes[target_index].id;
+
+		if (!both_armed || !selected) {
+			if (normal_disarm && _configuration.eligible() && _routing_valid && !_registration_fault
+			    && _inventory_fault == slaaps::InventoryFault::None && _routing_fault == slaaps::RoutingFault::None
+			    && now < _manual.outputDeadline() && now < _manual_permission.deadline_us
+			    && (!_manual_first_command_deadline || now < _manual_first_command_deadline)
+			    && (_flight_transfer_target == slaaps::ControlMode::None || now < _flight_transfer_deadline)
+			    && _manual.commandRevision() == _prepared_request.command_revision
+			    && permissionRevision() == _prepared_request.permission_revision
+			    && _preparation.revision() && _preparation.transitionRevision()
+			    && (!(_prepared_request.binding.banks & 1U)
+				|| (_manual_activation_revisions[0] && _main_activation_lifetime.revision() == _manual_activation_revisions[0]))
+			    && (!(_prepared_request.binding.banks & 2U)
+				|| (_manual_activation_revisions[1] && _aux_activation_lifetime.revision() == _manual_activation_revisions[1]))
+			    && ordinaryFlightDisarm(now, maximum_age, vehicle, armed)) { *normal_disarm = true; }
+
+			// A mode edge may occur during these live copies. Retain the exact
+			// outgoing permission and issue no outgoing calculation. The next
+			// tick must complete a bounded transfer or cancel the original lease.
+			if (waiting && both_armed && !_registration_fault && _modes[other_index].configured
+			    && vehicle.nav_state == _modes[other_index].id && vehicle.nav_state_user_intention == _modes[other_index].id
+			    && !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode
+			    && _manual_permission.mode == _manual.mode() && now < _manual_permission.deadline_us
+			    && now < _manual.outputDeadline()) { *waiting = true; return true; }
+
+			return false;
+		}
+	}
+
 	slaaps::ManualPermissionSample sample{};
 	auto &permission = sample.permission;
 	permission.timestamp_us = now;
@@ -1036,10 +1238,25 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting)
 
 	if (propulsion) { permission.deadline_us = math::min(permission.deadline_us, _power_sample.deadline_us); }
 
+	if (!bench && _flight_transfer_target != slaaps::ControlMode::None) {
+		if (!_flight_transfer_deadline || now >= _flight_transfer_deadline) { return false; }
+
+		permission.deadline_us = math::min(permission.deadline_us, _flight_transfer_deadline);
+	}
+
+	// The Manual wait bounds activation and the first handled command, not
+	// ongoing flight. Fresh denied prearm observations cannot extend that bound.
+	if (!bench && (!_manual.active() || !_manual.handledSequence())) {
+		if (!_manual_entry_deadline || now >= _manual_entry_deadline) { return false; }
+
+		permission.deadline_us = math::min(permission.deadline_us, _manual_entry_deadline);
+	}
+
 	permission.session = _preparation_session;
 	permission.source = _modes[bench ? kBenchMode : kManualMode].request;
 	permission.configuration = _configuration.identity();
-	permission.mode = _prepared_request.mode;
+	permission.mode = output_mode;
+	permission.transition_us = output_transition;
 	permission.armed = (have_vehicle && vehicle.arming_state == vehicle_status_s::ARMING_STATE_ARMED)
 			   || (have_armed && armed.armed);
 	permission.kill = have_armed && armed.kill;
@@ -1106,6 +1323,240 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting)
 	return published;
 }
 
+bool Slaaps::capturedOrdinaryFlightDisarm(hrt_abstime now)
+{
+	if (!_companion_protocol.observedOrdinaryDisarm(now) || !_manual.active() || !_configuration.eligible()
+	    || _selected_use != 1 || !_routing_valid || _registration_fault
+	    || _inventory_fault != slaaps::InventoryFault::None || _routing_fault != slaaps::RoutingFault::None
+	    || !_power_bound || !_power_valid || now >= _power_sample.deadline_us
+	    || (_configuration.configuration().schedule.enabled && (!_condition_valid || now >= _condition_sample.deadline_us))
+	    || now >= _manual.outputDeadline() || now >= _manual_permission.deadline_us
+	    || (_manual_first_command_deadline && now >= _manual_first_command_deadline)
+	    || (_flight_transfer_target != slaaps::ControlMode::None && now >= _flight_transfer_deadline)
+	    || _manual.commandRevision() != _prepared_request.command_revision
+	    || permissionRevision() != _prepared_request.permission_revision || !_preparation.revision() || !_preparation.transitionRevision()) { return false; }
+
+	if ((_prepared_request.binding.banks & 1U)
+	    && (!_manual_activation_revisions[0] || _main_activation_lifetime.revision() != _manual_activation_revisions[0])) { return false; }
+
+	if ((_prepared_request.binding.banks & 2U)
+	    && (!_manual_activation_revisions[1] || _aux_activation_lifetime.revision() != _manual_activation_revisions[1])) { return false; }
+
+	return true;
+}
+
+void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicle,
+				 const actuator_armed_s &armed, bool armed_fresh)
+{
+	const auto &configuration = _configuration.configuration();
+	const auto current_mode = _manual.mode();
+	const bool manual_selected = _modes[kManualMode].configured && vehicle.nav_state == _modes[kManualMode].id
+				     && vehicle.nav_state_user_intention == _modes[kManualMode].id;
+	const bool acceleration_selected = _modes[kAccelerationMode].configured && vehicle.nav_state == _modes[kAccelerationMode].id
+					   && vehicle.nav_state_user_intention == _modes[kAccelerationMode].id;
+	const auto selected_mode = acceleration_selected ? slaaps::ControlMode::Acceleration :
+				   manual_selected ? slaaps::ControlMode::Manual : slaaps::ControlMode::None;
+	const uint64_t authority_age = configuration.actuator_permission_age_us > 0 ?
+				       static_cast<uint64_t>(configuration.actuator_permission_age_us) : 0;
+	bool activation_lifetimes = true;
+
+	if (_prepared_request.binding.banks & 1U) {
+		activation_lifetimes &= _manual_activation_revisions[0] && _main_activation_lifetime.revision() == _manual_activation_revisions[0];
+	}
+
+	if (_prepared_request.binding.banks & 2U) {
+		activation_lifetimes &= _manual_activation_revisions[1] && _aux_activation_lifetime.revision() == _manual_activation_revisions[1];
+	}
+
+	if (!armed_fresh || !authority_age || !vehicle.timestamp || vehicle.timestamp > now || now - vehicle.timestamp > authority_age
+	    || !armed.timestamp || armed.timestamp > now || now - armed.timestamp > authority_age
+	    || vehicle.arming_state != vehicle_status_s::ARMING_STATE_ARMED || !armed.armed
+	    || armed.kill || armed.lockdown || armed.termination || armed.in_esc_calibration_mode || _registration_fault
+	    || !_configuration.eligible() || _selected_use != 1 || !_routing_valid || !activation_lifetimes
+	    || !slaaps::ManualBankPreparation::flightMode(current_mode) || !slaaps::ManualBankPreparation::flightMode(selected_mode)
+	    || _manual.commandRevision() != _prepared_request.command_revision || permissionRevision() != _prepared_request.permission_revision
+	    || !_preparation.revision() || !_preparation.transitionRevision()
+	    || (_manual_first_command_deadline && now >= _manual_first_command_deadline)
+	    || _preparation.pollActivationObservedLive(now, configuration, _routing_snapshot, _inventory_fault) != slaaps::ActivationStatus::Consumed
+	    || !observePower(now) || (configuration.schedule.enabled && !_condition_valid)) {
+		cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+		return;
+	}
+
+	if (_flight_transfer_target == slaaps::ControlMode::None && selected_mode != current_mode) {
+		slaaps::ManualWorkerOutput handled{};
+		uint64_t handled_us{};
+
+		if (_manual_first_command_deadline || !_manual.handledOutput(handled, handled_us) || !handled_us
+		    || handled.mode != current_mode || handled.transition_us != _manual_permission.transition_us
+		    || !vehicle.nav_state_timestamp || vehicle.nav_state_timestamp > vehicle.timestamp || vehicle.nav_state_timestamp >= now
+		    || vehicle.nav_state_timestamp <= _manual_permission.transition_us || vehicle.nav_state_timestamp <= _preparation_session
+		    || _manual_permission.timestamp_us > vehicle.nav_state_timestamp || _manual_permission.mode != current_mode
+		    || _manual_permission.session != _preparation_session || _manual_permission.source != _prepared_request.source
+		    || _manual_permission.configuration != _configuration.identity()
+		    || (selected_mode == slaaps::ControlMode::Acceleration && !slaaps::validateAccelerationControlConfiguration(configuration).valid())) {
+			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+			return;
+		}
+
+		_flight_transfer_us = vehicle.nav_state_timestamp;
+		_flight_transfer_target = selected_mode;
+		_flight_previous_permission = _manual_permission;
+		// The latest issued ticket owns the active lease. The preceding handled
+		// frame is genuine history, not the expiry of an already pending frame.
+		_flight_transfer_deadline = math::min(_manual.outputDeadline(), _flight_previous_permission.deadline_us);
+	}
+
+	if (_flight_transfer_target != slaaps::ControlMode::None) {
+		if (selected_mode != _flight_transfer_target || vehicle.nav_state_timestamp != _flight_transfer_us
+		    || !_flight_transfer_deadline || now >= _flight_transfer_deadline) {
+			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+			return;
+		}
+
+		// Drain only the already issued outgoing ticket. This cannot calculate,
+		// publish a new old-mode frame or renew any outgoing input/output lease.
+		_manual_status = _manual.monitorTransferObserved(_flight_previous_permission, _prepared_request.binding);
+		now = hrt_absolute_time();
+
+		if (!_manual.active() || now >= _flight_transfer_deadline
+		    || (_manual_status != slaaps::ManualWorkerStatus::Waiting && _manual_status != slaaps::ManualWorkerStatus::Ready)) {
+			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+			return;
+		}
+
+		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_ACTIVATING;
+
+		if (_manual.outstanding()) { return; }
+
+		if (selected_mode == slaaps::ControlMode::Acceleration) {
+			_acceleration_input = {};
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS)
+			SlaapsNativeTest::beforeAccelerationCapture();
+#endif
+
+			if (!_companion_protocol.captureControlInput(_configuration.identity(), _input_observation, _acceleration_input)) {
+				const uint64_t stopped = hrt_absolute_time();
+				const bool normal_disarm = capturedOrdinaryFlightDisarm(stopped);
+
+				if (normal_disarm || (!_companion_protocol.awaitingControlInput()
+						      && !_companion_protocol.awaitingAccelerationObservation(_flight_transfer_us))) {
+					cancelPreparation(stopped, slaaps::PreparationStatus::Rejected, normal_disarm);
+				}
+
+				return;
+			}
+
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS)
+			SlaapsNativeTest::afterAccelerationCapture(_acceleration_input);
+#endif
+			_acceleration_input.operating_condition = _condition_sample;
+
+		} else if (_input_observation.manual.timestamp_sample_us <= _flight_transfer_us) {
+			return; // A pre-edge held pilot sample cannot resume Manual control.
+		}
+
+		bool waiting = false, normal_disarm = false;
+
+		if (!publishManualPermission(now, &waiting, selected_mode, _flight_transfer_us, &normal_disarm)) {
+			cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected, normal_disarm);
+			return;
+		}
+
+		if (waiting) { return; }
+
+		now = hrt_absolute_time();
+
+		if (now >= _flight_transfer_deadline || !slaaps::ManualBankPreparation::permitted(_manual_permission, selected_mode)) {
+			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+			return;
+		}
+
+		_manual_status = selected_mode == slaaps::ControlMode::Acceleration ?
+				 _manual.transferAcceleration(now, _flight_transfer_us, configuration, _flight_previous_permission,
+						 _manual_permission, _acceleration_input, _prepared_request.binding) :
+				 _manual.transferManual(now, _flight_transfer_us, configuration, _flight_previous_permission,
+							_manual_permission, _input_observation, _manual_input_policy, _prepared_request.binding,
+							_condition_valid ? &_condition_sample : nullptr);
+		_acceleration_input = {};
+
+		if (!_manual.active() || (_manual_status != slaaps::ManualWorkerStatus::Command
+					  && _manual_status != slaaps::ManualWorkerStatus::Waiting && _manual_status != slaaps::ManualWorkerStatus::NotDue)) {
+			cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected);
+			return;
+		}
+
+		if (_manual_status == slaaps::ManualWorkerStatus::Command) {
+			_flight_transfer_target = slaaps::ControlMode::None;
+			_flight_transfer_us = _flight_transfer_deadline = 0;
+			_flight_previous_permission = {};
+			_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_FIRST_COMMAND;
+		}
+
+		return;
+	}
+
+	if (current_mode == slaaps::ControlMode::Acceleration) {
+		_acceleration_input = {};
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS)
+		SlaapsNativeTest::beforeAccelerationCapture();
+#endif
+
+		if (!_companion_protocol.captureControlInput(_configuration.identity(), _input_observation, _acceleration_input)) {
+			const uint64_t stopped = hrt_absolute_time();
+			const bool normal_disarm = capturedOrdinaryFlightDisarm(stopped);
+
+			if (normal_disarm || !_companion_protocol.awaitingControlInput()) {
+				cancelPreparation(stopped, slaaps::PreparationStatus::Rejected, normal_disarm);
+				return;
+			}
+
+			_manual_status = _manual.monitorTransferObserved(_manual_permission, _prepared_request.binding);
+
+			if (!_manual.active()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
+
+			_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_ACTIVATING;
+			return; // Map renewal requires a fresh ACK/request inside the old lease.
+		}
+
+#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS)
+		SlaapsNativeTest::afterAccelerationCapture(_acceleration_input);
+#endif
+		_acceleration_input.operating_condition = _condition_sample;
+	}
+
+	bool waiting = false, normal_disarm = false;
+
+	if (!publishManualPermission(now, &waiting, slaaps::ControlMode::None, 0, &normal_disarm)) {
+		cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected, normal_disarm);
+		return;
+	}
+
+	if (waiting) { _manual_entry_status = slaaps_status_s::MANUAL_ENTRY_ACTIVATING; return; }
+
+	if (!slaaps::ManualBankPreparation::permitted(_manual_permission, current_mode)) {
+		cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected);
+		return;
+	}
+
+	_manual_status = current_mode == slaaps::ControlMode::Acceleration ?
+			 _manual.cycleAccelerationObserved(_manual_permission, _acceleration_input, _prepared_request.binding) :
+			 _manual.cycleObserved(_manual_permission, _input_observation, _prepared_request.binding,
+					       _manual_first_command_deadline, _condition_valid ? &_condition_sample : nullptr);
+	_acceleration_input = {};
+
+	if (!_manual.active()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
+
+	slaaps::ManualWorkerOutput handled{};
+	uint64_t handled_us{};
+
+	if (_manual.handledOutput(handled, handled_us) && handled_us && handled.mode == current_mode
+	    && handled.transition_us == _manual_permission.transition_us) {
+		_manual_first_command_deadline = 0;
+		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_RUNNING;
+	}
+}
+
 void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &vehicle,
 				    const actuator_armed_s &armed, bool armed_fresh)
 {
@@ -1121,14 +1572,15 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 				       && now - vehicle.timestamp <= static_cast<uint64_t>(configuration.actuator_permission_age_us)
 				       && armed.timestamp && armed.timestamp <= now
 				       && now - armed.timestamp <= static_cast<uint64_t>(configuration.actuator_permission_age_us);
-	const bool normal_disarm = armed_fresh && current_authority && !both_armed
-				   && (vehicle.arming_state == vehicle_status_s::ARMING_STATE_DISARMED || !armed.armed)
-				   && !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode;
+	const bool normal_disarm = armed_fresh && current_authority && _configuration.eligible() && _routing_valid
+				   && ordinaryFlightDisarm(now, static_cast<uint64_t>(configuration.actuator_permission_age_us), vehicle, armed);
 
 	if (normal_disarm && (_manual.active() || _manual_configuration_active)) {
 		cancelPreparation(now, slaaps::PreparationStatus::Rejected, true);
 		return;
 	}
+
+	if (_manual.active()) { updateFlightControl(now, vehicle, armed, armed_fresh); return; }
 
 	bool activation_lifetimes = true;
 
@@ -1192,33 +1644,24 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 
 	now = hrt_absolute_time();
 
-	if (_manual.active()) {
-		if ((_manual_first_command_deadline && now >= _manual_first_command_deadline)
-		    || !_configuration.eligible()
-		    || _preparation.pollActivationObservedLive(now, configuration, _routing_snapshot, _inventory_fault) != slaaps::ActivationStatus::Consumed) {
-			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
-			return;
-		}
-
-		_manual_status = _manual.cycleObserved(_manual_permission, _input_observation,
-						       _prepared_request.binding, _manual_first_command_deadline,
-						       _condition_valid ? &_condition_sample : nullptr);
-
-		if (!_manual.active()) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); return; }
-
-		if (_manual.handledSequence()) {
-			_manual_first_command_deadline = 0;
-			_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_RUNNING;
-		}
-
-		return;
-	}
-
 	if (!observePrearmInput(now, true)) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); return; }
 
 	if (!_manual_activation_owned) {
 		if (!_preparation_pending || _preparation_status != slaaps::PreparationStatus::Ready
 		    || now >= _preparation_deadline || now > UINT64_MAX - static_cast<uint64_t>(configuration.activation_ack_timeout_us)) {
+			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+			return;
+		}
+
+		const uint64_t raw_age = static_cast<uint64_t>(math::min(configuration.manual_age_ms, configuration.output_lease_ms)) * 1000;
+		const uint64_t raw_timestamp = _input_observation.manual.timestamp_sample_us;
+		uint64_t reserve{};
+		now = hrt_absolute_time();
+
+		if (!slaaps::activationReserveUs(configuration, reserve) || raw_timestamp > UINT64_MAX - raw_age
+		    || _manual_permission.deadline_us <= now || _manual_permission.deadline_us - now <= reserve
+		    || _preparation_deadline <= now || _preparation_deadline - now <= reserve
+		    || raw_timestamp + raw_age <= now || raw_timestamp + raw_age - now <= reserve) {
 			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
 			return;
 		}
@@ -1260,6 +1703,7 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 		return;
 	}
 
+	_manual_first_command_deadline = math::min(_manual_first_command_deadline, _manual_entry_deadline);
 	_manual_configuration_active = true;
 	_manual_status = _manual.begin(now, configuration, _manual_permission, _input_observation, _manual_input_policy,
 				       _prepared_request.binding, _prepared_request.command_revision, _prepared_request.acknowledgment_revisions,
@@ -1347,7 +1791,9 @@ void Slaaps::updateBench(hrt_abstime now)
 	if (!_bench_entry_selected) {
 		_bench_entry_selected = true;
 
-		if (_preparation_session || _manual.active() || _prearm_input.active()) { cancelPreparation(now, slaaps::PreparationStatus::Inactive); }
+		if (_preparation_session || _preparation_requested || _manual_entry_deadline || _manual.active() || _prearm_input.active()) {
+			cancelPreparation(now, slaaps::PreparationStatus::Inactive);
+		}
 
 		_manual_entry_selected = false;
 		_manual_entry_allowed = disarmed;
@@ -1579,21 +2025,40 @@ void Slaaps::updateBench(hrt_abstime now)
 			cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return;
 		}
 
+		uint64_t edf_raw_deadline{};
+
 		if (edf) {
 			_bench_arming_authorized = true;
 			_bench_can_arm = disarmed && _bench_can_run && !permission_waiting;
-			const uint64_t raw_age = static_cast<uint64_t>(configuration.manual_age_ms) * 1000 + 1;
+			// Match ManualEdfInput's original, exclusive raw-command lease.
+			const uint64_t raw_age = static_cast<uint64_t>(math::min(configuration.manual_age_ms, configuration.output_lease_ms)) * 1000;
+			uint64_t reserve{};
 
-			if (_bench_sample.timestamp_sample_us > UINT64_MAX - raw_age) { cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return; }
+			if (_bench_sample.timestamp_sample_us > UINT64_MAX - raw_age
+			    || !slaaps::activationReserveUs(configuration, reserve)) { cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return; }
 
-			_bench_can_arm_deadline = math::min(_preparation_deadline,
-							    math::min(_manual_permission.deadline_us, _bench_sample.timestamp_sample_us + raw_age));
+			edf_raw_deadline = _bench_sample.timestamp_sample_us + raw_age;
+			const uint64_t original_deadline = math::min(_preparation_deadline,
+							   math::min(_manual_permission.deadline_us, edf_raw_deadline));
+			// Readiness must leave the declared activation window and first-command
+			// reserve on the original inputs, without requiring armed outputs.
+			_bench_can_arm_deadline = original_deadline > reserve ? original_deadline - reserve : 0;
 			_bench_can_arm &= now < _bench_can_arm_deadline;
 			_bench_entry_status = slaaps_status_s::BENCH_ENTRY_WAIT_ARM;
 
 			if (!both_armed || permission_waiting) { return; }
 
 			_bench_can_arm = false;
+		}
+
+		uint64_t reserve{};
+		now = hrt_absolute_time();
+
+		if (!slaaps::activationReserveUs(configuration, reserve)
+		    || _manual_permission.deadline_us <= now || _manual_permission.deadline_us - now <= reserve
+		    || _preparation_deadline <= now || _preparation_deadline - now <= reserve
+		    || (edf && (edf_raw_deadline <= now || edf_raw_deadline - now <= reserve))) {
+			cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return;
 		}
 
 		_manual_activation_owned = true;
@@ -1703,12 +2168,19 @@ void Slaaps::updatePreparation(hrt_abstime now)
 
 		_manual_entry_allowed = false;
 		_manual_entry_started = now;
+		_manual_entry_deadline = 0;
+		_manual_preparation_response_deadline = 0;
 		_preparation_requested = true;
 		_preparation_status = slaaps::PreparationStatus::Waiting;
 		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_WAIT_CONFIGURATION;
 	}
 
 	if (!_preparation_requested && !_preparation_pending) { return; }
+
+	if (_manual_entry_deadline && now >= _manual_entry_deadline) {
+		cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+		return;
+	}
 
 	const bool bound = _prearm_input.active();
 
@@ -1725,7 +2197,7 @@ void Slaaps::updatePreparation(hrt_abstime now)
 
 	if (!_configuration.hasCandidate() || _selected_use != 1
 	    || !slaaps::manualActivationTimingConfigured(_configuration.configuration())) {
-		if (bound || _preparation_pending) {
+		if (bound || _preparation_pending || _manual_entry_deadline) {
 			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
 
 		} else {
@@ -1733,6 +2205,19 @@ void Slaaps::updatePreparation(hrt_abstime now)
 		}
 
 		return;
+	}
+
+	if (!_manual_entry_deadline) {
+		const uint64_t wait = static_cast<uint64_t>(_configuration.configuration().manual_ready_wait_s) * 1000000;
+
+		if (!_manual_entry_started || now < _manual_entry_started || _manual_entry_started > UINT64_MAX - wait
+		    || now >= _manual_entry_started + wait) {
+			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+			return;
+		}
+
+		// Waiting for initial configuration/input/routing never restarts this clock.
+		_manual_entry_deadline = _manual_entry_started + wait;
 	}
 
 	_manual_input_policy = {static_cast<uint64_t>(_configuration.configuration().selected_status_age_us),
@@ -1774,11 +2259,15 @@ void Slaaps::updatePreparation(hrt_abstime now)
 	}
 
 	if (_preparation_pending) {
-		if (!publishManualPermission(now)) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); return; }
+		const bool already_ready = _preparation_status == slaaps::PreparationStatus::Ready;
+
+		if ((!already_ready && (!_manual_preparation_response_deadline || now >= _manual_preparation_response_deadline))
+		    || !publishManualPermission(now)) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); return; }
 
 		_preparation_status = _preparation.pollObservedLive(now, _configuration.configuration(), _routing_snapshot, _inventory_fault);
 
-		if (_preparation_status == slaaps::PreparationStatus::Rejected) {
+		if (_preparation_status == slaaps::PreparationStatus::Rejected
+		    || (!already_ready && now >= _manual_preparation_response_deadline)) {
 			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
 
 		} else {
@@ -1802,15 +2291,17 @@ void Slaaps::updatePreparation(hrt_abstime now)
 	slaaps::ManualPreparationRequest request{};
 	request.timestamp_us = now;
 
-	// This existing immutable bound is a non-actuating handshake deadline,
-	// not persistent ready-to-arm authority or qualified flight timing.
-	if (now > UINT64_MAX - slaaps::ManualBankPreparation::kMaximumPreparationUs) {
+	// Keep the initial response limit separate from the immutable operator
+	// window. Neither is armed permission or qualified hardware timing.
+	if (now >= _manual_entry_deadline || now > UINT64_MAX - slaaps::ManualBankPreparation::kMaximumPreparationUs) {
 		cancelPreparation(now, slaaps::PreparationStatus::Rejected);
 		return;
 	}
 
-	request.deadline_us = now + slaaps::ManualBankPreparation::kMaximumPreparationUs;
-	request.session = now;
+	request.deadline_us = _manual_entry_deadline;
+	request.session = _manual_entry_started;
+	_manual_preparation_response_deadline = math::min(request.deadline_us,
+						request.timestamp_us + slaaps::ManualBankPreparation::kMaximumPreparationUs);
 	request.source = _modes[kManualMode].request;
 	request.configuration = _configuration.identity();
 	request.command_revision = _manual.commandRevision();
@@ -1857,6 +2348,16 @@ void Slaaps::updatePreparation(hrt_abstime now)
 
 void Slaaps::updateCompanion(hrt_abstime now)
 {
+	// A deliberate disarmed companion Grant may preauthorize protocol entry.
+	// This does not depend on an active worker or confer flight/output admission.
+	const bool entry_transitions = _configuration.hasCandidate() && _selected_use == 1 && !_registration_fault
+				       && _modes[kManualMode].configured && _modes[kAccelerationMode].configured
+				       && !_bench_entry_selected && !_bench_disarm_pending
+				       && !slaaps::ManualBankPreparation::commissioningMode(_prepared_request.mode);
+	_companion_protocol.update(_configuration.hasCandidate() ? &_configuration.configuration() : nullptr,
+				   _configuration.identity(), _last_apply, _modes[kManualMode].id,
+				   _modes[kAccelerationMode].id, entry_transitions, now);
+
 	// Receipt evidence only. No payload becomes an eligible command or survives
 	// this call; trusted session/clock admission and acceleration control remain
 	// separate from the configured receiver's authentication observation.
@@ -2017,6 +2518,124 @@ void Slaaps::updateCompanion(hrt_abstime now)
 	}
 }
 
+void Slaaps::publishAccelerationStatus(hrt_abstime now)
+{
+	const auto &evidence = _manual.accelerationDiagnostic();
+	auto &status = _acceleration_status.get();
+	status = {};
+	status.timestamp = now;
+	status.configuration_identity = evidence.configuration;
+	status.output_session = evidence.session;
+	status.request_source = evidence.request_source;
+	status.request_session = evidence.request_session;
+	status.request_sequence = evidence.request_sequence;
+	status.request_observed_us = evidence.request_observed_us;
+	status.fault_observed_us = evidence.fault_us;
+	status.calculated_sequence = evidence.calculated_sequence;
+	status.calculated_deadline = evidence.calculated_deadline_us;
+	status.handled_sequence = evidence.handled_sequence;
+	status.handled_us = evidence.handled_us;
+	status.handled_deadline = evidence.handled_deadline_us;
+	status.active = _manual.active() && _manual.mode() == slaaps::ControlMode::Acceleration;
+	status.state = static_cast<uint8_t>(evidence.state);
+	status.control_fault = static_cast<uint8_t>(evidence.fault);
+	status.allocation_stage = static_cast<uint8_t>(evidence.allocation_stage);
+	status.allocation_result = static_cast<uint8_t>(evidence.allocation_result);
+	status.worker_status = static_cast<uint8_t>(evidence.worker_status);
+	status.calculated_moment_mask = evidence.calculated_moment_mask;
+	status.handled_moment_mask = evidence.handled_moment_mask;
+	status.calculated_canard_mask = evidence.calculated_canard_mask;
+	status.handled_canard_mask = evidence.handled_canard_mask;
+	_acceleration_status.update();
+
+	const bool rejected = evidence.state == slaaps::AccelerationDiagnosticState::Rejected;
+
+	if (evidence.state == slaaps::AccelerationDiagnosticState::Inactive) {
+		_have_acceleration_report = false;
+		return; // Historical masks are not active saturation after a normal exit.
+	}
+
+	if (!rejected && (!status.active || !evidence.handled_sequence || evidence.handled_us > now
+			  || !evidence.handled_us || now >= evidence.handled_deadline_us)) { return; }
+
+	const bool same_report = _have_acceleration_report && rejected == _reported_acceleration_rejection
+				 && evidence.session == _reported_acceleration_session && evidence.configuration == _reported_acceleration_configuration
+				 && evidence.fault == _reported_acceleration_fault && evidence.allocation_stage == _reported_acceleration_stage
+				 && evidence.allocation_result == _reported_acceleration_solver && evidence.worker_status == _reported_acceleration_worker
+				 && (rejected ? evidence.fault_us == _reported_acceleration_fault_us :
+				     evidence.handled_moment_mask == _reported_acceleration_moment && evidence.handled_canard_mask == _reported_acceleration_canard);
+
+	if ((!rejected && !_have_acceleration_report && !evidence.handled_moment_mask && !evidence.handled_canard_mask)
+	    || _bench_disarm_pending || same_report || (_last_acceleration_diagnostic && (now < _last_acceleration_diagnostic
+			    || now - _last_acceleration_diagnostic < kAccelerationDiagnosticIntervalUs))) { return; }
+
+	if (rejected) {
+		const char *message = "SLAAPS accel: check command/state evidence";
+
+		switch (evidence.fault) {
+		case slaaps::AccelerationControlFault::AllocationRejected:
+			switch (evidence.allocation_result) {
+			case slaaps::WrenchAllocationResult::InvalidConfiguration: message = "SLAAPS accel: check wrench profile"; break;
+
+			case slaaps::WrenchAllocationResult::InvalidInput: message = "SLAAPS accel: check allocation inputs"; break;
+
+			case slaaps::WrenchAllocationResult::ArithmeticFailure: message = "SLAAPS accel: allocation arithmetic fault"; break;
+
+			default:
+				message = evidence.allocation_stage == slaaps::AccelerationAllocationStage::CurrentOwnerThrust ?
+					  "SLAAPS accel: current-model allocation rejected" : "SLAAPS accel: target allocation rejected";
+				break;
+			}
+
+			break;
+
+		case slaaps::AccelerationControlFault::InvalidConfiguration: message = "SLAAPS accel: check control profile"; break;
+
+		case slaaps::AccelerationControlFault::Expired: message = "SLAAPS accel: command/state evidence expired"; break;
+
+		case slaaps::AccelerationControlFault::StateChanged: message = "SLAAPS accel: source changed; re-enter"; break;
+
+		case slaaps::AccelerationControlFault::InvalidSchedule: message = "SLAAPS accel: check schedule envelope"; break;
+
+		case slaaps::AccelerationControlFault::GainTransitionRejected: message = "SLAAPS accel: scheduled gain step rejected"; break;
+
+		case slaaps::AccelerationControlFault::ArithmeticFailure: message = "SLAAPS accel: controller arithmetic fault"; break;
+
+		case slaaps::AccelerationControlFault::TimeRegression: message = "SLAAPS accel: observation clock rejected"; break;
+
+		case slaaps::AccelerationControlFault::None:
+			message = evidence.worker_status == slaaps::ManualWorkerStatus::OutputRejected ?
+				  "SLAAPS accel: output ACK/ownership rejected" : "SLAAPS accel: shared worker rejected output";
+			break;
+
+		default: break;
+		}
+
+		mavlink_log_critical(&_diagnostic_log_pub, "%s", message);
+
+	} else if (evidence.handled_moment_mask || evidence.handled_canard_mask) {
+		mavlink_log_info(&_diagnostic_log_pub, "SLAAPS accel: model limits %u/%u; check demand",
+				 evidence.handled_moment_mask, evidence.handled_canard_mask);
+
+	} else {
+		mavlink_log_info(&_diagnostic_log_pub, "SLAAPS accel: modeled clipping cleared");
+	}
+
+	_have_acceleration_report = true;
+	_reported_acceleration_rejection = rejected;
+	_reported_acceleration_session = evidence.session;
+	_reported_acceleration_configuration = evidence.configuration;
+	_reported_acceleration_fault = evidence.fault;
+	_reported_acceleration_stage = evidence.allocation_stage;
+	_reported_acceleration_solver = evidence.allocation_result;
+	_reported_acceleration_worker = evidence.worker_status;
+	_reported_acceleration_fault_us = evidence.fault_us;
+	_reported_acceleration_moment = evidence.handled_moment_mask;
+	_reported_acceleration_canard = evidence.handled_canard_mask;
+	// A throttled change remains eligible because only emitted keys are stored.
+	_last_acceleration_diagnostic = hrt_absolute_time();
+}
+
 void Slaaps::publishStatus(hrt_abstime now)
 {
 	slaaps_status_s status{};
@@ -2087,8 +2706,9 @@ void Slaaps::publishStatus(hrt_abstime now)
 	}
 
 	status.unavailable_reason = !status.direct_actuator_modes_configured ? slaaps_status_s::UNAVAILABLE_REGISTRATION :
-				    status.configuration_valid ? slaaps_status_s::UNAVAILABLE_OUTPUT_INTEGRATION :
-				    slaaps_status_s::UNAVAILABLE_CONFIGURATION;
+				    !status.configuration_valid ? slaaps_status_s::UNAVAILABLE_CONFIGURATION :
+				    _selected_use == 1 ? slaaps_status_s::UNAVAILABLE_FLIGHT_ADMISSION :
+				    slaaps_status_s::UNAVAILABLE_OUTPUT_INTEGRATION;
 
 	if (_bench_can_run && status.configuration_valid && (_selected_use == 0 || (_selected_use == 2 && status.power_ready))
 	    && _modes[kBenchMode].id >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
@@ -2102,6 +2722,7 @@ void Slaaps::publishStatus(hrt_abstime now)
 	// Only an exact disarmed prepared EDF session permits operator arming.
 	// Neither commissioning mode confers Manual/acceleration flight admission.
 	_status.publish(status);
+	publishAccelerationStatus(now);
 }
 
 void Slaaps::updateSchedule()
@@ -2111,6 +2732,8 @@ void Slaaps::updateSchedule()
 	const bool bench = slaaps::ManualBankPreparation::commissioningMode(_prepared_request.mode) && (active || _preparation_pending);
 	uint32_t interval = bench ? research_actuator_command::kBenchIntervalUs : slaaps::manualScheduleInterval(_configuration.configuration(),
 			    active);
+
+	if (_configuration.hasCandidate()) { interval = math::min(interval, slaaps::companionScheduleInterval(_configuration.configuration())); }
 
 	if (!interval) {
 		cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected);
@@ -2129,6 +2752,7 @@ void Slaaps::Run()
 	const hrt_abstime now = hrt_absolute_time();
 
 	if (should_exit()) {
+		_companion_protocol.stop();
 		_companion_deadline = 0;
 		_companion_status = slaaps_status_s::COMPANION_DISABLED;
 
@@ -2225,8 +2849,14 @@ void Slaaps::Run()
 		if (_configuration.hasCandidate() && _selected_use == 1) {
 			const auto &configuration = _configuration.configuration();
 			const bool timing = slaaps::manualActivationTimingConfigured(configuration);
-			_input_observation = _inputs.capture(timing ? static_cast<uint64_t>(configuration.selected_status_age_us) : kMaximumStatusAgeUs,
-							     timing ? static_cast<uint64_t>(configuration.actuator_permission_age_us) : kMaximumStatusAgeUs);
+			vehicle_status_s mode{};
+			const bool have_mode = _vehicle_status.copy(&mode);
+			const bool state_only = _manual.active() && have_mode && _modes[kAccelerationMode].configured
+						&& mode.nav_state == _modes[kAccelerationMode].id;
+			const uint64_t status_age = timing ? static_cast<uint64_t>(configuration.selected_status_age_us) : kMaximumStatusAgeUs;
+			const uint64_t permission_age = timing ? static_cast<uint64_t>(configuration.actuator_permission_age_us) : kMaximumStatusAgeUs;
+			_input_observation = state_only ? _acceleration_states.captureState(status_age, permission_age) : _inputs.capture(status_age,
+					     permission_age);
 			_input_metadata_valid = _input_observation.state.valid && _input_observation.permission_fresh;
 			_input_epoch = _input_observation.state.source_epoch;
 
@@ -2237,10 +2867,12 @@ void Slaaps::Run()
 
 		if (!_bench_entry_selected && !_bench_disarm_pending) { updatePreparation(hrt_absolute_time()); }
 
-		updateSchedule();
 		publishStatus(hrt_absolute_time());
 	}
 
+	// An inactive profile can change on a tick where maintenance is not due.
+	// Apply its observation cadence before waiting on the previous interval.
+	updateSchedule();
 	answerChecks(hrt_absolute_time());
 }
 
@@ -2252,9 +2884,12 @@ int Slaaps::task_spawn(int argc, char *argv[])
 
 	if (!instance) { return PX4_ERROR; }
 
-	slaaps::ParameterSnapshot initial{};
+	// Scheduling has not started; reuse the object's snapshot storage instead
+	// of placing a second full profile on the 2048-byte builtin command stack.
+	auto &initial = instance->_stop_profile;
 
-	if (!instance->_parameters.initialize() || !instance->_parameters.capture(initial, instance->_snapshot_duration)) {
+	if (!instance->_parameters.initialize()
+	    || !instance->_parameters.capture(initial, instance->_snapshot_duration, instance->_parameter_scratch)) {
 		delete instance;
 		PX4_ERR("parameter schema unavailable");
 		return PX4_ERROR;
@@ -2272,6 +2907,15 @@ int Slaaps::task_spawn(int argc, char *argv[])
 	if (!instance->_permission_revision) { delete instance; return PX4_ERROR; }
 
 	instance->_last_apply = initial.apply_counter;
+
+	if (!slaaps::generateCompanionIdentity(instance->_companion_identity_seed)) {
+		PX4_WARN("companion identity unavailable; manual and bench remain independent");
+	}
+
+	if (!instance->_companion_protocol.initialize(instance->_companion_identity_seed)) {
+		PX4_WARN("companion action unavailable; manual and bench remain independent");
+	}
+
 	const uint64_t identity = hrt_absolute_time() << 3;
 
 	for (unsigned i = 0; i < kModeCount; ++i) { instance->_modes[i].request = identity | (i + 1); }
@@ -2284,7 +2928,10 @@ int Slaaps::task_spawn(int argc, char *argv[])
 
 int Slaaps::print_status()
 {
-	uORB::Subscription status_sub{ORB_ID(slaaps_status)};
+#if defined(CONFIG_SLAAPS_ROUTING_TEST)
+	PX4_INFO("native first bench cancellation line=%u", _native_cancel_line.load());
+#endif
+	uORB::Subscription status_sub {ORB_ID(slaaps_status)};
 	slaaps_status_s status{};
 
 	if (!status_sub.copy(&status)) { return PX4_ERROR; }
@@ -2296,6 +2943,23 @@ int Slaaps::print_status()
 		 status.configuration_valid, status.configuration_use, static_cast<long>(status.apply_counter),
 		 status.configuration_fault, static_cast<unsigned long>(status.snapshot_duration_us));
 
+	// CLI runs outside the supervisor queue. Compare a coherent parameter copy
+	// with the published accepted identity; never read mutable owner state here.
+	// Keep both destination and scratch off the command stack, and independent
+	// of the live owner's scratch. PX4 NuttX new is checked with -fcheck-new.
+	auto *profile = new slaaps::ParameterSnapshot[2] {};
+	uint32_t capture_duration{};
+	const bool accepted = profile && _parameters.capture(profile[0], capture_duration, profile[1]) && status.configuration_valid
+			      && profile->apply_counter == status.apply_counter && profile->use == status.configuration_use
+			      && slaaps::fingerprint(profile->configuration) == status.configuration_identity
+			      && slaaps::Px4ConfigurationSource::remembered(*profile);
+	PX4_INFO("profile accepted=%u schema=%ld record=%ld revision=%ld declared_state=%ld",
+		 static_cast<unsigned>(accepted), static_cast<long>(accepted ? profile->configuration.data_schema_version : 0),
+		 static_cast<long>(accepted ? profile->configuration.data_record_id : 0),
+		 static_cast<long>(accepted ? profile->configuration.data_revision : 0),
+		 static_cast<long>(accepted ? profile->configuration.data_assessment : 0));
+	delete[] profile;
+
 	if (status.cfg_param[0]) { PX4_INFO("configuration rejected parameter=%s", status.cfg_param); }
 
 	PX4_INFO("flight unavailable=%u", status.unavailable_reason);
@@ -2303,12 +2967,37 @@ int Slaaps::print_status()
 		 status.companion_transport_status, static_cast<unsigned long>(status.companion_receiver_revision),
 		 static_cast<unsigned long long>(status.companion_event_sequence),
 		 static_cast<unsigned long long>(status.companion_frame_deadline));
+	_companion_protocol.printStatus();
 	PX4_INFO("manual endpoint=%lu active=%d", static_cast<unsigned long>(status.manual_command_revision),
 		 status.manual_worker_active);
 	PX4_INFO("schedule=%lu us worker_status=%u", static_cast<unsigned long>(status.schedule_interval_us),
 		 status.manual_worker_status);
 	PX4_INFO("control schedule enabled=%d inputs=%d status=%u (not envelope qualification)",
 		 status.schedule_enabled, status.schedule_inputs_valid, status.schedule_status);
+	// CLI owns its own snapshot; do not race the queue-owned diagnostic scratch.
+	// Keep the additional message off the already constrained command stack.
+	uORB::Subscription acceleration_sub{ORB_ID::slaaps_acceleration_status};
+	auto *acceleration = new slaaps_acceleration_status_s{};
+
+	if (acceleration && acceleration_sub.copy(acceleration)) {
+		PX4_INFO("accel active=%d state=%u fault=%u stage=%u solver=%u worker=%u",
+			 acceleration->active, acceleration->state, acceleration->control_fault, acceleration->allocation_stage,
+			 acceleration->allocation_result, acceleration->worker_status);
+		PX4_INFO("accel output_session=%llu config=%llu fault_time=%llu",
+			 static_cast<unsigned long long>(acceleration->output_session), static_cast<unsigned long long>(acceleration->configuration_identity),
+			 static_cast<unsigned long long>(acceleration->fault_observed_us));
+		PX4_INFO("accel request=%llu/%llu/%llu captured=%llu",
+			 static_cast<unsigned long long>(acceleration->request_source), static_cast<unsigned long long>(acceleration->request_session),
+			 static_cast<unsigned long long>(acceleration->request_sequence), static_cast<unsigned long long>(acceleration->request_observed_us));
+		PX4_INFO("accel calculated=%llu deadline=%llu model_masks=%u/%u (not handled)",
+			 static_cast<unsigned long long>(acceleration->calculated_sequence), static_cast<unsigned long long>(acceleration->calculated_deadline),
+			 acceleration->calculated_moment_mask, acceleration->calculated_canard_mask);
+		PX4_INFO("accel handled=%llu at=%llu deadline=%llu model_masks=%u/%u (not measured)",
+			 static_cast<unsigned long long>(acceleration->handled_sequence), static_cast<unsigned long long>(acceleration->handled_us),
+			 static_cast<unsigned long long>(acceleration->handled_deadline), acceleration->handled_moment_mask, acceleration->handled_canard_mask);
+	}
+
+	delete acceleration;
 	PX4_INFO("power required=%d ready=%d status=%u bound=%d revision=%lu voltage=%.3f deadline=%llu",
 		 status.power_required, status.power_ready, status.power_status, status.power_source_bound,
 		 static_cast<unsigned long>(status.power_publisher_revision), static_cast<double>(status.power_voltage_v),
@@ -2322,6 +3011,16 @@ int Slaaps::print_status()
 		 status.manual_preparation_status, static_cast<unsigned long long>(status.manual_preparation_session),
 		 status.manual_preparation_banks, static_cast<unsigned long long>(status.manual_preparation_deadline));
 	PX4_INFO("manual entry=%u (software lifecycle; no flight admission)", status.manual_entry_status);
+	{
+		uORB::Subscription permission{ORB_ID(slaaps_manual_permission)};
+		slaaps_manual_permission_s snapshot{};
+
+		if (permission.copy(&snapshot)) {
+			PX4_INFO("flight output mode=%u transition=%llu (permission snapshot only)", snapshot.mode,
+				 static_cast<unsigned long long>(snapshot.transition));
+		}
+	}
+
 	PX4_INFO("bench entry=%u active=%d target=%u deadline=%llu (bounded ground commissioning)",
 		 status.bench_entry_status, status.bench_worker_active, status.bench_target,
 		 static_cast<unsigned long long>(status.bench_session_deadline));

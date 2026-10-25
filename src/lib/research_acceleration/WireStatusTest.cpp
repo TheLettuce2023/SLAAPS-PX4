@@ -55,6 +55,9 @@ void mapAllS1()
 	}
 
 	uint16_t sentinel = 99;
+	check(mapDecisionCodeV1(DecisionCode::InvalidCommandAttitude, sentinel) && sentinel == 38,
+	      "explicit_v2_attitude_rejection_appends_wire_decision");
+	sentinel = 99;
 	check(!mapDecisionCodeV1(static_cast<DecisionCode>(99), sentinel) && sentinel == 99,
 	      "unknown_s1_does_not_write");
 }

@@ -1,4 +1,5 @@
 #include "WireAdapter.hpp"
+#include "WireStatus.hpp"
 
 #include <array>
 #include <cmath>
@@ -202,6 +203,82 @@ void goldenAndAccess()
 	      && expired.reports[0].s1_decision.code == DecisionCode::RequestExpired
 	      && bytes(output) == bytes(sentinel),
 	      "expiry_keeps_ack_and_output");
+}
+
+void fullCommandAdmission()
+{
+	WireAdapter adapter(config(), {kController});
+	establishAndArm(adapter);
+	auto full = request(3, 1);
+	full.wire.protocol_version = kWireProtocolVersionV2;
+	full.flags = kWireFullCommandFlagsV2;
+	full.wire.desired_attitude_ned_from_body[0] = -1.F;
+	check(adapter.processRequest(sample(kArmedGeneration, 1110, ArmState::Armed), full, ingress()).code
+	      == IngressCode::AcknowledgementRequired, "v2_still_requires_exact_barrier_ack");
+	acceptAck(adapter, 0);
+
+	for (unsigned fault = 0; fault < 8; ++fault) {
+		auto bad = full;
+		auto verdict = ingress();
+
+		if (fault == 0) { bad.flags = 0; }
+
+		if (fault == 1) { bad.flags = 2; }
+
+		if (fault == 2) { bad.reserved[3] = 1; }
+
+		if (fault == 3) { bad.wire.desired_attitude_ned_from_body[0] = 0.F; }
+
+		if (fault == 4) { bad.wire.desired_attitude_ned_from_body[0] = 1.02F; }
+
+		if (fault == 5) { bad.wire.source_id = kSource + 1; }
+
+		if (fault == 6) { verdict.parser_authenticated = false; }
+
+		if (fault == 7) { bad.wire.producer_monotonic_us = 105; }
+
+		const auto rejected = adapter.processRequest(sample(kArmedGeneration, 1115, ArmState::Armed), bad, verdict);
+		check(rejected.code != IngressCode::Completed, "v2_keeps_shape_source_authentication_and_ack_ordering");
+
+		if (fault == 3 || fault == 4) {
+			WireStatusV1 status{};
+			check(rejected.code == IngressCode::WireAttitudeInvalid
+			      && buildStatusV1(rejected.reports[rejected.report_count - 1], {1, 1, StatusDelivery::Directed}, status)
+			      == StatusBuildCode::Ok && status.decision_code == 38 && !(status.status_flags & 1),
+			      "v2_bad_quaternion_reports_attitude_not_transport_authentication");
+		}
+	}
+
+	check(adapter.processRequest(sample(kArmedGeneration, 1115, ArmState::Armed), full, ingress()).code
+	      == IngressCode::Completed, "v2_accepts_atomic_acceleration_and_attitude");
+	CanonicalRequest output{};
+	check(adapter.getEligibleFullRequest(sample(kArmedGeneration, 1116, ArmState::Armed), output).code
+	      == AdapterCode::EligibleRequest && output.protocol_version == kWireProtocolVersionV2
+	      && output.command_kind == CommandKind::AccelerationAndAttitude
+	      && output.desired_attitude_ned_from_body(0) == 1.F && output.sequence == 1,
+	      "full_accessor_copies_only_ack_validated_canonical_v2");
+	const auto before = bytes(output);
+	check(adapter.processRequest(sample(kArmedGeneration, 1116, ArmState::Armed), full, ingress()).operation_s1_decision.code
+	      == DecisionCode::DuplicateSequence, "v2_uses_shared_replay_floor");
+	check(adapter.getEligibleFullRequest(sample(kArmedGeneration, 1128, ArmState::Armed), output).code
+	      != AdapterCode::EligibleRequest && bytes(output) == before, "full_accessor_original_expiry_preserves_output");
+
+	WireAdapter legacy(config(), {kController});
+	establishAndArm(legacy);
+	acceptAck(legacy);
+	check(submit(legacy).code == IngressCode::Completed, "v1_commissioning_still_accepts");
+	const auto legacy_full_access = legacy.getEligibleFullRequest(sample(kArmedGeneration, 1116, ArmState::Armed), output);
+	check(legacy_full_access.code == AdapterCode::NoEligibleRequest && bytes(output) == before
+	      && !legacy_full_access.reports[0].s1_decision.eligible_for_control
+	      && legacy_full_access.reports[0].s1_decision.code == DecisionCode::NoEligibleRequest,
+	      "v1_never_full_control_eligible_and_never_forges_attitude");
+	WireStatusV1 status{};
+	check(buildStatusV1(legacy_full_access.reports[0], {1, 1, StatusDelivery::Directed}, status) == StatusBuildCode::Ok
+	      && status.decision_code == 36 && !(status.status_flags & 1), "v1_full_accessor_status_remains_ineligible");
+	check(legacy.getEligibleRequest(sample(kArmedGeneration, 1116, ArmState::Armed), output).code
+	      == AdapterCode::EligibleRequest && output.command_kind == CommandKind::AccelerationOnly
+	      && output.desired_attitude_ned_from_body.norm() == 0.F,
+	      "legacy_accessor_retains_acceleration_only_commissioning");
 }
 
 void packetNegatives()
@@ -1001,6 +1078,7 @@ void finalIngressOracleEdges()
 int main()
 {
 	goldenAndAccess();
+	fullCommandAdmission();
 	packetNegatives();
 	requestCacheAndFailures();
 	closureAndCapacity();

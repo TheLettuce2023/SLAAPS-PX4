@@ -22,6 +22,7 @@ public:
 	virtual bool servoBench() const = 0;
 	virtual bool edfBench() const = 0;
 	virtual bool retainedCommissioningStop(uint64_t driver) const = 0;
+	virtual bool retainedDisarmStop(uint64_t driver) const = 0;
 };
 
 namespace
@@ -45,11 +46,22 @@ public:
 		const bool vehicle_fresh = readVehicle(now);
 		const bool actually_armed = armed.armed || _vehicle_sample.arming_state == vehicle_status_s::ARMING_STATE_ARMED;
 		const bool actuator_fresh = armed.timestamp && armed.timestamp <= now && now - armed.timestamp < kCommanderAgeUs;
-		const bool stopped = actuator_fresh && ((vehicle_fresh && !actually_armed && !servoBench())
-							|| armed.kill || armed.lockdown || armed.termination || armed.in_esc_calibration_mode
-							|| (servoBench() && (actually_armed || !armed.prearmed)));
+
+		// The first arming publication may precede the other one. A retained
+		// prearm denial is not a falling edge. Once this owner has observed both
+		// fresh armed publications, either fresh explicit disarm ends its output.
+		if ((_claimed || _listening) && vehicle_fresh && actuator_fresh && armed.armed
+		    && _vehicle_sample.arming_state == vehicle_status_s::ARMING_STATE_ARMED) { _armed_seen = true; }
+
+		const bool explicit_disarm = _armed_seen && !servoBench()
+					     && ((vehicle_fresh && _vehicle_sample.arming_state == vehicle_status_s::ARMING_STATE_DISARMED)
+						 || (actuator_fresh && !armed.armed));
+		const bool stopped = explicit_disarm || (actuator_fresh
+				     && (armed.kill || armed.lockdown || armed.termination || armed.in_esc_calibration_mode
+					 || (servoBench() && (actually_armed || !armed.prearmed))));
 
 		if (stopped && (_claimed || _stop_pending)) {
+			_ordinary_disarm_stop |= explicit_disarm;
 			cancel(now);
 			_stop_pending = true;
 			return SlaapsOutputStatus::Inhibited;
@@ -61,6 +73,13 @@ public:
 		// stale authority or the old enable command. It owns no new write ticket.
 		if (edfBench() && _stop_complete && (!vehicle_fresh || !actuator_fresh || actually_armed)) {
 			return SlaapsOutputStatus::Inhibited;
+		}
+
+		// This is an immutable off-only ticket caused by an observed disarm,
+		// never a policy inferred from later stale or unknown authority. Retry a
+		// rejected hardware write without adopting a new driver or calibration.
+		if (_stop_pending && _ordinary_disarm_stop) {
+			return retainedDisarmStop(driver) ? SlaapsOutputStatus::Inhibited : fail(now, true);
 		}
 
 		// Releasing kill while still armed cannot resume the cancelled session.
@@ -106,6 +125,14 @@ public:
 
 		if (!_bank.active()) { return SlaapsOutputStatus::Waiting; }
 
+		if (_waiting_for_transfer) {
+			_candidate = _bank.waitTransferLive(now, _permission, _routing.inventory, _request.binding);
+
+			if (_bank.fault() != slaaps::ManualBankFault::None) { return fail(now, true); }
+
+			return _candidate.command_valid && _bank.awaitingHandling() ? SlaapsOutputStatus::Command : SlaapsOutputStatus::Waiting;
+		}
+
 		_candidate = _bank.dispatchLive(now, _permission, _routing.inventory, _request.binding);
 
 		if (_bank.fault() != slaaps::ManualBankFault::None) { return fail(now, true); }
@@ -134,8 +161,8 @@ public:
 
 	void confirmInhibited(bool success) override
 	{
-		// Failed physical stop handling remains pending; only a later fresh
-		// explicit inhibition may retry. There is no command acknowledgment.
+		// Failed physical stop handling remains pending. A retained off-only
+		// ticket or a later fresh inhibition may retry; neither acknowledges a command.
 		_stop_pending = !success;
 
 		if (success) {
@@ -157,6 +184,11 @@ public:
 	bool retainedCommissioningStop(uint64_t driver) const override
 	{
 		return edfBench() && _claimed && _stop_pending && _stop_mask && driver && driver == _stop_driver
+		       && _stop_session == _request.session && _stop_mode == _request.mode;
+	}
+	bool retainedDisarmStop(uint64_t driver) const override
+	{
+		return _ordinary_disarm_stop && _claimed && _stop_pending && _stop_mask && driver && driver == _stop_driver
 		       && _stop_session == _request.session && _stop_mode == _request.mode;
 	}
 	uint32_t interval() const override
@@ -260,6 +292,11 @@ private:
 
 		// Retain the accepted physical stop frame across armed configuration
 		// corruption. A future deliberate prepared session may replace it.
+		if (_stop_session != _request.session || _stop_driver != driver) {
+			_armed_seen = false;
+			_ordinary_disarm_stop = false;
+		}
+
 		_stop_mask = 0;
 		_stop_driver = driver;
 		_stop_session = _request.session;
@@ -283,6 +320,7 @@ private:
 	{
 		_permission = {};
 		_waiting_for_grant = false;
+		_waiting_for_transfer = false;
 		const bool vehicle_read = readVehicle(now);
 		const bool configured = configuration(false, _request.mode) && slaaps::fingerprint(_configuration.configuration) == _request.configuration;
 		const bool supervisor_read = supervisor(now);
@@ -315,11 +353,21 @@ private:
 
 		if (edfBench()) { _permission.commissioning_admitted &= granted_armed && both_armed; }
 
+		const unsigned mode_index = _permission.mode == slaaps::ControlMode::Acceleration ? 1 : (commissioning() ? 2 : 0);
+		const unsigned other_index = mode_index == 0 ? 1 : 0;
+		const bool selected_mode = _vehicle_sample.nav_state == _supervisor_sample.mode_id[mode_index]
+					   && (!_permission.transition_us || _permission.transition_us == _vehicle_sample.nav_state_timestamp);
+		const bool transfer_wait = !awaiting_grant && !commissioning()
+					   && (!_bank.awaitingHandling() || _bank.canCompleteAtTransition(_vehicle_sample.nav_state_timestamp))
+					   && slaaps::ManualBankPreparation::flightMode(_permission.mode)
+					   && _supervisor_sample.mode_id[other_index] >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
+					   && _supervisor_sample.mode_id[other_index] <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8
+					   && _vehicle_sample.nav_state == _supervisor_sample.mode_id[other_index];
 		const bool local = ready && driver == _request.binding.driver[Bank]
 				   && vehicle_read && fresh(_vehicle_sample.timestamp, now) && fresh(armed.timestamp, now)
 				   && !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode
 				   && configured && supervisor_read && fresh(_supervisor_sample.timestamp, now)
-				   && _vehicle_sample.nav_state == _supervisor_sample.mode_id[commissioning() ? 2 : 0]
+				   && (selected_mode || transfer_wait)
 				   && routing_read && routingFresh(now)
 				   && _routing.driver[Bank] == driver;
 
@@ -341,8 +389,9 @@ private:
 		}
 
 		_permission.healthy &= permission_fresh && local;
+		_waiting_for_transfer = permission_fresh && local && transfer_wait;
 		_waiting_for_grant = awaiting_grant && permission_read == slaaps::BoundRead::Waiting && local && now < _request.deadline_us;
-		return permission_fresh && slaaps::ManualBankPreparation::permitted(_permission, _request.mode);
+		return permission_fresh && slaaps::ManualBankPreparation::permitted(_permission, _permission.mode);
 	}
 
 	bool routingFresh(uint64_t now) const
@@ -405,8 +454,9 @@ private:
 	uint64_t _session{};
 	uint64_t _stop_driver{}, _stop_session{};
 	slaaps::ControlMode _stop_mode{slaaps::ControlMode::None};
-	bool _initialized{}, _listening{}, _have_configuration{}, _configuration_valid{}, _claimed{}, _fault_latched{}, _waiting_for_grant{};
-	bool _stop_pending{}, _stop_complete{};
+	bool _initialized{}, _listening{}, _have_configuration{}, _configuration_valid{}, _claimed{}, _fault_latched{}, _waiting_for_grant{},
+	     _waiting_for_transfer{};
+	bool _stop_pending{}, _stop_complete{}, _armed_seen{}, _ordinary_disarm_stop{};
 	uint16_t _stop_mask{};
 	float _stop_disarmed[slaaps::kMaximumChannelsPerBank] {}, _stop_failsafe[slaaps::kMaximumChannelsPerBank] {};
 };
@@ -497,10 +547,10 @@ bool MixingOutput::updateSlaapsPreparation()
 
 	const bool command = _slaaps_output_status == SlaapsOutputStatus::Command;
 	const bool bench = _slaaps_preparation->servoBench();
-	// Only the accepted EDF commissioning owner may service its immutable off
-	// ticket without live authority. It cannot acknowledge or authorize a command,
-	// adopt another driver/routing or relax any airborne Manual loss behavior.
-	const bool retained_stop = !command && _slaaps_preparation->retainedCommissioningStop(_slaaps_driver_instance);
+	// A retained explicit-disarm or EDF commissioning off ticket cannot grant
+	// a command, adopt another physical owner or infer an airborne loss policy.
+	const bool retained_stop = !command && (_slaaps_preparation->retainedCommissioningStop(_slaaps_driver_instance)
+						|| _slaaps_preparation->retainedDisarmStop(_slaaps_driver_instance));
 	const bool inhibit = current.kill || current.lockdown || current.termination || current.in_esc_calibration_mode
 			     || (bench ? current.armed || !current.prearmed : !current.armed);
 	const uint64_t before_write = hrt_absolute_time();

@@ -34,6 +34,7 @@
 #include "VehicleAcceleration.hpp"
 
 #include <px4_platform_common/log.h>
+#include <cstring>
 
 #include <uORB/topics/vehicle_imu_status.h>
 
@@ -125,6 +126,7 @@ void VehicleAcceleration::CheckAndUpdateFilters()
 	if (sample_rate_changed || (fabsf(_lp_filter.get_cutoff_freq() - _param_imu_accel_cutoff.get()) > 0.1f)) {
 		_lp_filter.set_cutoff_frequency(_filter_sample_rate, _param_imu_accel_cutoff.get());
 		_lp_filter.reset(_acceleration_prev);
+		AdvanceSourceGeneration();
 	}
 }
 
@@ -135,20 +137,54 @@ void VehicleAcceleration::SensorBiasUpdate(bool force)
 		estimator_selector_status_s estimator_selector_status;
 
 		if (_estimator_selector_status_sub.copy(&estimator_selector_status)) {
-			_estimator_sensor_bias_sub.ChangeInstance(estimator_selector_status.primary_instance);
+			_bias_selection_valid = _estimator_sensor_bias_sub.ChangeInstance(estimator_selector_status.primary_instance);
 		}
 	}
 
+	const uint8_t instance = _estimator_sensor_bias_sub.get_instance();
+
+	if (instance != _bias_source_instance) {
+		_bias_source_instance = instance;
+		AdvanceSourceGeneration();
+	}
+
+	estimator_sensor_bias_s bias{};
+	unsigned revision{};
+	bool copied = false;
+#if defined(CONFIG_MODULES_SLAAPS)
+	(void)force;
+	// Copy payload and publication lifetime together, including held samples.
+	// A replacement with no new payload must still invalidate provenance.
+	copied = _estimator_sensor_bias_sub.copyBound(&bias, revision);
+	const unsigned current_revision = _estimator_sensor_bias_sub.revision();
+
+	if (current_revision != _bias_source_revision) {
+		_bias_source_revision = current_revision;
+		AdvanceSourceGeneration();
+	}
+
+	_bias_source_available = copied && revision && revision == current_revision;
+#else
+
 	if (_estimator_sensor_bias_sub.updated() || force) {
-		estimator_sensor_bias_s bias;
+		copied = _estimator_sensor_bias_sub.copy(&bias);
+	}
 
-		if (_estimator_sensor_bias_sub.copy(&bias)) {
-			if (bias.accel_device_id == _calibration.device_id()) {
-				_bias = Vector3f{bias.accel_bias};
+	_bias_source_available = _estimator_sensor_bias_sub.advertised();
+#endif
 
-			} else {
-				_bias.zero();
-			}
+	if (copied) {
+		if (bias.accel_device_id == _calibration.device_id()) {
+			_bias = Vector3f{bias.accel_bias};
+			_bias_timestamp = bias.timestamp;
+			_bias_timestamp_sample = bias.timestamp_sample;
+			_bias_publisher_revision = revision;
+			_bias_instance = instance;
+			_bias_valid = bias.accel_bias_valid && _bias.isAllFinite();
+
+		} else {
+			_bias.zero();
+			ClearBiasProvenance();
 		}
 	}
 }
@@ -173,6 +209,7 @@ bool VehicleAcceleration::SensorSelectionUpdate(bool force)
 
 						// clear bias and corrections
 						_bias.zero();
+						ClearBiasProvenance();
 
 						_calibration.set_device_id(device_id, sensor_accel_sub.get().is_external);
 
@@ -207,6 +244,64 @@ void VehicleAcceleration::ParametersUpdate(bool force)
 	}
 }
 
+void VehicleAcceleration::AdvanceSourceGeneration()
+{
+	if (_source_generation) {
+		_source_generation = _source_generation == UINT64_MAX ? 0 : _source_generation + 1;
+	}
+}
+
+void VehicleAcceleration::ClearBiasProvenance()
+{
+	_bias_timestamp = 0;
+	_bias_timestamp_sample = 0;
+	_bias_publisher_revision = 0;
+	_bias_instance = UINT8_MAX;
+	_bias_valid = false;
+}
+
+#if defined(CONFIG_MODULES_SLAAPS)
+void VehicleAcceleration::UpdateRawSourceProvenance(unsigned revision)
+{
+	const uint8_t instance = _sensor_sub.get_instance();
+
+	if (_raw_source_instance != instance || _raw_source_revision != revision) {
+		_raw_source_instance = instance;
+		_raw_source_revision = revision;
+		AdvanceSourceGeneration();
+	}
+}
+#endif
+
+void VehicleAcceleration::UpdateSourceProvenance()
+{
+	const auto &offset = _calibration.offset();
+	const auto &scale = _calibration.scale();
+	const auto &rotation = _calibration.rotation();
+	bool changed = _source_device_id != _calibration.device_id() || _source_calibrated != _calibration.calibrated()
+		       || _source_calibration_count != _calibration.calibration_count();
+	constexpr unsigned kAxes = 3;
+
+	for (unsigned row = 0; row < kAxes; ++row) {
+		changed |= std::memcmp(&_source_offset(row), &offset(row), sizeof(float)) != 0
+			   || std::memcmp(&_source_scale(row), &scale(row), sizeof(float)) != 0;
+
+		for (unsigned column = 0; column < kAxes; ++column) {
+			changed |= std::memcmp(&_source_rotation(row, column), &rotation(row, column), sizeof(float)) != 0;
+		}
+	}
+
+	if (_source_initialized && changed) { AdvanceSourceGeneration(); }
+
+	_source_device_id = _calibration.device_id();
+	_source_calibrated = _calibration.calibrated();
+	_source_calibration_count = _calibration.calibration_count();
+	_source_offset = offset;
+	_source_scale = scale;
+	_source_rotation = rotation;
+	_source_initialized = true;
+}
+
 void VehicleAcceleration::Run()
 {
 	// backup schedule
@@ -221,6 +316,12 @@ void VehicleAcceleration::Run()
 
 	SensorBiasUpdate(selection_updated);
 
+#if defined(CONFIG_MODULES_SLAAPS)
+	// Observe loss even when there is no new raw payload. Never republish an old
+	// numerical value with a new timestamp merely to announce a lifetime change.
+	UpdateRawSourceProvenance(_sensor_sub.revision());
+#endif
+
 	// require valid sensor sample rate to run
 	if (!PX4_ISFINITE(_filter_sample_rate)) {
 		CheckAndUpdateFilters();
@@ -230,12 +331,35 @@ void VehicleAcceleration::Run()
 		}
 	}
 
+	UpdateSourceProvenance();
+
 	// process all outstanding messages
 	int sensor_sub_updates = 0;
 	sensor_accel_s sensor_data;
 
-	while ((sensor_sub_updates < sensor_accel_s::ORB_QUEUE_LENGTH) && _sensor_sub.update(&sensor_data)) {
+	while (sensor_sub_updates < sensor_accel_s::ORB_QUEUE_LENGTH) {
+#if defined(CONFIG_MODULES_SLAAPS)
+		unsigned raw_revision {};
+
+		if (!_sensor_sub.copyQueuedBound(sensor_data, raw_revision)) { break; }
+
 		sensor_sub_updates++;
+		UpdateRawSourceProvenance(raw_revision);
+		const unsigned current_revision = _sensor_sub.revision();
+
+		if (raw_revision != current_revision) {
+			UpdateRawSourceProvenance(current_revision);
+			continue;
+		}
+
+#else
+
+		if (!_sensor_sub.update(&sensor_data)) { break; }
+
+		sensor_sub_updates++;
+#endif
+
+		if (sensor_data.device_id != _calibration.device_id()) { continue; }
 
 		const Vector3f accel_raw{sensor_data.x, sensor_data.y, sensor_data.z};
 
@@ -251,8 +375,35 @@ void VehicleAcceleration::Run()
 
 			// publish once all new samples are processed
 			if (!_sensor_sub.updated()) {
+#if defined(CONFIG_MODULES_SLAAPS)
+				const unsigned final_revision = _sensor_sub.revision();
+
+				if (raw_revision != final_revision) {
+					UpdateRawSourceProvenance(final_revision);
+					return;
+				}
+
+#endif
 				// Publish vehicle_acceleration
-				vehicle_acceleration_s v_acceleration;
+				vehicle_acceleration_s v_acceleration{};
+				v_acceleration.device_id = sensor_data.device_id;
+				v_acceleration.calibrated = _calibration.calibrated();
+				v_acceleration.source_generation = _source_generation;
+#if defined(CONFIG_MODULES_SLAAPS)
+				v_acceleration.raw_publisher_revision = raw_revision;
+				v_acceleration.raw_instance = _sensor_sub.get_instance();
+#endif
+				v_acceleration.filter_cutoff_hz = _lp_filter.get_cutoff_freq();
+				v_acceleration.filter_sample_rate_hz = _lp_filter.get_sample_freq();
+				v_acceleration.bias_timestamp = _bias_timestamp;
+				v_acceleration.bias_timestamp_sample = _bias_timestamp_sample;
+				v_acceleration.bias_publisher_revision = _bias_publisher_revision;
+				v_acceleration.bias_instance = _bias_instance;
+				v_acceleration.bias_valid = _bias_valid && _bias_selection_valid && _bias_source_available
+							    && _bias_instance == _bias_source_instance;
+#if defined(CONFIG_MODULES_SLAAPS)
+				v_acceleration.bias_valid &= _bias_publisher_revision && _bias_publisher_revision == _bias_source_revision;
+#endif
 				v_acceleration.timestamp_sample = sensor_data.timestamp_sample;
 				accel_filtered.copyTo(v_acceleration.xyz);
 				v_acceleration.timestamp = hrt_absolute_time();

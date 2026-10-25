@@ -101,10 +101,15 @@ inline bool sameSession(const TrustedSession &left, const TrustedSession &right)
 
 inline bool validRequestPacket(const DecodedRequestV1 &packet)
 {
+	const bool full_command = packet.wire.protocol_version == kWireProtocolVersionV2
+				  && packet.flags == kWireFullCommandFlagsV2;
+	// Unknown versions with legacy flags retain the existing WireVersionInvalid
+	// conversion diagnostic; no unknown version is accepted by canonicalization.
+	const bool acceleration_only = packet.wire.protocol_version != kWireProtocolVersionV2 && packet.flags == 0;
 	return packet.wire.source_id != 0 && packet.wire.session_id != 0
 	       && packet.wire.controller_instance_id != 0 && packet.wire.transition_epoch != 0
 	       && packet.wire.clock_mapping_epoch != 0 && packet.target_system != 0 && packet.target_component != 0
-	       && packet.flags == 0 && packet.reserved[0] == 0 && packet.reserved[1] == 0
+	       && (full_command || acceleration_only) && packet.reserved[0] == 0 && packet.reserved[1] == 0
 	       && packet.reserved[2] == 0 && packet.reserved[3] == 0;
 }
 
@@ -172,6 +177,9 @@ inline IngressCode canonicalizeIngressCode(CanonicalizeCode code)
 
 	case CanonicalizeCode::WireEnumInvalid:
 		return IngressCode::WireEnumInvalid;
+
+	case CanonicalizeCode::WireAttitudeInvalid:
+		return IngressCode::WireAttitudeInvalid;
 
 	case CanonicalizeCode::WireTimeInvalid:
 		return IngressCode::WireTimeInvalid;

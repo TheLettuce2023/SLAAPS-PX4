@@ -179,12 +179,13 @@ private:
 	 */
 	void handle_message_command_both(mavlink_message_t *msg, const vehicle_command_s &vehicle_command);
 
-	uint8_t handle_request_message_command(uint16_t message_id, float param2 = 0.0f, float param3 = 0.0f,
+	uint8_t handle_request_message_command(uint32_t message_id, float param2 = 0.0f, float param3 = 0.0f,
 					       float param4 = 0.0f, float param5 = 0.0f, float param6 = 0.0f, float param7 = 0.0f);
 
 	void handle_message(mavlink_message_t *msg);
 #if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
-	void publish_slaaps_companion(const mavlink_message_t *msg, bool verified, bool signing_active, uint32_t generation);
+	void publish_slaaps_companion(const mavlink_message_t *msg, bool verified, bool signing_active, uint32_t generation,
+				      const slaaps_companion_packet_s *clock = nullptr);
 #endif
 	void handle_messages_in_gimbal_mode(mavlink_message_t &msg);
 
@@ -274,8 +275,8 @@ private:
 	 *
 	 * @return PX4_OK on success, PX4_ERROR on fail.
 	 */
-	int set_message_interval(int msgId, float interval, float param3, float param4, float param7);
-	void get_message_interval(int msgId);
+	int set_message_interval(uint32_t msgId, float interval, float param3, float param4, float param7);
+	bool get_message_interval(uint32_t msgId);
 
 	bool evaluate_target_ok(int command, int target_system, int target_component);
 
@@ -339,7 +340,7 @@ private:
 	struct ReceivedMessageStats {
 		float avg_rate_hz{0.f}; // average rate
 		uint32_t last_time_received_ms{0};
-		uint16_t msg_id{0};
+		uint32_t msg_id{0};
 		uint8_t system_id{0};
 		uint8_t component_id{0};
 	};

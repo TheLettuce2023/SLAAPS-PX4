@@ -86,6 +86,8 @@ bool mapDecisionCodeV1(DecisionCode code, uint16_t &output)
 
 	case DecisionCode::Latched: value = 37; break;
 
+	case DecisionCode::InvalidCommandAttitude: value = 38; break;
+
 	default: return false;
 	}
 
@@ -111,7 +113,7 @@ constexpr uint8_t kSnapshot = 5;
 
 bool assignedDecision(uint16_t code)
 {
-	return code <= 37 || (code >= 64 && code <= 83);
+	return code <= 38 || (code >= 64 && code <= 83);
 }
 
 bool validStatus(const WireStatusV1 &s)
@@ -530,6 +532,8 @@ StatusBuildCode buildStatusV1(const IngressReport &r, const StatusRecipient &rec
 		case IngressCode::WireTimeInvalid: return localCode(input, code, {21, 23});
 
 		case IngressCode::WireNonFinite: return localCode(input, code, {28});
+
+		case IngressCode::WireAttitudeInvalid: return localCode(input, code, {38});
 
 		case IngressCode::ApiDomainMismatch:
 		case IngressCode::Observed: return false;

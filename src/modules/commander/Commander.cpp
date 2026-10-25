@@ -718,6 +718,9 @@ transition_result_t Commander::arm(arm_disarm_reason_t calling_reason, bool run_
 		}
 
 		_health_and_arming_checks.update(false, true);
+#if defined(CONFIG_MODULES_SLAAPS)
+		observeSlaapsVehicleState();
+#endif
 
 		if (!_health_and_arming_checks.canArm(_vehicle_status.nav_state)) {
 			tune_negative(true);
@@ -739,6 +742,9 @@ transition_result_t Commander::arm(arm_disarm_reason_t calling_reason, bool run_
 
 	_vehicle_status.armed_time = hrt_absolute_time();
 	_vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_ARMED;
+#if defined(CONFIG_MODULES_SLAAPS)
+	observeSlaapsVehicleState();
+#endif
 	_vehicle_status.latest_arming_reason = (uint8_t)calling_reason;
 
 	mavlink_log_info(&_mavlink_log_pub, "Armed by %s\t", arm_disarm_reason_str(calling_reason));
@@ -781,6 +787,9 @@ transition_result_t Commander::disarm(arm_disarm_reason_t calling_reason, bool f
 	_vehicle_status.armed_time = 0;
 	_vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
 	_vehicle_status.latest_disarming_reason = (uint8_t)calling_reason;
+#if defined(CONFIG_MODULES_SLAAPS)
+	observeSlaapsVehicleState();
+#endif
 	_vehicle_status.takeoff_time = 0;
 
 	_have_taken_off_since_arming = false;
@@ -1529,6 +1538,9 @@ Commander::handle_command(const vehicle_command_s &cmd)
 						} else {
 							_vehicle_status.calibration_enabled = true;
 							_actuator_armed.in_esc_calibration_mode = true;
+#if defined(CONFIG_MODULES_SLAAPS)
+							observeSlaapsVehicleState();
+#endif
 							_worker_thread.startTask(WorkerThread::Request::ESCCalibration);
 						}
 
@@ -1658,6 +1670,9 @@ Commander::handle_command(const vehicle_command_s &cmd)
 
 	case vehicle_command_s::VEHICLE_CMD_RUN_PREARM_CHECKS:
 		_health_and_arming_checks.update(true);
+#if defined(CONFIG_MODULES_SLAAPS)
+		observeSlaapsVehicleState();
+#endif
 		answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
 		return true;
 
@@ -1882,6 +1897,9 @@ void Commander::executeActionRequest(const action_request_s &action_request)
 			events::send(events::ID("commander_kill_sw_disengaged"), events::Log::Info, "Kill disengaged");
 			_status_changed = true;
 			_actuator_armed.kill = false;
+#if defined(CONFIG_MODULES_SLAAPS)
+			observeSlaapsVehicleState();
+#endif
 		}
 
 		break;
@@ -1903,6 +1921,9 @@ void Commander::executeActionRequest(const action_request_s &action_request)
 
 			_status_changed = true;
 			_actuator_armed.kill = true;
+#if defined(CONFIG_MODULES_SLAAPS)
+			observeSlaapsVehicleState();
+#endif
 		}
 
 		break;
@@ -1961,6 +1982,48 @@ void Commander::updateParameters()
 	}
 
 }
+
+#if defined(CONFIG_MODULES_SLAAPS)
+void Commander::observeSlaapsVehicleState()
+{
+	slaaps_vehicle_state_s current{};
+	current.arming_state = _vehicle_status.arming_state;
+	current.nav_state = _vehicle_status.nav_state;
+	current.armed = _actuator_armed.armed;
+	current.prearmed = _actuator_armed.prearmed;
+	current.lockdown = _actuator_armed.lockdown;
+	current.kill = _actuator_armed.kill;
+	current.termination = _actuator_armed.termination;
+	current.in_esc_calibration_mode = _actuator_armed.in_esc_calibration_mode;
+	current.attitude_invalid = _failsafe_flags.attitude_invalid;
+	current.angular_velocity_invalid = _failsafe_flags.angular_velocity_invalid;
+	const bool available = _failsafe_flags.timestamp && _failsafe_flags.timestamp <= hrt_absolute_time()
+			       && (current.arming_state == vehicle_status_s::ARMING_STATE_DISARMED
+				   || current.arming_state == vehicle_status_s::ARMING_STATE_ARMED)
+			       && current.nav_state < vehicle_status_s::NAVIGATION_STATE_MAX;
+	const auto &prior = _slaaps_vehicle_state;
+	const bool changed = available != _slaaps_state_available || current.arming_state != prior.arming_state
+			     || current.nav_state != prior.nav_state || current.armed != prior.armed || current.prearmed != prior.prearmed
+			     || current.lockdown != prior.lockdown || current.kill != prior.kill || current.termination != prior.termination
+			     || current.in_esc_calibration_mode != prior.in_esc_calibration_mode
+			     || current.attitude_invalid != prior.attitude_invalid || current.angular_velocity_invalid != prior.angular_velocity_invalid;
+
+	if (!_slaaps_state_seen && available) {
+		_slaaps_transition = 1;
+		_slaaps_state_seen = true;
+
+	} else if (changed && _slaaps_state_seen && _slaaps_transition) {
+		_slaaps_transition = _slaaps_transition == UINT64_MAX ? 0 : _slaaps_transition + 1;
+	}
+
+	// Observe at real mutation boundaries, not only at publication. A disarm/
+	// rearm excursion in one command-drain loop must not alias its starting tuple.
+	_slaaps_state_changed |= changed;
+	_slaaps_state_available = available;
+	current.transition = available ? _slaaps_transition : 0;
+	_slaaps_vehicle_state = current;
+}
+#endif
 
 void Commander::run()
 {
@@ -2064,6 +2127,9 @@ void Commander::run()
 
 			perf_begin(_preflight_check_perf);
 			_health_and_arming_checks.update();
+#if defined(CONFIG_MODULES_SLAAPS)
+			observeSlaapsVehicleState();
+#endif
 			bool pre_flight_checks_pass = _health_and_arming_checks.canArm(_vehicle_status.nav_state);
 
 			if (_vehicle_status.pre_flight_checks_pass != pre_flight_checks_pass) {
@@ -2129,6 +2195,9 @@ void Commander::run()
 		// _actuator_armed.kill // action_request_s::ACTION_KILL
 		_actuator_armed.termination = (_vehicle_status.nav_state == _vehicle_status.NAVIGATION_STATE_TERMINATION);
 		// _actuator_armed.in_esc_calibration_mode // VEHICLE_CMD_PREFLIGHT_CALIBRATION
+#if defined(CONFIG_MODULES_SLAAPS)
+		observeSlaapsVehicleState();
+#endif
 
 		// Send parachute command upon termination
 		if (!actuator_armed_prev.termination && _actuator_armed.termination && isArmed()) {
@@ -2137,7 +2206,11 @@ void Commander::run()
 
 		// publish states (armed, control_mode, vehicle_status) at 2 Hz or immediately when changed
 		if ((now >= _vehicle_status.timestamp + 500_ms) || _status_changed || nav_state_or_failsafe_changed
-		    || !(_actuator_armed == actuator_armed_prev)) {
+		    || !(_actuator_armed == actuator_armed_prev)
+#if defined(CONFIG_MODULES_SLAAPS)
+		    || _slaaps_state_changed
+#endif
+		   ) {
 
 			// publish actuator_armed first (used by output modules)
 			_actuator_armed.timestamp = hrt_absolute_time();
@@ -2151,6 +2224,12 @@ void Commander::run()
 			_vehicle_status.accepts_offboard_setpoints = _mode_management.currentModeAcceptsOffboardSetpoints(_vehicle_status.nav_state);
 			_vehicle_status.timestamp = hrt_absolute_time();
 			_vehicle_status_pub.publish(_vehicle_status);
+#if defined(CONFIG_MODULES_SLAAPS)
+			_slaaps_vehicle_state.timestamp = hrt_absolute_time();
+
+			if (_slaaps_vehicle_state_pub.publish(_slaaps_vehicle_state)) { _slaaps_state_changed = false; }
+
+#endif
 
 			_failure_detector.publishStatus(_health_and_arming_checks.getEscArmStatus(), _health_and_arming_checks.getMotorFailureMask());
 		}
@@ -2451,6 +2530,9 @@ void Commander::checkWorkerThread()
 	if (_worker_thread.hasResult()) {
 		int ret = _worker_thread.getResultAndReset();
 		_actuator_armed.in_esc_calibration_mode = false;
+#if defined(CONFIG_MODULES_SLAAPS)
+		observeSlaapsVehicleState();
+#endif
 
 		if (_vehicle_status.calibration_enabled) { // did we do a calibration?
 			_vehicle_status.calibration_enabled = false;
@@ -2543,6 +2625,9 @@ bool Commander::handleModeIntentionAndFailsafe()
 			false);
 	_vehicle_status.nav_state =
 		_mode_management.getNavStateReplacementIfValid(FailsafeBase::modeFromAction(_failsafe.selectedAction(), _user_mode_intention.get()));
+#if defined(CONFIG_MODULES_SLAAPS)
+	observeSlaapsVehicleState();
+#endif
 	_vehicle_status.executor_in_charge = _mode_management.modeExecutorInCharge(); // Set this in sync with nav_state
 	_vehicle_status.nav_state_display = _mode_management.getNavStateDisplay(_vehicle_status.nav_state);
 
@@ -2553,6 +2638,9 @@ bool Commander::handleModeIntentionAndFailsafe()
 
 	case FailsafeBase::Action::Terminate:
 		_vehicle_status.nav_state = _vehicle_status.NAVIGATION_STATE_TERMINATION;
+#if defined(CONFIG_MODULES_SLAAPS)
+		observeSlaapsVehicleState();
+#endif
 		break;
 
 	default:

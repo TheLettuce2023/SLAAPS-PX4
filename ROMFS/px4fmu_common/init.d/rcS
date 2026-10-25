@@ -631,9 +631,13 @@ else
 	fi
 
 	#
-	# Start the navigator.
+	# Start the navigator for vehicle types with a supported navigation path.
+	# SLAAPS owns its external modes and has no stock mission/RTL fallback.
 	#
-	navigator start
+	if [ "$VEHICLE_TYPE" != "slaaps" ]
+	then
+		navigator start
+	fi
 
 	#
 	# Start a thermal calibration if required.

@@ -49,8 +49,12 @@ bool UserModeIntention::change(uint8_t user_intended_nav_state, ModeChangeSource
 		user_intended_nav_state = _handler->getReplacedModeIfAny(user_intended_nav_state);
 	}
 
-	// Always allow mode change while disarmed
-	bool always_allow = force || !isArmed();
+	// Disarmed selection and stock force behavior remain unchanged. An armed
+	// SLAAPS vehicle still needs a runnable controller even for forced LAND;
+	// explicit termination must remain available independently of canRun.
+	const bool slaaps_airframe = _health_and_arming_checks.isSlaapsAirframe();
+	const bool always_allow = !isArmed() || (force && !slaaps_airframe)
+				  || (slaaps_airframe && user_intended_nav_state == vehicle_status_s::NAVIGATION_STATE_TERMINATION);
 	bool allow_change = true;
 
 	if (!always_allow) {

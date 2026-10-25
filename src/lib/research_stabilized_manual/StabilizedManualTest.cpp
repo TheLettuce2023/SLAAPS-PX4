@@ -109,6 +109,57 @@ struct Fixture {
 	}
 };
 
+void handledEntryTests()
+{
+	Fixture f;
+	CanardVector handled{{.4F, -.4F, .3F, -.3F}};
+	const Vector3f rate(.5F, -.5F, .25F);
+	check(f.control.configure(f.configuration) == Status::Ok, "handled entry configures");
+	check(f.control.enableFromHandled(f.now, f.manual, f.sample, f.now - kTickUs, handled, rate) == Status::Ok,
+	      "centered manual transfer accepts bounded handled history");
+	check(f.control.cycle(f.now, f.manual, f.sample, f.report) == Status::Ok, "first transfer calculation uses elapsed handled time");
+
+	for (unsigned i = 0; i < handled.size(); ++i) {
+		check(std::fabs(f.report.allocation.command[i] - handled[i]) <= 5.F * kDt + 1.e-5F,
+		      "first manual output slews from actual handled command rather than trim");
+	}
+
+	for (unsigned axis = 0; axis < 3; ++axis) {
+		check(std::fabs(f.report.rate_setpoint_rad_s(axis) - rate(axis)) <= 20.F * kDt + 1.e-5F,
+		      "manual rate target slews from outgoing handled target");
+	}
+
+	for (unsigned scenario = 0; scenario < 5; ++scenario) {
+		Fixture rejected;
+		auto canards = handled;
+		TimeUs time = rejected.now - kTickUs;
+		auto target = rate;
+
+		if (scenario == 0) { time = 0; }
+
+		if (scenario == 1) { time = rejected.now + 1; }
+
+		if (scenario == 2) { time = rejected.now - rejected.configuration.maximum_cycle_us - 1; }
+
+		if (scenario == 3) { canards[0] = 1.1F; }
+
+		if (scenario == 4) { target(0) = std::numeric_limits<float>::quiet_NaN(); }
+
+		check(rejected.control.configure(rejected.configuration) == Status::Ok, "rejected handled entry configures");
+		check(rejected.control.enableFromHandled(rejected.now, rejected.manual, rejected.sample, time, canards, target) != Status::Ok
+		      && !rejected.control.eligible(), "invalid handled history cannot enable manual control");
+	}
+
+	Fixture immediate;
+	check(immediate.control.configure(immediate.configuration) == Status::Ok
+	      && immediate.control.enableFromHandled(immediate.now, immediate.manual, immediate.sample,
+			      immediate.now, handled, rate) == Status::Ok,
+	      "an acknowledgment at the current instant is valid handled history");
+	check(immediate.control.cycle(immediate.now, immediate.manual, immediate.sample, immediate.report) == Status::NotDue
+	      && immediate.control.eligible(), "same-instant handled entry waits without calculation or fault");
+	check(immediate.tick() == Status::Ok, "handled entry calculates after the minimum cycle interval");
+}
+
 void allocationTests()
 {
 	auto configuration = fixtureConfiguration().allocation;
@@ -409,7 +460,7 @@ void feedbackTests()
 
 int main()
 {
-	allocationTests(); referenceTests(); faultTests(); feedbackTests();
+	handledEntryTests(); allocationTests(); referenceTests(); faultTests(); feedbackTests();
 	std::printf("checks=%u failures=%u scope=host_truth_feedback_only\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

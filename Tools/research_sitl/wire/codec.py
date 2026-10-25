@@ -185,7 +185,7 @@ def _status_values(fields):
         values[name] = _uint(values[name], _U64_MAX, name)
     values['protocol_version'] = _protocol(values['protocol_version'])
     values['decision_code'] = _uint(values['decision_code'], _U16_MAX, 'decision_code')
-    if not (0 <= values['decision_code'] <= 37 or 64 <= values['decision_code'] <= 83):
+    if not (0 <= values['decision_code'] <= 38 or 64 <= values['decision_code'] <= 83):
         raise CodecError('decision_code is unassigned in v1')
     values['first_latched_code'] = _uint(values['first_latched_code'], _U16_MAX, 'first_latched_code')
     values['status_flags'] = _uint(values['status_flags'], _U16_MAX, 'status_flags')

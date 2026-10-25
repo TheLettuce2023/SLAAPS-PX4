@@ -24,6 +24,15 @@ bool Px4ConfigurationSource::initialize()
 #include <lib/slaaps/VehicleParameters.def>
 #undef SLAAPS_INT
 #undef SLAAPS_FLOAT
+	const char *imu_parameters[kAxes] {"EKF2_IMU_POS_X", "EKF2_IMU_POS_Y", "EKF2_IMU_POS_Z"};
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		_imu_position[axis] = param_find(imu_parameters[axis]);
+		valid = valid && _imu_position[axis] != PARAM_INVALID && param_type(_imu_position[axis]) == PARAM_TYPE_FLOAT;
+	}
+
+	_accel_cutoff = param_find("IMU_ACCEL_CUTOFF");
+	valid = valid && _accel_cutoff != PARAM_INVALID && param_type(_accel_cutoff) == PARAM_TYPE_FLOAT;
 	_apply = param_find("SLA_CFG_APPLY");
 	_use = param_find("SLA_CFG_KIND");
 	_saved_apply = param_find("SLA_CFG_SAVED");
@@ -38,9 +47,14 @@ bool Px4ConfigurationSource::initialize()
 
 bool Px4ConfigurationSource::capture(ParameterSnapshot &snapshot, uint32_t &duration_us) const
 {
-	if (!_initialized) { return false; }
-
 	ParameterSnapshot candidate{};
+	return capture(snapshot, duration_us, candidate);
+}
+
+bool Px4ConfigurationSource::capture(ParameterSnapshot &snapshot, uint32_t &duration_us, ParameterSnapshot &candidate) const
+{
+	if (!_initialized || &snapshot == &candidate) { return false; }
+
 	unsigned index = 0;
 	bool valid = true;
 	hrt_abstime elapsed{};
@@ -54,6 +68,14 @@ bool Px4ConfigurationSource::capture(ParameterSnapshot &snapshot, uint32_t &dura
 #include <lib/slaaps/VehicleParameters.def>
 #undef SLAAPS_INT
 #undef SLAAPS_FLOAT
+
+		// These are existing native parameter intents, read under the same
+		// transaction. The producer's actual applied cutoff is checked separately.
+		for (unsigned axis = 0; axis < kAxes; ++axis) {
+			valid = (param_get(_imu_position[axis], &candidate.configuration.feedback.imu_position[axis]) == 0) && valid;
+		}
+
+		valid = (param_get(_accel_cutoff, &candidate.configuration.feedback.cutoff_hz) == 0) && valid;
 		valid = (param_get(_apply, &candidate.apply_counter) == 0) && valid;
 		valid = (param_get(_use, &candidate.use) == 0) && valid;
 		valid = (param_get(_saved_apply, &candidate.saved_apply) == 0) && valid;

@@ -208,13 +208,15 @@ struct AdminResult {
 	AdminReport reports[3];
 };
 
-struct DecodedRequestV1 {
-	WireRequestV1 wire;
+struct DecodedRequest {
+	WireRequest wire;
 	uint8_t target_system;
 	uint8_t target_component;
 	uint8_t flags;
 	uint8_t reserved[4];
 };
+
+using DecodedRequestV1 = DecodedRequest;
 
 enum class IngressPacketKind : uint8_t { None, Acknowledgement, Request };
 enum class IngressReportKind : uint8_t { ExogenousBarrier, Operation, Terminal };
@@ -245,7 +247,8 @@ enum class IngressCode : uint16_t {
 	WireTimeInvalid,
 	WireNonFinite,
 	S1Rejected,
-	ApiDomainMismatch
+	ApiDomainMismatch,
+	WireAttitudeInvalid
 };
 
 struct IngressCorrelation {
@@ -445,6 +448,9 @@ public:
 	AdapterResult observeTrustedState(const TrustedStateSample &sample);
 	AdapterResult poll(const TrustedStateSample &sample);
 	AdapterResult getEligibleRequest(const TrustedStateSample &sample, CanonicalRequest &request);
+	// Full controller boundary: v1 acceleration-only commissioning is insufficient.
+	// Same freshness, session, barrier ACK and output-preservation rules as above.
+	AdapterResult getEligibleFullRequest(const TrustedStateSample &sample, CanonicalRequest &request);
 
 	// Successful administration closes ACK; rejected administration may preserve it. No transport I/O.
 	AdminResult processSession(const TrustedStateSample &sample, const DecodedSessionV1 &packet,
@@ -500,7 +506,8 @@ private:
 
 	enum class OperationKind : uint8_t { Observation, Poll, Access };
 
-	AdapterResult process(const TrustedStateSample &sample, OperationKind operation, CanonicalRequest *request = nullptr);
+	AdapterResult process(const TrustedStateSample &sample, OperationKind operation, CanonicalRequest *request = nullptr,
+			      bool require_full_command = false);
 	bool structurallyValid(const TrustedStateSample &sample) const;
 	bool matchesRetainedState(const TrustedStateSample &sample) const;
 	bool hasNormalReportCapacity(uint8_t count) const;

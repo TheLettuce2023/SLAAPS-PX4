@@ -44,6 +44,75 @@ def verify_elf(data, image, origin, capacity):
     return segments
 
 
+def defined_elf_functions(data):
+    """Read definitions from the checked ARM ELF, not a potentially stale nm log."""
+    header = struct.unpack_from("<16sHHIIIIIHHHHHH", data)
+    assert header[0][:7] == b"\x7fELF\x01\x01\x01" and header[2] == 40
+    offset, size, count = header[6], header[11], header[12]
+    assert size == 40 and offset + size * count <= len(data)
+    sections = [struct.unpack_from("<IIIIIIIIII", data, offset + index * size) for index in range(count)]
+    functions = set()
+    for section in sections:
+        if section[1] != 2: # SHT_SYMTAB
+            continue
+        start, length, linked, entry_size = section[4], section[5], section[6], section[9]
+        assert entry_size == 16 and length % entry_size == 0 and start + length <= len(data) and linked < count
+        strings = sections[linked]
+        assert strings[1] == 3 and strings[4] + strings[5] <= len(data)
+        names = data[strings[4]:strings[4] + strings[5]]
+        for position in range(start, start + length, entry_size):
+            name, _, _, info, _, index = struct.unpack_from("<IIIBBH", data, position)
+            if info & 15 != 2 or not 0 < index < count: # Defined STT_FUNC
+                continue
+            if sections[index][2] & 6 != 6: # SHF_ALLOC | SHF_EXECINSTR
+                continue
+            assert name < len(names)
+            end = names.find(b"\0", name)
+            assert end >= name
+            functions.add(names[name:end].decode("ascii"))
+    assert functions, "ELF has no defined function symbols"
+    return functions
+
+
+def verify_identity_implementation(stage, receipt, manifest, data):
+    profile = "boards/px4/fmu-v6x/nuttx-config/slaaps/defconfig"
+    entry = manifest["inputs"].get(profile)
+    if entry is None:
+        return dict(required=False, implementation="not_required_by_snapshot")
+    source = bound_path(ROOT, profile)
+    assert digest(source) == entry["sha256"]
+    if not re.search(r"^CONFIG_STM32H7_RNG=y$", source.read_text(), re.M):
+        return dict(required=False, implementation="not_required_by_snapshot")
+    configuration = receipt.get("nuttx_configuration")
+    provenance = "builder_receipt"
+    if configuration is None:
+        # Explicit post-link capture supports immutable receipts produced before
+        # the builder exported these files. It remains bound to this artifact.
+        captured = json.loads(bound_path(stage, "nuttx-configuration.json").read_text())
+        assert captured["board_receipt_sha256"] == digest(stage / "board-result.json")
+        configuration = captured["nuttx_configuration"]
+        provenance = "receipt_bound_postlink_capture"
+    text = {}
+    for label in ("header", "config"):
+        item = configuration[label]
+        path = bound_path(stage, item["path"])
+        assert digest(path) == item["sha256"]
+        text[label] = path.read_text()
+    required = ("STM32H7_RNG", "STM32H7_HSI48", "ARCH_HAVE_RNG", "DEV_RANDOM", "DEV_URANDOM_ARCH")
+    for name in required:
+        assert re.search(r"^#define CONFIG_" + name + r" 1$", text["header"], re.M), name
+        assert re.search(r"^CONFIG_" + name + r"=y$", text["config"], re.M), name
+    assert not re.search(r"^#define CONFIG_DEV_URANDOM_XORSHIFT128\b", text["header"], re.M)
+    assert not re.search(r"^CONFIG_DEV_URANDOM_XORSHIFT128=y$", text["config"], re.M)
+    required_symbols = ("getrandom", "devrandom_register", "devurandom_register", "stm32_rng_read", "stm32_rng_interrupt")
+    functions = defined_elf_functions(data)
+    for name in required_symbols:
+        assert any(symbol == name or symbol.startswith(name + ".") for symbol in functions), "Missing linked hardware RNG function: " + name
+    return dict(required=True, implementation="configured_and_linked_stm32h7_rng",
+                configuration_provenance=provenance, configuration=configuration,
+                verified_defined_elf_functions=list(required_symbols), hardware_entropy_qualified=False)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", type=Path)
@@ -86,6 +155,7 @@ def main():
     assert len(image) == package["image_size"] and image == artifacts[".bin"].read_bytes()
     assert tag[1].encode() + b"\0" in image, "Embedded version string missing from flash image"
     segments = verify_elf(artifacts[".elf"].read_bytes(), image, origin, capacity)
+    identity = verify_identity_implementation(stage, receipt, manifest, artifacts[".elf"].read_bytes())
     changed = subprocess.check_output(["git", "ls-files", "-m", "-o", "--exclude-standard"], cwd=ROOT, text=True).splitlines()
     required += [name for name in changed if name.startswith(("src/", "platforms/", "boards/", "msg/", "ROMFS/", "cmake/")) or name == "CMakeLists.txt"]
     hashes = {}
@@ -105,6 +175,7 @@ def main():
                   board_id=53, embedded_git_tag=tag[1], image_bytes=len(image), flash_capacity=capacity,
                   flash_headroom=capacity-len(image), flash_load_segments=segments,
                   board_receipt_sha256=digest(receipt_path), verifier_sha256=digest(Path(__file__)),
+                  identity_implementation=identity,
                   checked_source_hashes=hashes, removed_sources=removed, hardware_operated=False, boot_verified=False)
     verifier_snapshot = stage / "verify_board.py"
     assert not verifier_snapshot.exists()

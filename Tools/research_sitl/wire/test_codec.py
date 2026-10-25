@@ -308,7 +308,7 @@ class CodecConformanceTest(unittest.TestCase):
         invalid["clock_mapping_epoch"] = 0
         cases.append(invalid)
         invalid = status_fields()
-        invalid["decision_code"] = 38
+        invalid["decision_code"] = 39
         cases.append(invalid)
         invalid = status_fields()
         invalid["decision_code"] = 0
@@ -326,6 +326,21 @@ class CodecConformanceTest(unittest.TestCase):
         zero_age = status_fields()
         zero_age["conservative_age_us"] = 0
         encode_status(zero_age)
+
+    def test_v2_does_not_change_v1_request_codec(self):
+        fields = request_fields()
+        fields['protocol_version'] = 0x00020000
+        fields['flags'] = 1
+        self.assert_codec_error(encode_request, fields)
+        payload = bytearray(REQUEST_BYTES)
+        payload[76:80] = (0x00020000).to_bytes(4, 'little')
+        payload[85] = 1
+        self.assert_codec_error(decode_request, bytes(payload))
+        self.assert_codec_error(decode_request, bytes(payload) + bytes.fromhex('0000803f') + bytes(12))
+        rejected = status_fields()
+        rejected.update(decision_code=38, status_flags=32, conservative_age_us=0,
+                        last_accepted_sequence=0)
+        self.assertEqual(decode_status(encode_status(rejected))['decision_code'], 38)
 
 
 if __name__ == "__main__":

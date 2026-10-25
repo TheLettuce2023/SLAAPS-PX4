@@ -71,6 +71,19 @@ MathStatus checkedVector(double x, double y, double z, Vec3f &output)
 
 } // namespace
 
+MathStatus normaliseAttitudeQuaternion(const QuaternionNedFromFrd &input, float norm_tolerance,
+				       QuaternionNedFromFrd &output)
+{
+	QuaternionNedFromFrd candidate;
+	const MathStatus result = normalisedQuaternion(input, norm_tolerance, candidate);
+
+	if (result == MathStatus::Ok) {
+		output = candidate.canonical();
+	}
+
+	return result;
+}
+
 MathStatus rotateFrdToNed(const QuaternionNedFromFrd &q_nb, float norm_tolerance,
 			  const Vec3f &v_frd, Vec3f &v_ned)
 {

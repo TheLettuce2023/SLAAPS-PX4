@@ -21,6 +21,8 @@ public:
 		uint64_t timestamp_us{};
 		float airspeed{}, edf{};
 		research_stabilized_manual::ScheduledControlPoint control{};
+		WrenchModel wrench{}; // Physical affine model at the identical filtered coordinates.
+		bool wrench_valid{};
 	};
 
 	bool begin(uint64_t now, const VehicleConfiguration &configuration,
@@ -33,6 +35,20 @@ public:
 		}
 
 		_configuration = configuration.schedule;
+		// Incomplete acceleration calibration cannot remove Manual authority.
+		// The acceleration consumer must require wrench_valid independently.
+		_wrench_enabled = configuration.wrench.enabled == 1 && validateWrenchConfiguration(configuration).valid();
+
+		if (_wrench_enabled) {
+			for (unsigned i = 0; i < kScheduleKnots; ++i) {
+				for (unsigned j = 0; j < kScheduleKnots; ++j) {
+					if (!makeWrenchCornerModel(configuration, i, j, _wrench_corner[i][j])) {
+						_wrench_enabled = false;
+					}
+				}
+			}
+		}
+
 		const auto &source = sample.source;
 
 		if (!source.airspeed_revision || !source.air_data_revision || !source.battery_revision || !source.baro_device_id
@@ -108,7 +124,7 @@ public:
 
 			if (!rateBounded(sample.indicated_airspeed_m_s - _last.indicated_airspeed_m_s,
 					 sample.airspeed_sample_us - _last.airspeed_sample_us, c.airspeed_transient_rate)
-			    || !rateBounded(edf - _raw_edf, now - _observed_us, c.edf_transient_rate)) {
+			    || !edfRateBounded(_raw_edf, edf, now - _observed_us, c.edf_transient_rate)) {
 				return fail(ControlScheduleStatus::Transient);
 			}
 		}
@@ -155,6 +171,19 @@ private:
 	{
 		return std::isfinite(delta) && (elapsed ? std::fabs(delta) <= limit * (static_cast<float>(elapsed) * 1e-6F) : sameFiniteValue(delta, 0.F));
 	}
+	static bool edfRateBounded(float previous, float current, uint64_t elapsed, float limit)
+	{
+		if (!std::isfinite(previous) || !std::isfinite(current) || !std::isfinite(limit) || limit <= 0.F) { return false; }
+
+		if (!elapsed) { return sameFiniteValue(previous, current); }
+
+		// The owner emits a binary32 command after adding its bounded step.
+		// Subtracting those two rounded commands can exceed the original step.
+		// Use the same reachable encoded endpoints, without an epsilon or an
+		// enlarged rate. IAS retains its independent measured-delta check above.
+		const float step = limit * (static_cast<float>(elapsed) * 1e-6F);
+		return std::isfinite(step) && current >= previous - step && current <= previous + step;
+	}
 	float filtered(float previous, float target, float dt, float rate) const
 	{
 		const float delta = (target - previous) * dt / (_configuration.filter_time_s + dt);
@@ -174,6 +203,18 @@ private:
 				const float weight = (i ? x : 1.F - x) * (j ? y : 1.F - y);
 				const auto &corner = c.corner[i][j];
 
+				if (_wrench_enabled) {
+					const auto &physical = _wrench_corner[i][j];
+
+					for (unsigned row = 0; row < kWrenchAxes; ++row) {
+						step.wrench.offset[row] += weight * physical.offset[row];
+
+						for (unsigned actuator = 0; actuator < kWrenchInputs; ++actuator) {
+							step.wrench.effectiveness[row][actuator] += weight * physical.effectiveness[row][actuator];
+						}
+					}
+				}
+
 				for (unsigned axis = 0; axis < kAxes; ++axis) {
 					step.control.rate_p(axis) += weight * corner.rate_p[axis];
 					step.control.rate_i(axis) += weight * corner.rate_i[axis];
@@ -187,10 +228,12 @@ private:
 			}
 		}
 
+		step.wrench_valid = _wrench_enabled;
 		return true; // Controller validates the interpolated gains and matrix before committing.
 	}
 	bool fail(ControlScheduleStatus status) { _status = status; _active = false; return false; }
 	ControlScheduleConfiguration _configuration{};
+	WrenchModel _wrench_corner[kScheduleKnots][kScheduleKnots] {};
 	OperatingConditionSourceIdentity _source{};
 	OperatingConditionSample _last{};
 	float _scale[kAxes] {}, _slope[kCanards] {};
@@ -198,6 +241,7 @@ private:
 	uint64_t _observed_us{}, _filter_us{}, _deadline_us{};
 	ControlScheduleStatus _status{ControlScheduleStatus::Inactive};
 	bool _active{};
+	bool _wrench_enabled{};
 };
 
 } // namespace slaaps

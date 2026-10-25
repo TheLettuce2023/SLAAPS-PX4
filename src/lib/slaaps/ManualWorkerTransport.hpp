@@ -38,7 +38,56 @@ public:
 	}
 	bool active() const { return _active; }
 	uint64_t handledSequence() const { return _active ? _worker.handledSequence() : 0; }
+	bool outstanding() const { return _active && _worker.outstanding(); }
+	uint64_t outputDeadline() const { return _active ? _worker.outputDeadline() : 0; }
+	ControlMode mode() const { return _active ? _worker.mode() : ControlMode::None; }
+	bool handledOutput(ManualWorkerOutput &frame, uint64_t &handled_us) const
+	{
+		return _active && _worker.handledOutput(frame, handled_us);
+	}
 	ControlScheduleStatus scheduleStatus() const { return _worker.scheduleStatus(); }
+	const AccelerationControlDiagnostic &accelerationDiagnostic() const { return _worker.accelerationDiagnostic(); }
+
+	ManualWorkerStatus monitorTransferObserved(const EdfPermission &previous, const ManualOutputBinding &binding)
+	{
+		research_stabilized_manual::ManualSample unused{};
+		return cycleImpl(0, previous, unused, nullptr, binding, nullptr, 0, nullptr, nullptr, true);
+	}
+	ManualWorkerStatus transferAcceleration(uint64_t now, uint64_t transition_us, const VehicleConfiguration &configuration,
+						const EdfPermission &previous, const EdfPermission &next, const AccelerationControlInput &input,
+						const ManualOutputBinding &binding)
+	{
+		if (!_active || _bench_mode != ControlMode::None || !handledBindingsCurrent()) { return reject(); }
+
+		ManualWorkerOutput output{};
+		const auto result = _worker.transferAcceleration(now, transition_us, configuration, previous, next, input, binding, output);
+		return publishResult(result, output, true);
+	}
+	ManualWorkerStatus transferManual(uint64_t now, uint64_t transition_us, const VehicleConfiguration &configuration,
+					  const EdfPermission &previous, const EdfPermission &next, const SelectedManualInput::Snapshot &snapshot,
+					  const SelectedInputPolicy &policy, const ManualOutputBinding &binding, const OperatingConditionSample *condition = nullptr)
+	{
+		if (!_active || _bench_mode != ControlMode::None || !handledBindingsCurrent()
+		    || (_selected_session ? !_selected_input.check(now, snapshot) : !_selected_input.begin(now, snapshot, policy))) { return reject(); }
+
+		_selected_session = true;
+		ManualWorkerOutput output{};
+		const auto result = _worker.transferManual(now, transition_us, configuration, previous, next, snapshot.manual,
+				    snapshot.state, binding, output, condition);
+		return publishResult(result, output, true);
+	}
+	ManualWorkerStatus cycleAccelerationObserved(const EdfPermission &permission, const AccelerationControlInput &input,
+			const ManualOutputBinding &binding)
+	{
+		research_stabilized_manual::ManualSample unused{};
+		return cycleImpl(0, permission, unused, nullptr, binding, nullptr, 0, nullptr, &input);
+	}
+	ManualWorkerStatus cycleAcceleration(uint64_t now, const EdfPermission &permission, const AccelerationControlInput &input,
+					     const ManualOutputBinding &binding)
+	{
+		research_stabilized_manual::ManualSample unused{};
+		return cycleImpl(now, permission, unused, nullptr, binding, nullptr, 0, nullptr, &input, false, false);
+	}
 
 	ManualWorkerStatus begin(uint64_t now, const VehicleConfiguration &configuration, const EdfPermission &permission,
 				 const research_stabilized_manual::ManualSample &manual,
@@ -173,6 +222,21 @@ public:
 	}
 
 private:
+	bool handledBindingsCurrent()
+	{
+		if (_lifetime.revision() != _revision || _worker.outstanding()) { return false; }
+
+		for (unsigned bank = 0; bank < 2; ++bank) {
+			if (!(_banks & (1U << bank))) { continue; }
+
+			slaaps_manual_ack_s wire{};
+
+			if (!_have_ack[bank] || acknowledgment(bank).read(wire) != BoundRead::Data
+			    || memcmp(&wire, &_last_ack[bank], sizeof(wire)) != 0) { return false; }
+		}
+
+		return true;
+	}
 	ManualWorkerStatus bind(uint64_t now, const EdfPermission &permission, const ManualOutputBinding &binding,
 				unsigned command_revision, const unsigned(&ack_revisions)[2])
 	{
@@ -214,13 +278,14 @@ private:
 				     const research_stabilized_manual::ManualSample &manual,
 				     const research_stabilized_manual::StateSample *state, const ManualOutputBinding &binding,
 				     const SelectedManualInput::Snapshot *observed = nullptr, uint64_t first_command_deadline_us = 0,
-				     const OperatingConditionSample *condition = nullptr)
+				     const OperatingConditionSample *condition = nullptr,
+				     const AccelerationControlInput *acceleration = nullptr, bool monitor_only = false, bool acceleration_live = true)
 	{
 		if (!_active) { return ManualWorkerStatus::Inactive; }
 
 		if (_lifetime.revision() != _revision) { return reject(); }
 
-		const bool live = observed || _bench_mode != ControlMode::None;
+		const bool live = observed || _bench_mode != ControlMode::None || monitor_only || (acceleration && acceleration_live);
 		ManualOutputAck pending[2] {};
 		unsigned count{};
 
@@ -259,7 +324,11 @@ private:
 		for (unsigned i = 0; i < (count ? count : 1); ++i) {
 			const auto *ack = count ? &pending[i] : nullptr;
 
-			if (_bench_mode == ControlMode::EdfBench) { result = _worker.cycleEdfBench(now, permission, manual, output, binding, ack); }
+			if (monitor_only) { result = _worker.monitorTransfer(now, permission, binding, ack); }
+
+			else if (acceleration) { result = _worker.cycleAcceleration(now, permission, *acceleration, output, binding, ack); }
+
+			else if (_bench_mode == ControlMode::EdfBench) { result = _worker.cycleEdfBench(now, permission, manual, output, binding, ack); }
 
 			else if (_bench_mode == ControlMode::ServoBench) { result = _worker.cycleBench(now, permission, manual, output, binding, ack); }
 
@@ -275,7 +344,8 @@ private:
 				if ((first_command_deadline_us && published >= first_command_deadline_us)
 				    || !encodeManualCommand(published, output, wire) || !_command.publish(wire)) { return reject(); }
 
-			} else if (result != ManualWorkerStatus::Waiting && result != ManualWorkerStatus::NotDue) {
+			} else if (result != ManualWorkerStatus::Waiting && result != ManualWorkerStatus::NotDue
+				   && !(monitor_only && result == ManualWorkerStatus::Ready)) {
 				stop();
 				return result;
 			}
@@ -283,9 +353,26 @@ private:
 
 		return result;
 	}
+	ManualWorkerStatus publishResult(ManualWorkerStatus result, const ManualWorkerOutput &output, bool live)
+	{
+		if (result == ManualWorkerStatus::Command) {
+			slaaps_manual_command_s wire{};
+			const uint64_t now = live ? hrt_absolute_time() : output.timestamp_us;
+
+			if (_lifetime.revision() != _revision || !encodeManualCommand(now, output, wire) || !_command.publish(wire)) { return reject(); }
+
+		} else if (result != ManualWorkerStatus::NotDue && result != ManualWorkerStatus::Waiting) { stop(); }
+
+		return result;
+	}
 
 	BoundSubscription<slaaps_manual_ack_s> &acknowledgment(unsigned bank) { return bank == 0 ? _main_ack : _aux_ack; }
-	ManualWorkerStatus reject() { stop(); return ManualWorkerStatus::OutputRejected; }
+	ManualWorkerStatus reject()
+	{
+		_worker.stop(ManualWorkerStatus::OutputRejected, hrt_absolute_time());
+		stop();
+		return ManualWorkerStatus::OutputRejected;
+	}
 	ManualWorker _worker;
 	SelectedManualInput _selected_input{};
 	bool _selected_session{};

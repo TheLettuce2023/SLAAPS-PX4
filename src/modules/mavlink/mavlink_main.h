@@ -88,6 +88,12 @@
 #include "mavlink_shell.h"
 #include "mavlink_ulog.h"
 
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+#include <uORB/ResearchSubscription.hpp>
+#include <uORB/topics/slaaps_companion_control.h>
+#include <uORB/topics/slaaps_companion_tx.h>
+#endif
+
 #define DEFAULT_BAUD_RATE       57600
 #define DEFAULT_DEVICE_NAME     "/dev/ttyS1"
 
@@ -540,9 +546,45 @@ public:
 	void set_signing_key_dirty() { _signing_key_dirty.store(true); }
 	void check_signing_key_dirty();
 
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+	// Serialize lifetime observations and transport decisions with the existing
+	// recursive channel send lock; these are never actuator/session grants.
+	bool send_slaaps_timesync(bool &handled);
+	bool match_slaaps_clock(const mavlink_message_t &message, bool verified, uint32_t generation,
+				slaaps_companion_packet_s &sample);
+	bool send_slaaps_companion_status();
+#endif
+
 
 private:
 	MavlinkReceiver 	_receiver;
+
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+	bool read_slaaps_control(uint64_t &now);
+	static bool same_slaaps_binding(const slaaps_companion_control_s &left, const slaaps_companion_control_s &right);
+	static bool slaaps_bootstrap_status(const mavlink_message_t &status);
+	bool slaaps_signed_output();
+	bool send_slaaps_status_sample(const slaaps_companion_tx_s &status, unsigned revision,
+				       uORB::ResearchSubscription &input, unsigned &pinned_revision, bool priority, bool &retry);
+	uORB::ResearchSubscription _slaaps_control_input{ORB_ID::slaaps_companion_control};
+	uORB::ResearchSubscription _slaaps_tx_input{ORB_ID::slaaps_companion_tx};
+	uORB::ResearchSubscription _slaaps_barrier_input{ORB_ID::slaaps_companion_barrier};
+	slaaps_companion_control_s _slaaps_control{};
+	unsigned _slaaps_control_revision{}, _slaaps_tx_revision{};
+	unsigned _slaaps_barrier_revision{}, _slaaps_barrier_candidate_revision{};
+	slaaps_companion_tx_s _slaaps_barrier_candidate{}; // Exact original envelope; retry never renews its deadline.
+	bool _slaaps_barrier_pending{};
+	uint64_t _slaaps_binding_started{}, _slaaps_last_challenge{}, _slaaps_complete_tx{};
+	bool _slaaps_control_rejected{};
+	struct {
+		slaaps_companion_control_s control{};
+		uint64_t sent_us{}, deadline_us{}, echo_ns{};
+		unsigned control_revision{};
+		uint32_t signing_generation{};
+		uint8_t local_system{}, local_component{};
+		bool valid{};
+	} _slaaps_clock;
+#endif
 
 	MavlinkSignControl	_sign_control{};
 

@@ -111,6 +111,17 @@ public:
 	 */
 	bool canRun(uint8_t nav_state) const { return _reporter.canRun(nav_state); }
 
+	// The check owns the boot-latched airframe identity. Mode commands must not
+	// bypass its controller restrictions by forcing a stock emergency mode.
+	bool isSlaapsAirframe() const
+	{
+#if defined(CONFIG_MODULES_SLAAPS)
+		return _slaaps_checks.isSlaapsAirframe();
+#else
+		return false;
+#endif
+	}
+
 	/**
 	 * Query the mode requirements: check if a mode prevents arming
 	 */

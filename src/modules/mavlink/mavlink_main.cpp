@@ -170,6 +170,305 @@ mavlink_message_t *Mavlink::get_buffer()
 void Mavlink::lock_send() { if (_instance_id >= 0) { pthread_mutex_lock(&mavlink_channel_send_mutexes[_instance_id]); } }
 void Mavlink::unlock_send() { if (_instance_id >= 0) { pthread_mutex_unlock(&mavlink_channel_send_mutexes[_instance_id]); } }
 
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+bool Mavlink::same_slaaps_binding(const slaaps_companion_control_s &left, const slaaps_companion_control_s &right)
+{
+	return left.configuration_identity == right.configuration_identity
+	       && left.controller_instance_id == right.controller_instance_id && left.binding_id == right.binding_id
+	       && left.maximum_round_trip_us == right.maximum_round_trip_us && left.mavlink_instance == right.mavlink_instance
+	       && left.source_system == right.source_system && left.source_component == right.source_component;
+}
+
+bool Mavlink::read_slaaps_control(uint64_t &now)
+{
+	slaaps_companion_control_s candidate{};
+	unsigned revision{};
+	const bool copied = _slaaps_control_input.copyBound(&candidate, revision);
+	now = hrt_absolute_time();
+	const auto reject = [&]() {
+		_slaaps_clock.valid = false;
+		_slaaps_barrier_pending = false;
+
+		if (_slaaps_control_revision) { _slaaps_control_rejected = true; }
+
+		return false;
+	};
+
+	if (!copied || !revision || revision != _slaaps_control_input.revision()) { return reject(); }
+
+	const bool same_namespace = _slaaps_control_revision
+				    && candidate.controller_instance_id == _slaaps_control.controller_instance_id
+				    && candidate.binding_id == _slaaps_control.binding_id;
+
+	if (same_namespace && (_slaaps_control_rejected || revision != _slaaps_control_revision
+			       || !same_slaaps_binding(candidate, _slaaps_control) || !candidate.enabled
+			       || candidate.timestamp < _slaaps_control.timestamp
+			       || candidate.timestamp >= _slaaps_control.deadline
+			       || (candidate.timestamp == _slaaps_control.timestamp && candidate.deadline != _slaaps_control.deadline))) {
+		return reject();
+	}
+
+	if (!candidate.enabled || _instance_id < 0 || _instance_id >= 4 || candidate.mavlink_instance != _instance_id
+	    || !candidate.timestamp || candidate.timestamp > now || candidate.deadline <= candidate.timestamp || now >= candidate.deadline
+	    || !candidate.configuration_identity || !candidate.controller_instance_id || !candidate.binding_id
+	    || !candidate.source_system || !candidate.source_component
+	    || !candidate.maximum_round_trip_us || candidate.maximum_round_trip_us > 1000000) { return reject(); }
+
+	if (!same_namespace) {
+		if (_slaaps_control_revision && candidate.timestamp <= _slaaps_control.timestamp) { return reject(); }
+
+		_slaaps_clock.valid = false;
+		_slaaps_control_rejected = false;
+		_slaaps_binding_started = candidate.timestamp;
+		_slaaps_tx_revision = 0;
+		_slaaps_barrier_revision = _slaaps_barrier_candidate_revision = 0;
+		_slaaps_barrier_pending = false;
+	}
+
+	_slaaps_control = candidate;
+	_slaaps_control_revision = revision;
+	return true;
+}
+
+bool Mavlink::slaaps_signed_output()
+{
+	const auto *signing = get_status()->signing;
+	return getProtocolVersion() == 2 && signing && signing_generation()
+	       && (signing->flags & MAVLINK_SIGNING_FLAG_SIGN_OUTGOING);
+}
+
+bool Mavlink::send_slaaps_timesync(bool &handled)
+{
+	handled = false;
+	lock_send();
+	const bool sent = [&]() {
+		uint64_t now{};
+
+		if (!read_slaaps_control(now)) { return false; }
+
+		handled = true;
+
+		if (!slaaps_signed_output() || !should_transmit() || !get_system_id() || !get_component_id()) { return false; }
+
+		const uint32_t generation = signing_generation();
+
+		if (_slaaps_clock.valid) {
+			if (now < _slaaps_clock.deadline_us && generation == _slaaps_clock.signing_generation
+			    && get_system_id() == _slaaps_clock.local_system && get_component_id() == _slaaps_clock.local_component) { return false; }
+
+			_slaaps_clock.valid = false;
+		}
+
+		now = hrt_absolute_time();
+
+		if (now <= _slaaps_last_challenge || now > static_cast<uint64_t>(INT64_MAX) / 1000
+		    || now >= _slaaps_control.deadline || now > UINT64_MAX - _slaaps_control.maximum_round_trip_us
+		    || _slaaps_complete_tx == UINT64_MAX) { return false; }
+
+		const uint64_t deadline = math::min(now + _slaaps_control.maximum_round_trip_us, _slaaps_control.deadline);
+		mavlink_timesync_t message{};
+		message.ts1 = static_cast<int64_t>(now * 1000);
+		message.target_system = _slaaps_control.source_system;
+		message.target_component = _slaaps_control.source_component;
+		_slaaps_last_challenge = now;
+		const uint64_t before = _slaaps_complete_tx;
+		mavlink_msg_timesync_send_struct(get_channel(), &message);
+
+		// The protected, nonwrapping counter changes only after a complete
+		// primary UART/UDP write, including synchronous RX-thread stream sends.
+		if (_slaaps_complete_tx != before + 1 || hrt_absolute_time() >= deadline) { return false; }
+
+		_slaaps_clock.control = _slaaps_control;
+		_slaaps_clock.control_revision = _slaaps_control_revision;
+		_slaaps_clock.sent_us = now;
+		_slaaps_clock.deadline_us = deadline;
+		_slaaps_clock.echo_ns = static_cast<uint64_t>(message.ts1);
+		_slaaps_clock.signing_generation = generation;
+		_slaaps_clock.local_system = static_cast<uint8_t>(get_system_id());
+		_slaaps_clock.local_component = static_cast<uint8_t>(get_component_id());
+		_slaaps_clock.valid = true;
+		return true;
+	}();
+	unlock_send();
+	return sent;
+}
+
+bool Mavlink::match_slaaps_clock(const mavlink_message_t &message, bool verified, uint32_t generation,
+				 slaaps_companion_packet_s &sample)
+{
+	lock_send();
+	const bool matched = [&]() {
+		uint64_t now{};
+
+		if (!read_slaaps_control(now) || !_slaaps_clock.valid) { return false; }
+
+		if (now >= _slaaps_clock.deadline_us || !slaaps_signed_output() || generation != signing_generation()
+		    || generation != _slaaps_clock.signing_generation || _slaaps_control_revision != _slaaps_clock.control_revision
+		    || !same_slaaps_binding(_slaaps_control, _slaaps_clock.control)
+		    || get_system_id() != _slaaps_clock.local_system || get_component_id() != _slaaps_clock.local_component) {
+			_slaaps_clock.valid = false;
+			return false;
+		}
+
+		// Foreign, unsigned, replayed or nonmatching traffic does not consume
+		// the one valid outstanding challenge.
+		if (!verified || message.magic != MAVLINK_STX || !(message.incompat_flags & MAVLINK_IFLAG_SIGNED)
+		    || message.msgid != MAVLINK_MSG_ID_TIMESYNC || message.len != MAVLINK_MSG_ID_TIMESYNC_LEN
+		    || message.sysid != _slaaps_control.source_system || message.compid != _slaaps_control.source_component) { return false; }
+
+		mavlink_timesync_t reply{};
+		mavlink_msg_timesync_decode(&message, &reply);
+
+		if (reply.tc1 <= 0 || reply.ts1 <= 0 || static_cast<uint64_t>(reply.ts1) != _slaaps_clock.echo_ns
+		    || reply.target_system != _slaaps_clock.local_system || reply.target_component != _slaaps_clock.local_component) { return false; }
+
+		if (!read_slaaps_control(now) || !_slaaps_clock.valid || now >= _slaaps_clock.deadline_us
+		    || _slaaps_control_revision != _slaaps_clock.control_revision
+		    || !same_slaaps_binding(_slaaps_control, _slaaps_clock.control)) { return false; }
+
+		slaaps_companion_packet_s candidate{};
+		candidate.control_binding_id = _slaaps_clock.control.binding_id;
+		candidate.controller_instance_id = _slaaps_clock.control.controller_instance_id;
+		candidate.configuration_identity = _slaaps_clock.control.configuration_identity;
+		candidate.clock_sent_us = _slaaps_clock.sent_us;
+		_slaaps_clock.valid = false;
+		sample = candidate;
+		return true;
+	}();
+	unlock_send();
+	return matched;
+}
+
+bool Mavlink::slaaps_bootstrap_status(const mavlink_message_t &status)
+{
+	// Frozen v1 state codes: disconnected, invalid map, no trusted session.
+	// The only exception is to the generation binding, never to signed TX.
+	constexpr uint16_t eligible_for_control = 1U;
+	return mavlink_msg_research_acceleration_status_get_clock_mapping_epoch(&status) == 0
+	       && mavlink_msg_research_acceleration_status_get_source_id(&status) == 0
+	       && mavlink_msg_research_acceleration_status_get_session_id(&status) == 0
+	       && mavlink_msg_research_acceleration_status_get_clock_mapping_state(&status) == 2
+	       && mavlink_msg_research_acceleration_status_get_transport_state(&status) == 2
+	       && mavlink_msg_research_acceleration_status_get_session_state(&status) == 1
+	       && !(mavlink_msg_research_acceleration_status_get_status_flags(&status) & eligible_for_control);
+}
+
+bool Mavlink::send_slaaps_status_sample(const slaaps_companion_tx_s &status, unsigned revision,
+					uORB::ResearchSubscription &input, unsigned &pinned_revision, bool priority, bool &retry)
+{
+	// Existing recursive send lock is held by the bounded dispatch caller.
+	retry = false;
+	uint64_t now{};
+	constexpr unsigned frame_size = MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_LEN
+					+ MAVLINK_NUM_NON_PAYLOAD_BYTES + MAVLINK_SIGNATURE_BLOCK_LEN;
+	constexpr uint32_t protocol_version = 0x00010000;
+	static_assert(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_LEN == 106, "Companion status payload changed");
+
+	if (!read_slaaps_control(now) || !revision || revision != input.revision()
+	    || (pinned_revision && revision != pinned_revision)
+	    || status.timestamp < _slaaps_binding_started || status.timestamp > now
+	    || status.deadline <= status.timestamp || now >= status.deadline || status.deadline > _slaaps_control.deadline
+	    || status.configuration_identity != _slaaps_control.configuration_identity
+	    || status.controller_instance_id != _slaaps_control.controller_instance_id || status.binding_id != _slaaps_control.binding_id
+	    || status.mavlink_instance != _instance_id || status.target_system != _slaaps_control.source_system
+	    || status.target_component != _slaaps_control.source_component || !slaaps_signed_output() || !should_transmit()
+	    || _slaaps_complete_tx == UINT64_MAX) { return false; }
+
+	mavlink_message_t frame{};
+	frame.msgid = MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS;
+	frame.len = sizeof(status.payload);
+	memcpy(_MAV_PAYLOAD_NON_CONST(&frame), status.payload, sizeof(status.payload));
+
+	if (mavlink_msg_research_acceleration_status_get_protocol_version(&frame) != protocol_version
+	    || mavlink_msg_research_acceleration_status_get_controller_instance_id(&frame) != status.controller_instance_id
+	    || !mavlink_msg_research_acceleration_status_get_transition_epoch(&frame)
+	    || !mavlink_msg_research_acceleration_status_get_status_sequence(&frame)
+	    || mavlink_msg_research_acceleration_status_get_target_system(&frame) != status.target_system
+	    || mavlink_msg_research_acceleration_status_get_target_component(&frame) != status.target_component
+	    || (status.signing_generation ? status.signing_generation != signing_generation() : !slaaps_bootstrap_status(frame))) { return false; }
+
+	constexpr uint8_t barrier_status_class = 3; // Frozen v1 logical barrier class.
+
+	if (priority && mavlink_msg_research_acceleration_status_get_status_class(&frame) != barrier_status_class) { return false; }
+
+	// Validate cached evidence even when the link has no space. Only a valid
+	// original envelope can remain pending for the next ordinary dispatch.
+	const bool space = get_free_tx_buf() >= frame_size;
+
+	if (input.revision() != revision || _slaaps_control_input.revision() != _slaaps_control_revision
+	    || hrt_absolute_time() >= math::min(status.deadline, _slaaps_control.deadline)) { return false; }
+
+	pinned_revision = revision;
+
+	if (!space) { retry = true; return false; }
+
+	const uint64_t before = _slaaps_complete_tx;
+	_mav_finalize_message_chan_send(get_channel(), MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS,
+					_MAV_PAYLOAD(&frame), MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_MIN_LEN,
+					MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_LEN, MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_CRC);
+	const bool sent = _slaaps_complete_tx == before + 1;
+	retry = !sent;
+	return sent;
+}
+
+bool Mavlink::send_slaaps_companion_status()
+{
+	lock_send();
+	bool sent = false;
+	uint64_t now{};
+	constexpr unsigned frame_size = MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS_LEN
+					+ MAVLINK_NUM_NON_PAYLOAD_BYTES + MAVLINK_SIGNATURE_BLOCK_LEN;
+
+	if (read_slaaps_control(now)) {
+		// The alias has the same queue depth. Drain only its bounded unread
+		// prefix into one latest candidate; ordinary reports cannot overwrite
+		// this retained exact barrier or its original envelope deadline.
+		for (unsigned copied = 0; copied < slaaps_companion_tx_s::ORB_QUEUE_LENGTH && _slaaps_barrier_input.updated(); ++copied) {
+			unsigned revision{};
+
+			if (!_slaaps_barrier_input.copyQueuedBound(&_slaaps_barrier_candidate, revision)) { break; }
+
+			_slaaps_barrier_candidate_revision = revision;
+			_slaaps_barrier_pending = true;
+		}
+
+		unsigned attempts{};
+
+		if (_slaaps_barrier_pending) {
+			bool retry{};
+			const unsigned candidate_revision = _slaaps_barrier_candidate_revision;
+			++attempts;
+			sent = send_slaaps_status_sample(_slaaps_barrier_candidate, candidate_revision,
+							 _slaaps_barrier_input, _slaaps_barrier_revision, true, retry);
+			_slaaps_barrier_pending = retry;
+
+			// A nested control read can first observe a new namespace and reset
+			// cache bookkeeping. Retry only the same validated candidate bytes
+			// and their real copied publisher revision, never a previous binding.
+			if (retry) { _slaaps_barrier_candidate_revision = candidate_revision; }
+		}
+
+		// Priority consumes one of the existing eight attempts even when it
+		// is invalid or TX fails. Correlated ordinary reports keep their path.
+		for (; attempts < slaaps_companion_tx_s::ORB_QUEUE_LENGTH && _slaaps_tx_input.updated()
+		     && get_free_tx_buf() >= frame_size; ++attempts) {
+			slaaps_companion_tx_s status{};
+			unsigned revision{};
+
+			if (!_slaaps_tx_input.copyQueuedBound(&status, revision)) { break; }
+
+			bool retry{};
+			sent |= send_slaaps_status_sample(status, revision, _slaaps_tx_input, _slaaps_tx_revision, false, retry);
+		}
+	}
+
+	unlock_send();
+	return sent;
+}
+
+#endif
+
+
 void Mavlink::check_signing_key_dirty()
 {
 	bool expected = true;
@@ -970,6 +1269,11 @@ void Mavlink::send_finish()
 
 	if (ret == (int)_buf_fill) {
 		_tx_message_count.fetch_add(1);
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_REQUEST)
+
+		if (_slaaps_complete_tx != UINT64_MAX) { ++_slaaps_complete_tx; }
+
+#endif
 		count_txbytes(_buf_fill);
 		_last_write_success_time = _last_write_try_time;
 
@@ -2162,6 +2466,10 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 			configure_stream_local(stream.name, stream.rate);
 		}
 	};
+
+#if defined(CONFIG_MODULES_SLAAPS) && defined(MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS)
+	configure_stream_local("SLAAPS_COMPANION_STATUS", -1.f);
+#endif
 
 	switch (_mode) {
 	case MAVLINK_MODE_NORMAL:

@@ -1,4 +1,6 @@
 #include "VehicleConfiguration.hpp"
+#include "WrenchAllocator.hpp"
+#include <lib/research_acceleration/TrustedTimeMap.hpp>
 
 #include <cmath>
 #include <cstring>
@@ -12,6 +14,10 @@ constexpr float kMinimumServoPulse = 500.F;
 constexpr float kMaximumServoPulse = 2500.F;
 constexpr int32_t kMaximumMetadataAgeUs = 1000000;
 constexpr int32_t kMaximumCycleUs = 500000;
+constexpr int32_t kMaximumManualReadyWaitS = 60; // Software operator-wait bound, not timing qualification.
+constexpr int32_t kMaximumRelativeDriftPpm = 100000;
+constexpr int32_t kMaximumMapIntervalUs = 60000000;
+constexpr float kMaximumCompanionAcceleration = 1000.F; // Software metadata range, not vehicle authority.
 
 bool positive(float value) { return std::isfinite(value) && value > 0.F; }
 
@@ -26,6 +32,18 @@ ConfigurationResult scalarRanges(const VehicleConfiguration &c)
 #include "VehicleParameters.def"
 #undef SLAAPS_INT
 #undef SLAAPS_FLOAT
+	const char *imu_parameters[kAxes] {"EKF2_IMU_POS_X", "EKF2_IMU_POS_Y", "EKF2_IMU_POS_Z"};
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		if (!std::isfinite(c.feedback.imu_position[axis])) { return {ConfigurationFault::ParameterRange, imu_parameters[axis]}; }
+	}
+
+	// Native metadata has no position range. The cutoff has an explicit native
+	// range, including zero for disabled filtering; never manufacture an offset.
+	if (!std::isfinite(c.feedback.cutoff_hz) || c.feedback.cutoff_hz < 0.F || c.feedback.cutoff_hz > 1000.F) {
+		return {ConfigurationFault::ParameterRange, "IMU_ACCEL_CUTOFF"};
+	}
+
 	return {};
 }
 
@@ -112,13 +130,54 @@ ConfigurationResult activationTiming(const VehicleConfiguration &c, uint64_t min
 		return {ConfigurationFault::InvalidTiming, "SLA_ACT_ACK_US"};
 	}
 
+	uint64_t reserve{};
+
+	if (!activationReserveUs(c, reserve)) { return {ConfigurationFault::InvalidTiming, "SLA_ACT_ACK_US"}; }
+
+	// Admission reserves the complete declared reply window, not only a lucky
+	// early reply. Original live sample expiry still needs an independent check.
+	if (c.output_lease_ms <= 0 || static_cast<uint64_t>(c.output_lease_ms) * kUsPerMs <= reserve) {
+		return {ConfigurationFault::InvalidTiming, "SLA_OUT_LEASE"};
+	}
+
+	// Commander age is inclusive; the permission deadline is exclusive.
+	if (static_cast<uint64_t>(c.actuator_permission_age_us) + 1 <= reserve) {
+		return {ConfigurationFault::InvalidTiming, "SLA_ARM_AGE"};
+	}
+
+	if (c.manual_age_ms <= 0 || static_cast<uint64_t>(c.manual_age_ms) * kUsPerMs <= reserve) {
+		return {ConfigurationFault::InvalidTiming, "SLA_IN_AGE"};
+	}
+
+	return {};
+}
+
+ConfigurationResult propulsionActivationTiming(const VehicleConfiguration &c)
+{
+	uint64_t reserve{};
+
+	if (!activationReserveUs(c, reserve)) { return {ConfigurationFault::InvalidTiming, "SLA_ACT_ACK_US"}; }
+
+	// The original selected battery report bounds every propulsion permission.
+	if (c.power.maximum_age_us <= 0 || static_cast<uint64_t>(c.power.maximum_age_us) + 1 <= reserve) {
+		return {ConfigurationFault::InvalidTiming, "SLA_PWR_AGE"};
+	}
+
 	return {};
 }
 
 ConfigurationResult manualActivationTiming(const VehicleConfiguration &c)
 {
-	return activationTiming(c, c.cycle_min_us > 0 ? static_cast<uint64_t>(c.cycle_min_us) : 0,
-				c.cycle_max_us > 0 ? static_cast<uint64_t>(c.cycle_max_us) : 0, "SLA_CYCLE_MAX");
+	const auto timing = activationTiming(c, c.cycle_min_us > 0 ? static_cast<uint64_t>(c.cycle_min_us) : 0,
+					     c.cycle_max_us > 0 ? static_cast<uint64_t>(c.cycle_max_us) : 0, "SLA_CYCLE_MAX");
+
+	if (!timing.valid()) { return timing; }
+
+	if (c.manual_ready_wait_s <= 0 || c.manual_ready_wait_s > kMaximumManualReadyWaitS) {
+		return {ConfigurationFault::InvalidTiming, "SLA_MAN_WAIT"};
+	}
+
+	return {};
 }
 
 ConfigurationResult benchActivationTiming(const VehicleConfiguration &c)
@@ -319,6 +378,302 @@ ConfigurationResult controlScheduleConfiguration(const VehicleConfiguration &c)
 
 	return {};
 }
+
+bool buildWrenchModel(const VehicleConfiguration &c, const ControlScheduleCorner *corner,
+		      float reference_thrust, WrenchModel &model)
+{
+	WrenchModel candidate{};
+	const auto &wrench = c.wrench;
+	bool edf_force_present = false;
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		const float force = corner ? corner->edf_force_per_thrust[axis] : wrench.edf_force_per_thrust[axis];
+		const float moment = corner ? corner->edf_moment_per_thrust[axis] : wrench.edf_moment_per_thrust[axis];
+		edf_force_present = edf_force_present || std::fabs(force) > 0.F;
+		candidate.effectiveness[axis][kCanards] = force;
+		candidate.effectiveness[kAxes + axis][kCanards] = moment;
+		candidate.offset[axis] = (corner ? corner->trim_force[axis] : wrench.trim_force[axis]) - force * reference_thrust;
+		candidate.offset[kAxes + axis] = (corner ? corner->trim_moment[axis] : wrench.trim_moment[axis])
+						 - moment * reference_thrust;
+
+		for (unsigned canard = 0; canard < kCanards; ++canard) {
+			const auto &surface = c.canard[canard];
+			const float force_derivative = corner ? corner->force_derivative[axis][canard] : surface.force_derivative[axis];
+			const float moment_derivative = corner ? corner->moment_derivative[axis][canard] : surface.moment_derivative[axis];
+			candidate.effectiveness[axis][canard] = force_derivative * surface.deflection_slope;
+			candidate.effectiveness[kAxes + axis][canard] = moment_derivative * surface.deflection_slope;
+			candidate.offset[axis] -= candidate.effectiveness[axis][canard] * surface.trim;
+			candidate.offset[kAxes + axis] -= candidate.effectiveness[kAxes + axis][canard] * surface.trim;
+		}
+	}
+
+	if (!edf_force_present) { return false; }
+
+	for (unsigned row = 0; row < kWrenchAxes; ++row) {
+		if (!std::isfinite(candidate.offset[row])) { return false; }
+
+		for (float coefficient : candidate.effectiveness[row]) {
+			if (!std::isfinite(coefficient)) { return false; }
+		}
+	}
+
+	model = candidate;
+	return true;
+}
+}
+
+ConfigurationResult validateWrenchConfiguration(const VehicleConfiguration &c)
+{
+	const auto scalar = scalarRanges(c);
+
+	if (!scalar.valid() || !c.wrench.enabled) { return scalar; }
+
+	const char *force_parameters[kAxes] {"SLA_WR_FT_X", "SLA_WR_FT_Y", "SLA_WR_FT_Z"};
+	const char *moment_parameters[kAxes] {"SLA_WR_MT_X", "SLA_WR_MT_Y", "SLA_WR_MT_Z"};
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		if (!positive(c.wrench.force_residual_tolerance[axis])) {
+			return {ConfigurationFault::InvalidWrench, force_parameters[axis]};
+		}
+
+		if (!positive(c.wrench.moment_residual_tolerance[axis])) {
+			return {ConfigurationFault::InvalidWrench, moment_parameters[axis]};
+		}
+	}
+
+	for (const auto &canard : c.canard) {
+		if (!validServo(canard)) { return {ConfigurationFault::InvalidServo, nullptr}; }
+	}
+
+	if (!validThrustCurve(c)) { return {ConfigurationFault::InvalidThrustCurve, "SLA_EDF_T4"}; }
+
+	research_stabilized_manual::AllocationConfiguration allocation{};
+	WrenchModel model{};
+
+	if (c.schedule.enabled) {
+		const auto schedule = controlScheduleConfiguration(c);
+
+		if (!schedule.valid()) { return schedule; }
+
+		for (unsigned i = 0; i < kScheduleKnots; ++i) {
+			for (unsigned j = 0; j < kScheduleKnots; ++j) {
+				float reference{};
+
+				if (!commandToThrust(c, c.schedule.edf_command[j], reference)
+				    || !buildWrenchModel(c, &c.schedule.corner[i][j], reference, model)) {
+					return {ConfigurationFault::InvalidWrench, nullptr};
+				}
+			}
+		}
+
+	} else {
+		buildAllocationConfiguration(c, allocation, nullptr);
+
+		if (!research_stabilized_manual::validAllocationConfiguration(allocation)) {
+			return {ConfigurationFault::InvalidEffectiveness, nullptr};
+		}
+
+		if (c.condition_thrust < c.edf_thrust[0] || c.condition_thrust > c.edf_thrust[kThrustPoints - 1]) {
+			return {ConfigurationFault::InvalidWrench, "SLA_TEST_THR"};
+		}
+
+		if (!buildWrenchModel(c, nullptr, c.condition_thrust, model)) {
+			return {ConfigurationFault::InvalidWrench, nullptr};
+		}
+	}
+
+	return {};
+}
+
+bool makeWrenchModel(const VehicleConfiguration &c, WrenchModel &model)
+{
+	return c.wrench.enabled == 1 && !c.schedule.enabled && validateWrenchConfiguration(c).valid()
+	       && buildWrenchModel(c, nullptr, c.condition_thrust, model);
+}
+
+bool makeWrenchCornerModel(const VehicleConfiguration &c, unsigned i, unsigned j, WrenchModel &model)
+{
+	if (c.wrench.enabled != 1 || c.schedule.enabled != 1 || i >= kScheduleKnots || j >= kScheduleKnots
+	    || !validateWrenchConfiguration(c).valid()) { return false; }
+
+	float reference{};
+	return commandToThrust(c, c.schedule.edf_command[j], reference)
+	       && buildWrenchModel(c, &c.schedule.corner[i][j], reference, model);
+}
+
+ConfigurationResult validateAccelerationFeedbackConfiguration(const VehicleConfiguration &c)
+{
+	const auto scalar = scalarRanges(c);
+
+	if (!scalar.valid() || !c.feedback.enabled) { return scalar; }
+
+	const auto &feedback = c.feedback;
+
+	if (feedback.latency_bound_us <= 0) { return {ConfigurationFault::InvalidFeedback, "SLA_FB_LAT_US"}; }
+
+	if (feedback.maximum_age_us <= feedback.latency_bound_us) { return {ConfigurationFault::InvalidFeedback, "SLA_FB_AGE"}; }
+
+	if (feedback.maximum_bias_age_us <= 0) { return {ConfigurationFault::InvalidFeedback, "SLA_FB_BIAS_AGE"}; }
+
+	if (feedback.settling_us < feedback.latency_bound_us) { return {ConfigurationFault::InvalidFeedback, "SLA_FB_SETTLE_US"}; }
+
+	if (!positive(feedback.maximum_specific_force_m_s2)) { return {ConfigurationFault::InvalidFeedback, "SLA_FB_F_MAX"}; }
+
+	if (!positive(feedback.maximum_acceleration_m_s2)) { return {ConfigurationFault::InvalidFeedback, "SLA_FB_A_MAX"}; }
+
+	if (!positive(feedback.gravity_m_s2)) { return {ConfigurationFault::InvalidFeedback, "SLA_FB_GRAV"}; }
+
+	if (c.state_age_ms <= 0) { return {ConfigurationFault::InvalidFeedback, "SLA_STATE_AGE"}; }
+
+	if (c.selected_status_age_us <= 0) { return {ConfigurationFault::InvalidFeedback, "SLA_STATUS_AGE"}; }
+
+	if (c.state_skew_ms <= 0 || static_cast<uint64_t>(c.state_skew_ms) * kUsPerMs <= static_cast<uint64_t>(feedback.latency_bound_us)) {
+		return {ConfigurationFault::InvalidFeedback, "SLA_STATE_SKEW"};
+	}
+
+	if (!positive(c.quaternion_tolerance) || c.quaternion_tolerance >= 1.F) {
+		return {ConfigurationFault::InvalidFeedback, "SLA_QUAT_TOL"};
+	}
+
+	const char *rate_parameters[kAxes] {"SLA_R_MEAS_R", "SLA_P_MEAS_R", "SLA_Y_MEAS_R"};
+	const char *acceleration_parameters[kAxes] {"SLA_R_MEAS_A", "SLA_P_MEAS_A", "SLA_Y_MEAS_A"};
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		if (!positive(c.axis[axis].measured_rate_limit)) { return {ConfigurationFault::InvalidFeedback, rate_parameters[axis]}; }
+
+		if (!positive(c.axis[axis].measured_accel_limit)) { return {ConfigurationFault::InvalidFeedback, acceleration_parameters[axis]}; }
+	}
+
+	return {};
+}
+
+bool companionClockRenewalConfigured(const CompanionConfiguration &c, uint64_t &lead_us, uint64_t *observation_slack_us)
+{
+	if (c.map_interval_us <= 0 || c.map_interval_us > 60000000 || c.maximum_round_trip_us <= 0
+	    || c.maximum_round_trip_us > 1000000 || c.timestamp_uncertainty_us <= 0 || c.timestamp_uncertainty_us > 1000000
+	    || c.maximum_relative_drift_ppm <= 0 || c.maximum_relative_drift_ppm > 100000
+	    || c.maximum_clock_uncertainty_us <= 0 || c.maximum_clock_uncertainty_us > 1000000) { return false; }
+
+	const auto interval = static_cast<uint64_t>(c.map_interval_us);
+	const auto rtt = static_cast<uint64_t>(c.maximum_round_trip_us);
+	const auto stamp = static_cast<uint64_t>(c.timestamp_uncertainty_us);
+	const auto drift = static_cast<uint64_t>(c.maximum_relative_drift_ppm);
+	constexpr uint64_t ppm_scale = 1000000;
+
+	if (interval > UINT64_MAX / drift) { return false; }
+
+	const uint64_t product = interval * drift;
+	const uint64_t drift_uncertainty = product / ppm_scale + (product % ppm_scale ? 1 : 0);
+	const uint64_t lead = interval / 2 > rtt ? interval / 2 : rtt;
+	const uint64_t uncertainty = rtt / 2 + (rtt & 1U) + stamp + drift_uncertainty;
+	const uint64_t spent = rtt + (rtt & 1U) + stamp + drift_uncertainty;
+
+	if (lead >= interval || uncertainty > static_cast<uint64_t>(c.maximum_clock_uncertainty_us)
+	    || spent >= interval || interval - spent <= lead) { return false; }
+
+	lead_us = lead;
+
+	if (observation_slack_us) { *observation_slack_us = interval - spent - lead; }
+
+	return true;
+}
+
+ConfigurationResult validateAccelerationControlConfiguration(const VehicleConfiguration &c)
+{
+	const auto scalar = scalarRanges(c);
+
+	if (!scalar.valid()) { return scalar; }
+
+	if (c.acceleration_control.enabled != 1) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_ACC_CTL_EN"}; }
+
+	const char *gain_parameters[kAxes] {"SLA_ACC_P_X", "SLA_ACC_P_Y", "SLA_ACC_P_Z"};
+	const char *limit_parameters[kAxes] {"SLA_ACC_LIM_X", "SLA_ACC_LIM_Y", "SLA_ACC_LIM_Z"};
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		if (!positive(c.acceleration_control.acceleration_feedback_p[axis])) { return {ConfigurationFault::InvalidAccelerationControl, gain_parameters[axis]}; }
+
+		if (!positive(c.acceleration_control.correction_limit[axis])) { return {ConfigurationFault::InvalidAccelerationControl, limit_parameters[axis]}; }
+	}
+
+	if (!positive(c.mass)) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_MASS"}; }
+
+	if (c.feedback.enabled != 1) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_FB_EN"}; }
+
+	const auto feedback = validateAccelerationFeedbackConfiguration(c);
+
+	if (!feedback.valid()) { return feedback; }
+
+	if (c.schedule.enabled != 1) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_SCH_EN"}; }
+
+	const auto schedule = validateControlSchedule(c);
+
+	if (!schedule.valid()) { return schedule; }
+
+	if (c.wrench.enabled != 1) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_WR_EN"}; }
+
+	const auto wrench = validateWrenchConfiguration(c);
+
+	if (!wrench.valid()) { return wrench; }
+
+	// Shared weights/scales are fixed throughout interpolation. Squared
+	// weighted column norms are convex, so validating every corner bounds the
+	// allocator's numerical scaling over the entire supported rectangle.
+	WrenchModel model{};
+
+	for (unsigned i = 0; i < kScheduleKnots; ++i) {
+		for (unsigned j = 0; j < kScheduleKnots; ++j) {
+			float reference{};
+
+			if (!commandToThrust(c, c.schedule.edf_command[j], reference)
+			    || !buildWrenchModel(c, &c.schedule.corner[i][j], reference, model)) { return {ConfigurationFault::InvalidWrench, nullptr}; }
+
+			const auto scaling = validateVehicleWrenchAllocationScaling(c, model);
+
+			if (!scaling.valid()) { return scaling; }
+		}
+	}
+
+	const auto power = validatePowerConfiguration(c, true);
+
+	if (!power.valid()) { return power; }
+
+	if (c.schedule.battery_instance != c.power.battery_instance) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_SCH_BAT_INST"}; }
+
+	if (c.schedule.battery_id != c.power.battery_id) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_SCH_BAT_ID"}; }
+
+	if (!companionAdmissionConfigured(c)) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_CMP_ADMIT"}; }
+
+	uint64_t lead{};
+
+	if (!companionClockRenewalConfigured(c.companion, lead)) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_CMP_MAP_US"}; }
+
+	if (c.cycle_min_us <= 0 || c.cycle_max_us <= c.cycle_min_us) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_CYCLE_MAX"}; }
+
+	if (!positive(c.edf_rise)) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_EDF_RISE"}; }
+
+	if (!positive(c.edf_fall)) { return {ConfigurationFault::InvalidAccelerationControl, "SLA_EDF_FALL"}; }
+
+	for (const auto &axis : c.axis) {
+		if (!positive(axis.attitude_gain) || !positive(axis.rate_limit) || !positive(axis.setpoint_accel_limit)
+		    || !positive(axis.integrator_limit) || !positive(axis.moment_limit) || !positive(axis.moment_scale)) {
+			return {ConfigurationFault::InvalidAccelerationControl, nullptr};
+		}
+	}
+
+	return {};
+}
+
+bool activationReserveUs(const VehicleConfiguration &c, uint64_t &reserve_us)
+{
+	if (c.activation_ack_timeout_us <= 0 || c.first_command_budget_us <= 0) { return false; }
+
+	const auto activation = static_cast<uint64_t>(c.activation_ack_timeout_us);
+	const auto first_command = static_cast<uint64_t>(c.first_command_budget_us);
+
+	if (activation > UINT64_MAX - first_command) { return false; }
+
+	reserve_us = activation + first_command;
+	return true;
 }
 
 bool manualActivationTimingConfigured(const VehicleConfiguration &c)
@@ -365,7 +720,135 @@ ConfigurationResult validateCompanionConfiguration(const VehicleConfiguration &c
 
 	if (enabled && companion.maximum_age_us == 0) { return {ConfigurationFault::InvalidTiming, "SLA_CMP_AGE"}; }
 
+	if (companion.admission_enabled < 0 || companion.admission_enabled > 1) {
+		return {ConfigurationFault::ParameterRange, "SLA_CMP_ADMIT"};
+	}
+
+	if (companion.disarmed_policy < 0 || companion.disarmed_policy > 2) {
+		return {ConfigurationFault::ParameterRange, "SLA_CMP_DISARM"};
+	}
+
+	const bool admission = companion.admission_enabled == 1;
+	static constexpr const char *minimum_parameters[kAxes] {"SLA_CMP_AX_MIN", "SLA_CMP_AY_MIN", "SLA_CMP_AZ_MIN"};
+	static constexpr const char *maximum_parameters[kAxes] {"SLA_CMP_AX_MAX", "SLA_CMP_AY_MAX", "SLA_CMP_AZ_MAX"};
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		const float minimum = companion.acceleration_minimum[axis], maximum = companion.acceleration_maximum[axis];
+
+		if (!std::isfinite(minimum) || minimum < -kMaximumCompanionAcceleration || minimum > kMaximumCompanionAcceleration) {
+			return {ConfigurationFault::ParameterRange, minimum_parameters[axis]};
+		}
+
+		if (!std::isfinite(maximum) || maximum < -kMaximumCompanionAcceleration || maximum > kMaximumCompanionAcceleration) {
+			return {ConfigurationFault::ParameterRange, maximum_parameters[axis]};
+		}
+
+		if (admission && minimum > maximum) { return {ConfigurationFault::InvalidController, maximum_parameters[axis]}; }
+	}
+
+	if (!std::isfinite(companion.acceleration_norm_max) || companion.acceleration_norm_max < 0.F
+	    || companion.acceleration_norm_max > kMaximumCompanionAcceleration) {
+		return {ConfigurationFault::ParameterRange, "SLA_CMP_A_NORM"};
+	}
+
+	if (companion.minimum_validity_us < (admission ? 1 : 0) || companion.minimum_validity_us > kMaximumMetadataAgeUs) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_V_MIN"};
+	}
+
+	if (companion.maximum_validity_us < (admission ? 1 : 0) || companion.maximum_validity_us > kMaximumMetadataAgeUs
+	    || (admission && companion.maximum_validity_us < companion.minimum_validity_us)) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_V_MAX"};
+	}
+
+	if (companion.maximum_command_age_us < (admission ? 1 : 0) || companion.maximum_command_age_us > kMaximumMetadataAgeUs) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_CMD_AGE"};
+	}
+
+	if (companion.maximum_future_skew_us < (admission ? 1 : 0) || companion.maximum_future_skew_us > kMaximumMetadataAgeUs) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_FUTURE"};
+	}
+
+	if (companion.maximum_clock_uncertainty_us < (admission ? 1 : 0)
+	    || companion.maximum_clock_uncertainty_us > kMaximumMetadataAgeUs) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_CLOCK_U"};
+	}
+
+	if (companion.maximum_relative_drift_ppm < (admission ? 1 : 0) || companion.maximum_relative_drift_ppm > kMaximumRelativeDriftPpm) {
+		return {ConfigurationFault::ParameterRange, "SLA_CMP_DRIFT"};
+	}
+
+	if (companion.timestamp_uncertainty_us < (admission ? 1 : 0) || companion.timestamp_uncertainty_us > kMaximumMetadataAgeUs) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_STAMP_U"};
+	}
+
+	if (companion.maximum_round_trip_us < (admission ? 1 : 0) || companion.maximum_round_trip_us > kMaximumMetadataAgeUs) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_RTT"};
+	}
+
+	if (companion.map_interval_us < (admission ? 1 : 0) || companion.map_interval_us > kMaximumMapIntervalUs) {
+		return {ConfigurationFault::InvalidTiming, "SLA_CMP_MAP_US"};
+	}
+
+	if (!admission) { return {}; }
+
+	if (!enabled) { return {ConfigurationFault::ParameterRange, "SLA_CMP_EN"}; }
+
+	if (!companion.disarmed_policy) { return {ConfigurationFault::ParameterRange, "SLA_CMP_DISARM"}; }
+
+	if (!positive(companion.acceleration_norm_max)) { return {ConfigurationFault::InvalidController, "SLA_CMP_A_NORM"}; }
+
+	if (!positive(c.quaternion_tolerance) || c.quaternion_tolerance >= 1.F) {
+		return {ConfigurationFault::InvalidController, "SLA_QUAT_TOL"};
+	}
+
+	// Match RequestGuard's nonempty box/sphere intersection. A zero-width axis
+	// is permitted; no axis or norm limit is inferred from the vehicle model.
+	double closest_norm_squared = 0.;
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		const float minimum = companion.acceleration_minimum[axis], maximum = companion.acceleration_maximum[axis];
+		const double closest = minimum > 0.F ? minimum : (maximum < 0.F ? maximum : 0.F);
+		closest_norm_squared += closest * closest;
+	}
+
+	if (!std::isfinite(closest_norm_squared)
+	    || std::sqrt(closest_norm_squared) > static_cast<double>(companion.acceleration_norm_max)) {
+		return {ConfigurationFault::InvalidController, "SLA_CMP_A_NORM"};
+	}
+
 	return {};
+}
+
+bool companionAdmissionConfigured(const VehicleConfiguration &c)
+{
+	return c.companion.admission_enabled == 1 && validateCompanionConfiguration(c).valid();
+}
+
+bool makeCompanionContractConfiguration(const VehicleConfiguration &c, research_acceleration::ContractConfig &contract)
+{
+	if (!companionAdmissionConfigured(c)) { return false; }
+
+	const auto &companion = c.companion;
+	research_acceleration::ContractConfig candidate{};
+	candidate.protocol_version = research_acceleration::kWireProtocolVersionV1;
+	candidate.permitted_source = static_cast<uint64_t>(companion.source_id);
+	candidate.disarmed_policy = companion.disarmed_policy == 1 ? research_acceleration::DisarmedPolicy::Reject :
+				    research_acceleration::DisarmedPolicy::ValidateOnly;
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) {
+		candidate.acceleration_bounds.minimum_m_s2(axis) = companion.acceleration_minimum[axis];
+		candidate.acceleration_bounds.maximum_m_s2(axis) = companion.acceleration_maximum[axis];
+	}
+
+	candidate.acceleration_bounds.maximum_norm_m_s2 = companion.acceleration_norm_max;
+	candidate.timing.minimum_validity_us = static_cast<uint64_t>(companion.minimum_validity_us);
+	candidate.timing.maximum_validity_us = static_cast<uint64_t>(companion.maximum_validity_us);
+	candidate.timing.maximum_command_age_us = static_cast<uint64_t>(companion.maximum_command_age_us);
+	candidate.timing.maximum_future_skew_us = static_cast<uint64_t>(companion.maximum_future_skew_us);
+	candidate.timing.maximum_clock_uncertainty_us = static_cast<uint64_t>(companion.maximum_clock_uncertainty_us);
+	candidate.quaternion_norm_tolerance = c.quaternion_tolerance;
+	contract = candidate;
+	return true;
 }
 
 ConfigurationResult validatePowerConfiguration(const PowerConfiguration &power, bool required)
@@ -430,6 +913,10 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 
 	if (c.data_revision <= 0) { return {ConfigurationFault::MissingRecord, "SLA_DATA_REV"}; }
 
+	if (c.data_assessment > static_cast<int32_t>(DataAssessment::Incomplete) && c.data_record_id <= 0) {
+		return {ConfigurationFault::MissingRecord, "SLA_DATA_REC"};
+	}
+
 	if (c.manual_source != static_cast<int32_t>(ManualInputSource::RcOnly)
 	    && c.manual_source != static_cast<int32_t>(ManualInputSource::MavlinkOnly)) {
 		return {ConfigurationFault::ParameterRange, "SLA_IN_SOURCE"};
@@ -480,7 +967,8 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 
 		if (!positive(c.edf_fall)) { return {ConfigurationFault::InvalidController, "SLA_EDF_FALL"}; }
 
-		return benchActivationTiming(c);
+		const auto timing = benchActivationTiming(c);
+		return timing.valid() ? propulsionActivationTiming(c) : timing;
 	}
 
 	if (!positive(c.mass)) { return {ConfigurationFault::InvalidInertia, "SLA_MASS"}; }
@@ -531,13 +1019,17 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 		return {ConfigurationFault::InvalidTiming, "SLA_IN_AGE"};
 	}
 
-	const bool unconfigured_timing = !c.selected_status_age_us && !c.actuator_permission_age_us
+	const bool unconfigured_timing = !c.manual_ready_wait_s && !c.selected_status_age_us && !c.actuator_permission_age_us
 					 && !c.activation_ack_timeout_us && !c.first_command_budget_us;
 
 	if (!unconfigured_timing) {
 		const auto timing = manualActivationTiming(c);
 
 		if (!timing.valid()) { return timing; }
+
+		const auto propulsion_timing = propulsionActivationTiming(c);
+
+		if (!propulsion_timing.valid()) { return propulsion_timing; }
 	}
 
 	const auto schedule = controlScheduleConfiguration(c);
@@ -587,7 +1079,8 @@ bool equal(const VehicleConfiguration &left, const VehicleConfiguration &right)
 #include "VehicleParameters.def"
 #undef SLAAPS_INT
 #undef SLAAPS_FLOAT
-	return true;
+	return std::memcmp(left.feedback.imu_position, right.feedback.imu_position, sizeof(left.feedback.imu_position)) == 0
+	       && std::memcmp(&left.feedback.cutoff_hz, &right.feedback.cutoff_hz, sizeof(left.feedback.cutoff_hz)) == 0;
 }
 
 uint64_t fingerprint(const VehicleConfiguration &c)
@@ -609,6 +1102,10 @@ uint64_t fingerprint(const VehicleConfiguration &c)
 #include "VehicleParameters.def"
 #undef SLAAPS_INT
 #undef SLAAPS_FLOAT
+
+	for (unsigned axis = 0; axis < kAxes; ++axis) { append(&c.feedback.imu_position[axis]); }
+
+	append(&c.feedback.cutoff_hz);
 	return hash;
 }
 
@@ -627,6 +1124,21 @@ bool thrustToCommand(const VehicleConfiguration &c, float thrust_n, float &comma
 	}
 
 	return false;
+}
+
+bool commandToThrust(const VehicleConfiguration &c, float command, float &thrust_n)
+{
+	if (!validThrustCurve(c) || !std::isfinite(command) || command < 0.F || command > 1.F) { return false; }
+
+	const float coordinate = command * static_cast<float>(kThrustPoints - 1);
+	const unsigned low = static_cast<unsigned>(coordinate);
+	const float candidate = low >= kThrustPoints - 1 ? c.edf_thrust[kThrustPoints - 1]
+				: c.edf_thrust[low] + (coordinate - static_cast<float>(low)) * (c.edf_thrust[low + 1] - c.edf_thrust[low]);
+
+	if (!std::isfinite(candidate)) { return false; }
+
+	thrust_n = candidate;
+	return true;
 }
 
 bool normalizeManualThrottle(float raw, float low, float high, float &command)

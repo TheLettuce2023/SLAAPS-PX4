@@ -19,6 +19,11 @@ enum class MathStatus : uint8_t {
 	Overflow
 };
 
+// Checked normalization and canonical sign; q and -q produce the same attitude.
+// This does not infer a reference attitude. Failure preserves output.
+MathStatus normaliseAttitudeQuaternion(const QuaternionNedFromFrd &input, float norm_tolerance,
+				       QuaternionNedFromFrd &output);
+
 // q_nb rotates a vector expressed in FRD into NED. The output is unchanged
 // unless Ok is returned. A finite quaternion is normalised only when its norm
 // is within the caller-provided finite tolerance (0, 1) of one.

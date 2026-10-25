@@ -154,9 +154,17 @@ def main():
         files[str(destination.relative_to(out))] = dict(sha256=digest(destination), size=destination.stat().st_size)
     (out / "symbols.txt").write_text(symbols)
     shutil.copy2(build / "compile_commands.json", out / "compile_commands.json")
+    kernel = source / "platforms/nuttx/NuttX/nuttx"
+    configuration = {}
+    for label, original, name in (("header", kernel / "include/nuttx/config.h", "nuttx_config.h"),
+                                  ("config", kernel / ".config", "nuttx_dotconfig")):
+        assert original.is_file(), original
+        shutil.copy2(original, out / name)
+        configuration[label] = dict(path=name, sha256=digest(out / name))
     (out / "board-result.json").write_text(json.dumps(dict(passed=True, target=TARGET,
         source_manifest="board-source-manifest.json", source_manifest_sha256=digest(manifest_path),
         builder_sha256=digest(Path(__file__)), files=files,
+        nuttx_configuration=configuration,
         expected_git_tag=expected_tag, version_header_sha256=digest(out / "build_git_version.h"),
         hardware_operated=False, board_boot_verified=False, working_baseline_port=False), indent=2) + "\n")
     print("Board link PASS; no flashing or boot verification", flush=True)

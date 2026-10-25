@@ -2,6 +2,10 @@
 # Authentication is not source/session authorization, clock trust or output permission.
 uint64 timestamp # Local HRT after the complete frame or signing-state observation
 uint64 sequence # Nonwrapping receiver-local event sequence; gaps are observable
+uint64 control_binding_id # Matched clock exchange only; never inferred from a remote payload
+uint64 controller_instance_id
+uint64 configuration_identity
+uint64 clock_sent_us # Actual local challenge creation, accepted only after complete TX
 uint32 signing_generation # Nonwrapping local signing configuration lifetime, not key material
 uint32 message_id
 uint8 mavlink_instance # Supported instances 0..3, matching the topic suffix
@@ -13,6 +17,7 @@ uint8 payload_length
 uint8 event
 uint8 EVENT_LINK_STATE = 0
 uint8 EVENT_FRAME = 1
+uint8 EVENT_CLOCK_SAMPLE = 2
 bool mavlink2
 bool signing_active
 bool signature_verified # Configured verifier accepted this exact signed frame; never the signed bit alone

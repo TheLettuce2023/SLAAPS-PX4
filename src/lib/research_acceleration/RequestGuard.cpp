@@ -1,6 +1,7 @@
 #include "RequestGuard.hpp"
 
 #include <cmath>
+#include <cstring>
 #include <stdint.h>
 
 namespace research_acceleration
@@ -316,6 +317,13 @@ Decision RequestGuard::evaluate(const CanonicalRequest &request, const Evaluatio
 
 	if (payload.code == DecisionCode::Accepted) {
 		active_request_ = request;
+
+		if (request.command_kind == CommandKind::AccelerationAndAttitude) {
+			// evaluatePayload checked the identical immutable input and tolerance.
+			normaliseAttitudeQuaternion(request.desired_attitude_ned_from_body, config_.quaternion_norm_tolerance,
+						    active_request_.desired_attitude_ned_from_body);
+		}
+
 		has_active_request_ = true;
 		return decision(DecisionCode::Accepted, true, true, payload.conservative_age_us);
 	}
@@ -325,7 +333,14 @@ Decision RequestGuard::evaluate(const CanonicalRequest &request, const Evaluatio
 
 Decision RequestGuard::evaluatePayload(const CanonicalRequest &request, const EvaluationContext &context)
 {
-	if (request.protocol_version != config_.protocol_version) {
+	const bool full_command = request.protocol_version == kRequestProtocolVersionV2
+				  && request.command_kind == CommandKind::AccelerationAndAttitude
+				  && config_.protocol_version == kRequestProtocolVersionV1;
+	const bool acceleration_only = request.protocol_version == config_.protocol_version
+				       && request.protocol_version != kRequestProtocolVersionV2
+				       && request.command_kind == CommandKind::AccelerationOnly;
+
+	if (!full_command && !acceleration_only) {
 		return reject(DecisionCode::WrongProtocolVersion);
 	}
 
@@ -351,6 +366,29 @@ Decision RequestGuard::evaluatePayload(const CanonicalRequest &request, const Ev
 
 	if (request.reference_point != ReferencePoint::Cg) {
 		return reject(DecisionCode::WrongReferencePoint);
+	}
+
+	if (full_command) {
+		QuaternionNedFromFrd normalized;
+		const MathStatus status = normaliseAttitudeQuaternion(request.desired_attitude_ned_from_body,
+					  config_.quaternion_norm_tolerance, normalized);
+
+		if (status != MathStatus::Ok) {
+			return reject(status == MathStatus::NonFinite ? DecisionCode::NonFinite : DecisionCode::InvalidCommandAttitude);
+		}
+
+	} else {
+		for (int index = 0; index < 4; ++index) {
+			const float value = request.desired_attitude_ned_from_body(index);
+
+			if (!std::isfinite(value)) { return reject(DecisionCode::NonFinite); }
+
+			uint32_t bits{};
+			static_assert(sizeof(value) == sizeof(bits), "wire quaternion requires binary32");
+			memcpy(&bits, &value, sizeof(bits));
+
+			if (bits != 0) { return reject(DecisionCode::InvalidCommandAttitude); }
+		}
 	}
 
 	if (!finite(request.acceleration_frd_m_s2)) {

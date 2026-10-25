@@ -18,12 +18,16 @@ using TimeUs = uint64_t;
 using SourceId = uint64_t;
 using SessionId = uint64_t;
 
+static constexpr uint32_t kRequestProtocolVersionV1 = 0x00010000;
+static constexpr uint32_t kRequestProtocolVersionV2 = 0x00020000;
+
 enum class ArmState : uint8_t { Disarmed, Armed, Unknown };
 enum class ResearchModeState : uint8_t { NotSelected, Selected, Unknown };
 enum class DisarmedPolicy : uint8_t { Reject, ValidateOnly };
 enum class Frame : uint8_t { Frd };
 enum class Quantity : uint8_t { InertialAcceleration };
 enum class ReferencePoint : uint8_t { Cg };
+enum class CommandKind : uint8_t { AccelerationOnly, AccelerationAndAttitude };
 
 enum class DecisionCode : uint16_t {
 	Accepted, ValidatedDisarmed, NotConfigured, WrongProtocolVersion, WrongSource, NoSession,
@@ -34,7 +38,8 @@ enum class DecisionCode : uint16_t {
 	ValidityOutOfRange, RequestExpired, TimeArithmeticInvalid, RequiredStateInvalid, WrongFrame,
 	WrongQuantity, WrongReferencePoint, NonFinite, AxisOutOfBounds, NormOutOfBounds,
 	DisarmedRejected, ModeNotSelected, ArmStateUnknown, ModeStateUnknown, Disconnected, NoEligibleRequest, Latched,
-	ApiDomainMismatch // Local-only; append without changing existing wire ordinals.
+	ApiDomainMismatch, // Local-only; append without changing existing wire ordinals.
+	InvalidCommandAttitude
 };
 
 struct AccelerationBounds {
@@ -77,6 +82,9 @@ struct CanonicalRequest {
 	Quantity quantity;
 	ReferencePoint reference_point;
 	Vec3f acceleration_frd_m_s2;
+	// Version 1 never supplies an attitude, including an implicit identity/hold.
+	CommandKind command_kind{CommandKind::AccelerationOnly};
+	QuaternionNedFromFrd desired_attitude_ned_from_body{0.F, 0.F, 0.F, 0.F};
 };
 
 struct EvaluationContext {

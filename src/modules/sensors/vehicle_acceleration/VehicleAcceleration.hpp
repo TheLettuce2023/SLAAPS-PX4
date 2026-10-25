@@ -44,6 +44,9 @@
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionCallback.hpp>
+#if defined(CONFIG_MODULES_SLAAPS)
+#include <uORB/ResearchSubscription.hpp>
+#endif
 #include <uORB/topics/estimator_selector_status.h>
 #include <uORB/topics/estimator_sensor_bias.h>
 #include <uORB/topics/parameter_update.h>
@@ -74,22 +77,95 @@ private:
 	void ParametersUpdate(bool force = false);
 	void SensorBiasUpdate(bool force = false);
 	bool SensorSelectionUpdate(bool force = false);
+	void UpdateSourceProvenance();
+	void AdvanceSourceGeneration();
+	void ClearBiasProvenance();
+#if defined(CONFIG_MODULES_SLAAPS)
+	void UpdateRawSourceProvenance(unsigned revision);
+
+	// Keep the stock publication-count callback gate. Its composed subscription
+	// is registration-only; this bound cursor is the sole numerical queue reader.
+	class RawSubscription : public uORB::SubscriptionCallbackWorkItem
+	{
+	public:
+		RawSubscription(px4::WorkItem *work_item, const orb_metadata *meta) :
+			SubscriptionCallbackWorkItem(work_item, meta), _payload(meta) {}
+
+		bool ChangeInstance(uint8_t instance)
+		{
+			return SubscriptionCallbackWorkItem::ChangeInstance(instance) && _payload.ChangeInstance(instance);
+		}
+
+		bool updated()
+		{
+			hrt_abstime last_update = _last_update.load();
+			return _payload.advertised() && hrt_elapsed_time(&last_update) >= _interval_us.load() && _payload.updated();
+		}
+
+		bool copyQueuedBound(sensor_accel_s &sample, unsigned &revision)
+		{
+			revision = 0;
+
+			if (!updated() || !_payload.copyQueuedBound(&sample, revision)) { return false; }
+
+			// Preserve SubscriptionInterval's successful-copy interval accounting.
+			const hrt_abstime now = hrt_absolute_time();
+			const uint32_t interval_us = _interval_us.load();
+			_last_update.store(now > interval_us ? math::constrain(_last_update.load() + interval_us,
+					   now - interval_us, now) : now);
+			return true;
+		}
+
+		unsigned revision() { return _payload.revision(); }
+
+	private:
+		uORB::ResearchSubscription _payload;
+	};
+#endif
 
 	static constexpr int MAX_SENSOR_COUNT = 4;
 
 	uORB::Publication<vehicle_acceleration_s> _vehicle_acceleration_pub{ORB_ID(vehicle_acceleration)};
 
 	uORB::Subscription _estimator_selector_status_sub{ORB_ID(estimator_selector_status)};
-	uORB::Subscription _estimator_sensor_bias_sub{ORB_ID(estimator_sensor_bias)};
+#if defined(CONFIG_MODULES_SLAAPS)
+	uORB::ResearchSubscription _estimator_sensor_bias_sub {ORB_ID(estimator_sensor_bias)};
+#else
+	uORB::Subscription _estimator_sensor_bias_sub {ORB_ID(estimator_sensor_bias)};
+#endif
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	uORB::SubscriptionCallbackWorkItem _sensor_selection_sub{this, ORB_ID(sensor_selection)};
-	uORB::SubscriptionCallbackWorkItem _sensor_sub{this, ORB_ID(sensor_accel)};
+#if defined(CONFIG_MODULES_SLAAPS)
+	RawSubscription _sensor_sub {this, ORB_ID(sensor_accel)};
+	unsigned _raw_source_revision{};
+	uint8_t _raw_source_instance{UINT8_MAX};
+#else
+	uORB::SubscriptionCallbackWorkItem _sensor_sub {this, ORB_ID(sensor_accel)};
+#endif
 
 	calibration::Accelerometer _calibration{};
 
 	matrix::Vector3f _bias{};
+	uint64_t _bias_timestamp{};
+	uint64_t _bias_timestamp_sample{};
+	unsigned _bias_publisher_revision{};
+	unsigned _bias_source_revision{};
+	uint8_t _bias_instance{UINT8_MAX};
+	uint8_t _bias_source_instance{};
+	bool _bias_valid{};
+	bool _bias_source_available{};
+	bool _bias_selection_valid{true};
+
+	uint64_t _source_generation{1}; // Exhaustion sticks at zero; never reuse a generation.
+	uint32_t _source_device_id{};
+	matrix::Vector3f _source_offset{};
+	matrix::Vector3f _source_scale{};
+	matrix::Dcmf _source_rotation{};
+	uint8_t _source_calibration_count{};
+	bool _source_calibrated{};
+	bool _source_initialized{};
 
 	matrix::Vector3f _acceleration_prev{};
 

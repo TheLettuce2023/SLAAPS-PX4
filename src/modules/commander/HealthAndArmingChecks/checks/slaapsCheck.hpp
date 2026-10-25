@@ -9,6 +9,7 @@ class SlaapsChecks : public HealthAndArmingCheckBase
 {
 public:
 	void checkAndReport(const Context &context, Report &reporter) override;
+	bool isSlaapsAirframe() const { return _slaaps_airframe; }
 private:
 	uORB::Subscription _status{ORB_ID(slaaps_status)};
 	const param_t _autostart{param_find("SYS_AUTOSTART")};

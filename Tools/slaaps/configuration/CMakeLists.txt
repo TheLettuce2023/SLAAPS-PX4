@@ -33,7 +33,16 @@ endif()
 
 add_executable(slaaps_configuration_test
 	VehicleConfigurationTest.cpp
+	AccelerationFeedbackTest.cpp
+	AccelerationControllerTest.cpp
+	EdfOwnerTransferTest.cpp
+	FlightTransferTest.cpp
 	"${PX4_ROOT}/src/lib/slaaps/VehicleConfiguration.cpp"
+	"${PX4_ROOT}/src/lib/slaaps/WrenchAllocator.cpp"
+	"${PX4_ROOT}/src/lib/slaaps/VehicleWrenchAllocation.cpp"
+	"${PX4_ROOT}/src/lib/slaaps/AccelerationFeedback.cpp"
+	"${PX4_ROOT}/src/lib/slaaps/AccelerationControllerPort.cpp"
+	"${PX4_ROOT}/src/lib/research_acceleration/FrameMath.cpp"
 	"${PX4_ROOT}/src/lib/slaaps/ActuatorRouting.cpp"
 	"${PX4_ROOT}/src/lib/slaaps/EdfOwner.cpp"
 	"${PX4_ROOT}/src/lib/slaaps/ReportedRouting.cpp"

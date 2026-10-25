@@ -309,6 +309,9 @@ uint16_t WireAdapter::ingressLocalWireCode(IngressCode code, const TrustedStateS
 	case IngressCode::WireNonFinite:
 		return 28;
 
+	case IngressCode::WireAttitudeInvalid:
+		return 38;
+
 	case IngressCode::IngressRejected:
 		if (!ingress.mavlink2) { return 64; }
 
@@ -476,7 +479,8 @@ AdapterResult WireAdapter::terminalResult(AdapterCode code, TimeUs validator_tim
 	return result;
 }
 
-AdapterResult WireAdapter::process(const TrustedStateSample &sample, OperationKind operation, CanonicalRequest *request)
+AdapterResult WireAdapter::process(const TrustedStateSample &sample, OperationKind operation, CanonicalRequest *request,
+				   bool require_full_command)
 {
 #if RESEARCH_SITL_DIAGNOSTIC_CAPABILITY
 
@@ -573,6 +577,14 @@ AdapterResult WireAdapter::process(const TrustedStateSample &sample, OperationKi
 		CanonicalRequest candidate{};
 		copied_request = guard_.getEligibleRequest(sample.request_guard_context, candidate, decision);
 
+		if (copied_request && require_full_command
+		    && (candidate.protocol_version != kWireProtocolVersionV2
+			|| candidate.command_kind != CommandKind::AccelerationAndAttitude)) {
+			copied_request = false;
+			decision.code = DecisionCode::NoEligibleRequest;
+			decision.eligible_for_control = false;
+		}
+
 		if (copied_request && acknowledgementCurrent() && request != nullptr) {
 			*request = candidate;
 
@@ -643,6 +655,11 @@ AdapterResult WireAdapter::poll(const TrustedStateSample &sample)
 AdapterResult WireAdapter::getEligibleRequest(const TrustedStateSample &sample, CanonicalRequest &request)
 {
 	return process(sample, OperationKind::Access, &request);
+}
+
+AdapterResult WireAdapter::getEligibleFullRequest(const TrustedStateSample &sample, CanonicalRequest &request)
+{
+	return process(sample, OperationKind::Access, &request, true);
 }
 
 SessionSnapshot WireAdapter::sessionSnapshot() const
@@ -1227,7 +1244,9 @@ IngressCode WireAdapter::prepareRequest(const TrustedStateSample &sample, const 
 		code = IngressCode::AcknowledgementRequired;
 
 	} else {
-		const CanonicalizeCode conversion = canonicalizeRequestV1(packet.wire, sample.map, canonical);
+		const CanonicalizeCode conversion = packet.wire.protocol_version == kWireProtocolVersionV2
+						    ? canonicalizeRequestV2(packet.wire, sample.map, configuration_.quaternion_norm_tolerance, canonical)
+						    : canonicalizeRequestV1(packet.wire, sample.map, canonical);
 
 		if (conversion != CanonicalizeCode::Ok) {
 			code = canonicalizeIngressCode(conversion);

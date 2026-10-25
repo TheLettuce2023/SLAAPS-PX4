@@ -62,6 +62,60 @@ Decision evaluateOnce(const ContractConfig &config, const CanonicalRequest &requ
 	return guard.evaluate(request, context);
 }
 
+void fullCommandFixtures()
+{
+	auto config = fixtureConfig();
+	config.protocol_version = kRequestProtocolVersionV1;
+	RequestGuard guard(config);
+	establish(guard);
+	auto request = fixtureRequest();
+	request.protocol_version = kRequestProtocolVersionV2;
+	request.command_kind = CommandKind::AccelerationAndAttitude;
+	request.desired_attitude_ned_from_body = QuaternionNedFromFrd(-1.F, 0.F, 0.F, 0.F);
+	check(guard.evaluate(request, fixtureContext(110)).code == DecisionCode::Accepted,
+	      "full_command_uses_explicit_v2_under_v1_admin_envelope");
+	CanonicalRequest copied{};
+	Decision decision{};
+	check(guard.getEligibleRequest(fixtureContext(110), copied, decision)
+	      && copied.protocol_version == kRequestProtocolVersionV2
+	      && copied.command_kind == CommandKind::AccelerationAndAttitude
+	      && copied.desired_attitude_ned_from_body(0) == 1.F,
+	      "full_command_guard_caches_canonical_absolute_attitude");
+
+	for (unsigned fault = 0; fault < 6; ++fault) {
+		auto bad = request;
+		bad.sequence = 2;
+		bad.producer_monotonic_us = bad.producer_time_in_validator_domain_us = 101;
+		bad.producer_expiry_monotonic_us = bad.expiry_time_in_validator_domain_us = 201;
+
+		if (fault == 0) { bad.protocol_version = kRequestProtocolVersionV1; }
+
+		if (fault == 1) { bad.command_kind = CommandKind::AccelerationOnly; }
+
+		if (fault == 2) { bad.command_kind = static_cast<CommandKind>(99); }
+
+		if (fault == 3) { bad.desired_attitude_ned_from_body = QuaternionNedFromFrd(0.F, 0.F, 0.F, 0.F); }
+
+		if (fault == 4) { bad.desired_attitude_ned_from_body(0) = 1.02F; }
+
+		if (fault == 5) { bad.desired_attitude_ned_from_body(0) = std::numeric_limits<float>::infinity(); }
+
+		check(guard.evaluate(bad, fixtureContext(111)).code != DecisionCode::Accepted,
+		      "full_command_bad_version_kind_or_attitude_rejected");
+		check(guard.getEligibleRequest(fixtureContext(111), copied, decision) && copied.sequence == 1,
+		      "full_command_malformed_packet_does_not_replace_fresh_accepted_objective");
+	}
+
+	request.sequence = 2;
+	request.producer_monotonic_us = request.producer_time_in_validator_domain_us = 101;
+	request.producer_expiry_monotonic_us = request.expiry_time_in_validator_domain_us = 201;
+	request.desired_attitude_ned_from_body = QuaternionNedFromFrd(1.F, 0.F, 0.F, 0.F);
+	check(guard.evaluate(request, fixtureContext(111)).code == DecisionCode::Accepted,
+	      "full_command_rejections_do_not_consume_valid_sequence");
+	check(guard.evaluate(request, fixtureContext(111)).code == DecisionCode::DuplicateSequence,
+	      "full_command_keeps_original_replay_protection");
+}
+
 void additionalContractFixtures()
 {
 	// Non-operational branch/transition fixtures from independent S1 review.
@@ -572,6 +626,7 @@ int main()
 	check(precedence_guard.evaluate(malformed_foreign, bad_mapping).code == DecisionCode::ClockMappingInvalid,
 	      "fixture_global_context_loss_precedes_malformed_foreign_packet");
 	additionalContractFixtures();
+	fullCommandFixtures();
 	std::cout << checks << " checks; " << failures << " failures\n";
 	return failures == 0 ? 0 : 1;
 }
