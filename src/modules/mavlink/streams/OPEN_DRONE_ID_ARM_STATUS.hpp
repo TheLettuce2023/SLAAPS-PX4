@@ -54,7 +54,7 @@ public:
 	}
 
 	const char *get_name() const override { return get_name_static(); }
-	uint16_t get_id() override { return get_id_static(); }
+	uint32_t get_id() override { return get_id_static(); }
 
 	unsigned get_size() override
 	{

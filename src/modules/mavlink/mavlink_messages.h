@@ -52,15 +52,15 @@ class StreamListItem
 public:
 	MavlinkStream *(*new_instance)(Mavlink *mavlink);
 	const char *name;
-	uint16_t id;
+	uint32_t id;
 
-	constexpr StreamListItem(MavlinkStream * (*inst)(Mavlink *mavlink), const char *_name, uint16_t _id) :
+	constexpr StreamListItem(MavlinkStream * (*inst)(Mavlink *mavlink), const char *_name, uint32_t _id) :
 		new_instance(inst),
 		name(_name),
 		id(_id) {}
 
 	const char *get_name() const { return name; }
-	uint16_t get_id() const { return id; }
+	uint32_t get_id() const { return id; }
 };
 
 template <class T>
@@ -69,10 +69,10 @@ static constexpr StreamListItem create_stream_list_item()
 	return StreamListItem(&T::new_instance, T::get_name_static(), T::get_id_static());
 }
 
-const char *get_stream_name(const uint16_t msg_id);
+const char *get_stream_name(const uint32_t msg_id);
 
 MavlinkStream *create_mavlink_stream(const char *stream_name, Mavlink *mavlink);
 
-MavlinkStream *create_mavlink_stream(const uint16_t msg_id, Mavlink *mavlink);
+MavlinkStream *create_mavlink_stream(const uint32_t msg_id, Mavlink *mavlink);
 
 #endif /* MAVLINK_MESSAGES_H_ */

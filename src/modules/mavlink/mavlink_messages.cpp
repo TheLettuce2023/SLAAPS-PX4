@@ -538,7 +538,7 @@ static constexpr StreamListItem streams_list[] = {
 #endif // GLOBAL_POSITION_SENSOR_HPP
 };
 
-const char *get_stream_name(const uint16_t msg_id)
+const char *get_stream_name(const uint32_t msg_id)
 {
 	// search for stream with specified msg id in supported streams list
 	for (const auto &stream : streams_list) {
@@ -564,7 +564,7 @@ MavlinkStream *create_mavlink_stream(const char *stream_name, Mavlink *mavlink)
 	return nullptr;
 }
 
-MavlinkStream *create_mavlink_stream(const uint16_t msg_id, Mavlink *mavlink)
+MavlinkStream *create_mavlink_stream(const uint32_t msg_id, Mavlink *mavlink)
 {
 	// search for stream with specified name in supported streams list
 	for (const auto &stream : streams_list) {
