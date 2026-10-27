@@ -315,3 +315,11 @@ Motor1..Motor12 functions, so the SLAAPS EDF function (10104) gets no hardware o
 report inventory like `PWMOut`, and keep DShot special commands (beep, EDT, settings) from running while SLAAPS owns the
 channel. Board layout to confirm: Pixhawk 6X has an IO board, so the FMU outputs are PWM_AUX; the EDF on a DShot600
 timer group of AUX (PWM_AUX_TIMx), servos on MAIN.
+
+## Flash use: optimize later (2026-10-27)
+
+The px4_fmu-v6x_slaaps image uses 1,937,892 of 1,920 KB (98.57%) of flash after the DShot600 change, so there is almost
+no headroom. Task for later: reduce flash use (drop unused modules and drivers from boards/px4/fmu-v6x/slaaps.px4board,
+review size by module) before adding features. Not urgent for the current work.
+Build result 2026-10-27: DShot600 commit ebdb57d070 compiles and links for the 6X in a WSL copy
+(/var/tmp/slaaps-6x, CRLF cleaned there only). Not flashed, not bench tested.
