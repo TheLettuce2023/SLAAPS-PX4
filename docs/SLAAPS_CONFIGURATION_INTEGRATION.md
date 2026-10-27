@@ -1,5 +1,20 @@
 # SLAAPS configuration and routing implementation
 
+## October 25: ordinary EDF Bench arming accepted with synthetic health inputs
+
+Native `/var/tmp/slaaps-native-bp74v6k4` (`--wall-clock-test`, checkout `e908e64f1b` plus this change) LINK PASS.
+`slaaps_control_test selected health-valid` publishes labeled synthetic raw accel (shared feedback publisher, instance 0, id 456),
+gyro 123, baro 789, mag 1011 and a 5.0 V avionics `system_power`, binding only `CAL_ACC0_ID`, `CAL_GYRO0_ID`, `CAL_MAG0_ID`/`PRIO`.
+Commander checks, SLAAPS gates and arming code are unchanged; the forced `commander arm -f` fallback was removed.
+Two preconditions were real Commander latency, not defects: its health report accepted new sensors after 1.6–2.0 s,
+and its 300 ms external arming-check poll can retain Bench prevent-arming briefly after readiness. The verifier now
+waits on `health_report` and `failsafe_flags` before arming.
+Lifecycle runs `90t3z7j0` and `8xpvxwf0` pass with `ordinary_arming_accepted=true`, `forced_internal_test_arm=false`,
+including both EDF sessions and all later lifecycles. These used a scratch verifier copy that skips only the isolated
+supervisor phase, because that phase fails deterministically (`pqzyd61l`, `6obaexq9`) on the unrelated barrier check
+"ordinary queue overrun cannot overwrite or reconstruct the exact retained barrier payload".
+Synthetic inputs qualify no physical health. No hardware was operated.
+
 ## October 24: acceleration diagnostics compiled; lifecycle regression under investigation
 
 Frozen native `/var/tmp/slaaps-native-impnyvop` LINK PASS. Source manifest SHA256

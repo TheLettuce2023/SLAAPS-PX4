@@ -141,10 +141,9 @@ The owner checks commander armed state, selected mode, input freshness,
 configuration identity, health, kill/lockdown/termination, limits and slew
 before granting or refreshing output. Mode handoff must invalidate the old
 source and establish the new one without overlapping writers or accepting a
-stale command. Define command-loss and armed-flight fallback explicitly;
-do not assume either holding thrust or immediately cutting thrust is a
-universally safe airborne policy. Unimplemented policies prevent flight
-admission. The former blanket bench EDF prohibition is superseded by the October 22
+stale command. Command-loss and armed-flight fallback are defined in
+[SLAAPS_RECOVERY_POLICY.md](SLAAPS_RECOVERY_POLICY.md); implement exactly those responses.
+Unimplemented policies prevent flight admission. The former blanket bench EDF prohibition is superseded by the October 22
 commissioning requirement; the existing implementation still inhibits it until
 that distinct permission and bounded operational path are implemented.
 
@@ -290,5 +289,6 @@ Companion acceleration remains body-FRD inertial acceleration at CG in m/s^2,
 body-fixed between updates. The fixed EDF/canard force constraints and required
 attitude/yaw command must make the controller well-posed. Implement source/time/
 sequence/freshness limits and exclusive manual/acceleration handoff; do not
-assume independent control of arbitrary forces. Recovery policy and actual
-vehicle measurements remain pending; continue independent software integration.
+assume independent control of arbitrary forces. The recovery policy is decided
+([SLAAPS_RECOVERY_POLICY.md](SLAAPS_RECOVERY_POLICY.md)) but not implemented; measured
+vehicle values are reported taken but not yet supplied to the repository.

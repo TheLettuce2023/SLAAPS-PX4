@@ -1,10 +1,10 @@
 # SLAAPS implementation: start here
 
-Updated 2026-10-24 by Codex. Software progress is not flight acceptance.
+Updated 2026-10-25 by Claude. Software progress is not flight acceptance.
 Repository: https://github.com/TheLettuce2023/SLAAPS-PX4; branch `slaaps-sitl`.
-Committed, not pushed: power `58f4be89fa`, diagnostics `54b2da3c6b`.
-Companion/reserve/provenance integration is uncommitted. Preserve user AGENTS.md and `timestamp`.
-[Current evidence](SLAAPS_CONFIGURATION_INTEGRATION.md#october-24-acceleration-diagnostics-compiled-lifecycle-regression-under-investigation) retains exact overlays, hashes and failures.
+Pushed through `e908e64f1b` (registry, stream IDs, companion integration, docs). Preserve untracked `timestamp`.
+Recovery policy DECIDED 2026-10-25 by project lead: [decision record](SLAAPS_RECOVERY_POLICY.md); not yet implemented.
+[Current evidence](SLAAPS_CONFIGURATION_INTEGRATION.md#october-25-ordinary-edf-bench-arming-accepted-with-synthetic-health-inputs) retains exact overlays, hashes and failures.
 
 Signed UDP/parser -> active acceleration -> both captured banks and bidirectional Manual handoff pass.
 Authority/sensors/configuration are synthetic; ordinary flight admission and physical qualification remain absent.
@@ -40,8 +40,6 @@ SLA_MAN_WAIT fixes a 1–60s non-actuating window at entry; READY response remai
 Initial activation/first command stay inside that window; running leases remain independent.
 Delayed proposals cannot extend it; expiry requires deliberate re-entry. Flight flags stay denied.
 Mode names/custom IDs, wire selection, CURRENT_MODE, removal/restore pass; GUI and flight permission remain unqualified.
-Only five production registry files are staged (74 insertions/41 deletions); not committed, pending DCO review.
-The earlier six-file review is not standalone; the harness and other work remain unstaged.
 
 ## Navigation
 
@@ -57,6 +55,7 @@ Historical startup context: [October 22 archive](PROJECT_CONTEXT_ARCHIVE_2026102
 | Shared configuration/QGC | `slaaps_configuration_api`, `slaaps_parameter_capture`, `slaaps_parameter_schema`, `slaaps_parameter_metadata`, `slaaps_routing_core` |
 | Scheduling | `slaaps_control_schedule`, `slaaps_operating_condition`, `slaaps_operating_condition_observation`, `slaaps_schedule_portable_evidence` |
 | Verification | `slaaps_native_build`, `slaaps_native_test`, `slaaps_board_builder`, `slaaps_board_verifier` |
+| Airborne recovery | [Decision record](SLAAPS_RECOVERY_POLICY.md); `EdfOwner`, `ManualOutputBank`, `SlaapsOutputPreparation`, Commander failsafe |
 | Commissioning | [EDF milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-armed-edf-commissioning), [R09/R10 report](MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md) |
 | Companion integration | `slaaps_companion_protocol_owner`; [acceleration contract](ACCELERATION_WIRE_CONTRACT.md), [state contract](C0B2_STATE_CONTRACT.md); `wire`, `adapter`, `guard`, `clock` |
 
@@ -70,7 +69,12 @@ it does not provide altitude/position hold. Preserve nose-up/body conventions.
 Acceleration means inertial acceleration at CG in rotating body FRD, m/s²,
 body-fixed between updates; never reinterpret as specific force or direct actuators.
 Software implementation is authorized, not flashing, actuator/EDF operation or flight.
-Do not invent measured coefficients, ground-spool authority or airborne recovery.
+Do not invent ground-spool authority. Exception decided 2026-10-26 by the project lead: aerodynamic
+slopes (canard force/moment derivatives, rear-fin stability) may be computed by the firmware from the
+vehicle data sheet instead of being measured; computed values must be labelled as modeled, never as
+measured. The EDF thrust curve is linear through the bench maximum. Other measured values stay measured.
+Airborne recovery follows [the decision record](SLAAPS_RECOVERY_POLICY.md) only; its thrust/hold values
+must come from data. The EDF uses DShot600, which routing does not yet support (PWM only).
 Bench is never an airborne fallback or an entry from active flight. EDF commissioning
 requires deliberate visibly armed operation, bounded command/duration and stop/kill.
 
@@ -90,8 +94,8 @@ MAIN/AUX mixer endpoints consume calibrated canard/EDF commands through actual
 PWMOut/PX4IO callback interfaces. Exact saved tickets gate handled ACKs; commands
 cannot be written/acknowledged twice. Post-copy HRT caps original authority/report
 expiry; no lease is renewed. Disarm/kill/lockdown/termination retain an explicit stop
-frame until successfully handled. Armed authority loss latches RecoveryRequired;
-there is no invented airborne cut/hold-thrust policy. Native callbacks capture only.
+frame until successfully handled. Armed authority loss still latches RecoveryRequired; the
+decided recovery sequences (D1-D5) are not implemented yet. Native callbacks capture only.
 
 One typed configuration and native QGC parameter metadata provide coherent inactive
 apply, persistence and export/restore: mass/CG/inertia, geometry, servo conversion,
@@ -132,19 +136,27 @@ exact barrier acknowledgement, revoke and deliberate re-entry are integrated.
 Source/key/publisher changes and original map expiry cannot revive a session.
 The controller and exclusive active handoff pass native capture tests; cold acceleration entry remains incomplete.
 
-## Next three tasks and remaining dependencies
+## Next tasks and remaining dependencies
 
 1. Complete acceleration authority diagnostics from port through worker/supervisor to logged status/QGC text.
    Verify a valid signed but infeasible demand and calculated-vs-handled ACK evidence; preserve admission behavior.
-2. Normal EDF Bench arming already exposes its readiness gate; the native test lacks raw sensors
-   and avionics system_power. Preserve common checks; positive vehicle-health acceptance remains open.
-3. Close stock QGC operator workflow, working-base boot integration, runtime timing/stack
+2. Positive EDF Bench arming is DONE natively with synthetic inputs (see evidence log, October 25).
+   Full verifier is still blocked by the isolated-supervisor barrier failure below; fix that next,
+   then rerun the unmodified verifier. Physical vehicle health remains unqualified.
+   Isolated supervisor deterministically fails "ordinary queue overrun cannot overwrite or reconstruct
+   the exact retained barrier payload" on current checkout build `bp74v6k4` (companion priority barrier).
+3. Implement the decided recovery policy: D4 60 s EDF-off ceiling, D1/D3 owned recovery sequences,
+   D2 Manual handoff + QGC alarm, D5 armed Manual re-entry, D6 net-position parameters, closed
+   Commander failsafe path. Resolve the record's open clarifications first where they change design.
+4. Close stock QGC operator workflow, working-base boot integration, runtime timing/stack
    and physical acceptance, with separate authorization for any hardware operation.
 
-Still unavailable: actual mass/CG/inertia/CAD, signed effectiveness across qualified
-flow/wash, loaded servo dynamics, EDF thrust/response/voltage measurements, authority
-acceptance and recovery hardware/policy. These questions are pending; do not repeat
-unchanged requests or invent fallback values. Physical power-feed assignment/voltage
+Partial vehicle data is in `src/lib/slaaps/Master_Vehicle_Data_Sheet_Slaaps.xlsx` (mass 2.1 kg, CG 0.2716 m
+from the tail end, inertia Ixx 0.0072 / Iyy = Izz 0.0595 kg m^2, max EDF thrust 4 kg-force, canard airfoil,
+static rear fins). Not yet entered in firmware. Missing: CG Y/Z, IMU, per-canard and rear-fin geometry,
+EDF test voltage, servo calibration/dynamics and power bounds.
+Mapping: [data compilation doc](https://claude.ai/artifact/BQ6X9apsdjEQqcPPbP3dPJ).
+Recovery hardware: net landing area near the GCS, an operator reference only (D6). Physical power-feed assignment/voltage
 bounds, propulsion response, landed/takeoff behavior and EDF ceiling/duration need acceptance.
 Preserve working e8ea98b404/NuttX11 servo baseline. Newer-base boot issue is unresolved;
 R01-R10 operator servo passes are not numerical flight calibration or exact provenance.
@@ -156,8 +168,150 @@ Future EDF target never counts as achieved thrust; original command/map/link/sta
 Pending numerical state commits only after exact all-bank handled ACK time, without invented initial trim history.
 Cold acceleration requires genuine first handled output and an accepted ground-support/spool/takeoff model
 or measured feasible zero-EDF condition; a zero-output ACK alone cannot supply missing ground-support force.
-No automatic airborne fallback, transfer low-throttle reset, stale demand reuse or lease revival is authorized.
+Only the decided recovery responses are authorized airborne fallbacks; transfer low-throttle reset,
+stale demand reuse and lease revival remain unauthorized. D5 re-entry must start a fresh admitted session.
 Capture-boundary disarm and fault precedence now pass focused native regression, including actual active stop/profile restore.
 Historical failures and full hashes remain in the integration evidence record; current PASS does not explain all prior failures.
 Diagnostic board/build/runtime jobs are terminal; no compiler owns the slot. Do not overlap runtime with builds.
 Keep this chat while authority-diagnostic implementation is active; commit/NuttX approvals are unchanged.
+
+## Inertia tensor (entered 2026-10-26)
+
+Full tensor in `Tools/slaaps/parameters/slaaps_vehicle.params` (load in QGC, editable there):
+Ixx 0.0072, Iyy = Izz 0.0595 kg m^2. Ixy, Ixz, Iyz = 0 by symmetry declared by the project lead; this is an
+assumption, not a measurement. Replace with CAD or measured values when available. Firmware defaults stay 0
+(unconfigured); the file is loaded by the operator, not compiled in.
+
+## Rear fins (entered 2026-10-27)
+
+Four static flat-plate fins (no airfoil), 90 degrees apart, rotated 45 degrees from the canards, area 0.0036 m^2 per fin (confirmed 2026-10-27),
+COP 0.1516 m from the CG (sheet cell I4; the sheet has no IMU position, H4 is empty). Direction assumed aft of CG
+(x = -0.1516 m body FRD): confirmed by the project lead 2026-10-27. EDF position from x_0 is 0 (sheet J4, tail end). Fins give no main lift; the
+EDF carries the weight. Fin model not implemented; flat-plate slope will be labelled modeled.
+Canards are control surfaces only, not weight-bearing (confirmed 2026-10-27); the 13 m/s lift check no longer applies.
+
+## IMU position (entered 2026-10-27)
+
+IMU is 323.75 mm forward of the tail end (x_0), i.e. 0.32375 - 0.2716 = +0.05215 m forward of the CG (body FRD x).
+Vertical offset stated as "10 m up in the y": taken as a typo for 10 mm, pending confirmation. Up is -z in firmware
+FRD (the lead's "y down" label is the same direction), so z = -0.010 m from the geometric axis; the CG's own
+vertical position is still unknown, so the offset from the CG in z is unresolved. Lateral (y) offset: not given.
+Not entered in firmware.
+
+## Rear fin force model (specified 2026-10-27, per fin)
+
+Per fin: `L_tail = q * S_tail_total * CL_tail_usable`, q = 0.5 * rho * V^2, CL_tail_usable = 0.1 (constant, labelled
+modeled). Despite its name, S_tail_total is one fin's area, 0.0036 m^2 (confirmed by the project lead: the equation is
+per fin; four fins). Each fin acts at its COP, 0.1516 m aft of the CG. Example at 13 m/s sea level: q = 103.5 Pa,
+L = 0.0373 N per fin, moment about the CG = 0.00565 N m per fin. Not implemented. Open: force direction/sign versus
+sideslip and angle of attack (CL is constant, so no slope), per-fin direction from the 90 degree layout rotated 45
+degrees from the canards, and the air density source.
+Engagement (project lead, 2026-10-27): two fins are engaged at any given time, each producing its force perpendicular to
+the flow direction. Total at 13 m/s sea level: 2 * 0.0373 = 0.0746 N, moment about the CG 0.0113 N m. Open: which
+two fins engage (selection rule from the flow direction) and the sign of each force.
+Confirmed 2026-10-27: the two engaged fins are the two most crosswise to the flow (selected from sideslip and angle of
+attack); force is stabilizing (pushes the tail back toward the flow direction). Air density: fixed 1.225 kg/m^3 sea level
+unless changed.
+
+## IMU and CG resolved (2026-10-27)
+
+Confirmed by the project lead: IMU vertical offset is 10 mm up; CG is on the centerline (CG y = z = 0 on the
+longitudinal axis). IMU offset from the CG in body FRD: x = +0.05215 m, y = 0 m (IMU on centerline, confirmed), z = -0.010 m.
+Not yet entered in firmware.
+
+## EDF test voltage and current (2026-10-27)
+
+Thrust curve measured at 42 V (in-flight pack: two 5S LiPo in series, 10S), about 70 A draw (about 2.9 kW). Maps to
+SLA_EDF_VOLT = 42. 42 V equals 4.2 V/cell, a full-charge open-circuit figure; whether it was the loaded voltage at the
+EDF is unconfirmed. Not yet entered in firmware.
+Clarified 2026-10-27: 42 V was the measured no-load, full-charge pack voltage. The thrust values were produced under
+load sag from that starting point, so the curve is valid for a full-charge pack sagging naturally at about 70 A.
+Loaded voltage not recorded. SLA_EDF_VOLT = 42 stands as the reference (no-load) voltage.
+
+## Power range and spool (2026-10-27)
+
+SLA_PWR_VMIN 30 V and SLA_PWR_VMAX 42 V (10S, 3.0 to 4.2 V/cell) added to the QGC parameter file; the 30 V floor is
+my reading of "10S range". Spool time stated as near instant, ">100 ms" (likely under 100 ms): not entered.
+SLA_EDF_RISE and SLA_EDF_FALL are normalized rates per second, so an under-100 ms full-range spool would be 10 per second or more.
+Decided 2026-10-27: full-range EDF rise 0.4 s, fall 0.1 s, giving SLA_EDF_RISE 2.5 and SLA_EDF_FALL 10 (normalized per
+second), added to the QGC parameter file. These are command slew limits, not measured physical spool.
+
+## Canards and servos (2026-10-27)
+
+All four servos identical. Neutral 1500 us; hardware travel 500 to 2500 us (+-90 deg, 11.1 us/deg). Vehicle limit
++-15 deg = +-167 us (normalized +-1); aerodynamic limit 12 deg = 133 us (normalized +-0.8, from stall). Slew 0.11 s per
+60 deg = 545 deg/s = 36.36 normalized/s. PWM frequency 333 Hz. X layout, 90 deg apart, 40 mm from the centerline,
+viewed from the rear with the nose pointing away: servo 1 top right, then clockwise (2 bottom right, 3 bottom left,
+4 top left); outputs 1 to 4 on the Pixhawk 6X PWM rail (changeable in QGC). Entered in the QGC parameter file:
+SLA_Cn_PWM_NEG/CTR/POS 1333/1500/1667, DEF_MAX 15, MIN/MAX -0.8/0.8, RISE/FALL 36.36. Not entered: slope sign,
+mix coefficients, moment/force derivatives, trim, lag, latency, wash, output channel assignment, PWM rate.
+Positive deflection sense (project lead, 2026-10-27): servo 1 counter-clockwise, servo 2 clockwise, servo 3
+counter-clockwise, servo 4 clockwise. Viewing direction not yet stated. SLA_Cn_SLOPE not entered.
+Canard offset (2026-10-27): the 40 mm is radial from the centerline. At 45 degrees in the X layout each canard
+sits 28.28 mm over and 28.28 mm up or down: servo 1 (y,z) = (+28.28, -28.28) mm, 2 (+28.28, +28.28), 3 (-28.28, +28.28),
+4 (-28.28, -28.28) in body FRD.
+Viewing direction: from the outboard end looking toward the centerline. SLA_Cn_SLOPE = +0.261799 rad (15 deg) for all
+four, so a positive command is positive deflection in the stated sense; the per-servo sense (1 CCW, 2 CW, 3 CCW, 4 CW)
+must be carried by the moment and force derivatives when they are computed. Slope uncertainty (SLA_Cn_SL_UNC) unset.
+
+## Modeled canard derivatives (computed 2026-10-27, labelled modeled, not measured)
+
+Inputs: per-canard area 0.0506 x 0.0608 m = 0.003077 m^2 (chord x span, per canard assumed), aspect ratio 1.20,
+finite-wing lift slope 2*pi*AR/(2+sqrt(4+AR^2)) = 1.742 /rad (all-moving surface, delta = alpha change), rho 1.225,
+V = 13 m/s (q = 103.5 Pa), force along the circumferential normal to each canard (hinge radial, chord along x, flow
+along -x), arm: 0.2334 m forward of the CG (direction unconfirmed), 28.28 mm over and up/down. Result: 0.555 N/rad per
+canard; DFY/DFZ = +-0.3923 N/rad; DMR = +-0.0222, DMP = +-0.0916, DMY = +-0.0916 N m/rad, signs by servo as in the
+parameter file. DFX = 0. Uncertainties (SLA_Cn_DUR/DUP/DUY) not set. Using the sheet's 2D-like slope (about 5.0 /rad
+from Cl 1.05 at 12 deg) would scale every value by about 2.9.
+Confirmed 2026-10-27: finite-wing slope (1.742 /rad) stands; canard CP is forward of the CG. CP is taken at the quarter
+chord (NACA 0012), where the servo hinges sit, so aerodynamic force produces no hinge moment about the servo axis in
+this model. Uncertainties still unset.
+
+## Proposed uncertainties (2026-10-27, proposals; the lead may tighten them)
+
+SLA_Cn_SL_UNC 0.05 rad (about 2.9 deg, 19% of the 0.2618 rad slope); SLA_Cn_DUR 0.0111 and SLA_Cn_DUP / DUY 0.0458 N m/rad
+(50% of each modeled derivative). SLA_AIRSPD 13 m/s (the airflow the derivatives were modeled at). The 50% band does not reach
+the sheet's 2D-like slope (2.9 times the modeled values); a measurement is needed to settle that. Firmware validation
+requires a positive slope uncertainty below the slope and positive derivative uncertainties when no schedule is used.
+Unset and not needed to validate: SLA_Cn_LAG, SLA_Cn_DELAY, SLA_Cn_WASH (stored only, no consumer found), SLA_Cn_TRIM
+(0 is valid), SLA_Cn_BMR/BMP/BMY (proposal: sign of the matching modeled moment derivative, magnitude 1).
+Needed to validate and still unset: the per-axis moment scale SLA_R/P/Y_M_SCALE, input slots and signs.
+
+## Per-canard values entered (2026-10-27)
+
+SLA_Cn_TRIM 0 (parameter, adjustable in QGC). SLA_Cn_WASH 13 m/s (local airflow is free stream; the 13 m/s figure is the
+modeled reference). Derivatives stay modeled: no force balance is available. SLA_Cn_BMR/BMP/BMY entered per the proposal:
+roll -1/+1/-1/+1, pitch +1/-1/-1/+1, yaw -1/-1/+1/+1 for canards 1 to 4.
+Servo lag stated as 50 us with 20% error and delay as 8 us: not entered. Both are shorter than one 333 Hz PWM frame
+(3000 us), so ms was probably meant; awaiting confirmation. There is no firmware parameter for lag uncertainty.
+Confirmed 2026-10-27: servo lag 50 ms (20% error, recorded here only) and delay 8 ms. SLA_Cn_LAG 0.05 and SLA_Cn_DELAY 0.008
+entered in the QGC parameter file for all four canards.
+
+## Known values added to the QGC parameter file (2026-10-27)
+
+SLA_MASS 2.1; SLA_CG_Y and SLA_CG_Z 0 (CG on the centerline); SLA_EDF_T0..T4 0, 9.8067, 19.6133, 29.42, 39.2266 N;
+SLA_EDF_VOLT 42; moment scales SLA_R_M_SCALE 0.019, SLA_P_M_SCALE 0.077, SLA_Y_M_SCALE 0.077 N m (modeled authority
+estimate, accepted as starting values). SLA_CG_X not entered: the parameter is measured from a "declared body FRD
+reference" and the origin is undeclared (tail end x_0 would give 0.2716; the CG itself would give 0).
+Not entered: IMU offset (no parameter found), roll/pitch/yaw input slots and signs.
+
+## CG, IMU, sticks (2026-10-27)
+
+Origin is the tail end (x_0): SLA_CG_X 0.2716. IMU uses stock EKF2_IMU_POS_X/Y/Z, defined relative to the vehicle CG: 0.05215, 0,
+-0.010 m (confirmed in src/modules/ekf2/module.yaml). Sticks use the stock PX4 mapping: SLA_R/P/Y_INPUT 0/1/2, signs
++1/-1/+1 (stick forward is positive pitch in PX4, nose-up is negative; matches the research configuration, not verified on
+a bench), SLA_THR_LOW -1 and SLA_THR_HIGH +1. All added to the QGC parameter file.
+
+## DShot600 support: library layer (2026-10-27)
+
+Done (native tests only, no hardware): `OutputProtocol::Dshot600`; `slaaps_output_bank.protocol` (0 PWM, 1 DShot, rate_hz is
+kbit/s); `makeRoutingPlan` accepts DShot600 for the EDF only (servo on DShot, other rates, values outside the driver
+range 1..1999, minimum throttle or high failsafe as the off value are rejected; stopped output is the disarm frame 0);
+`assembleOutputInventory` maps a DShot bank at 600 kbit/s to Dshot600 and anything else to Unsupported.
+The EDF command conversion already interpolates between the channel's reported minimum and maximum, so it needs no change.
+
+Not done: the DShot driver (`src/drivers/dshot/DShot.cpp`) does not report SLAAPS inventory and initializes only
+Motor1..Motor12 functions, so the SLAAPS EDF function (10104) gets no hardware output. Needed: map 10104 to a motor slot,
+report inventory like `PWMOut`, and keep DShot special commands (beep, EDT, settings) from running while SLAAPS owns the
+channel. Board layout to confirm: Pixhawk 6X has an IO board, so the FMU outputs are PWM_AUX; the EDF on a DShot600
+timer group of AUX (PWM_AUX_TIMx), servos on MAIN.
