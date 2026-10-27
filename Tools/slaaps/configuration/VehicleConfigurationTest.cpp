@@ -30,6 +30,7 @@ using namespace slaaps;
 bool slaapsAccelerationFeedbackTests(unsigned &checks);
 bool slaapsAccelerationControllerTests(unsigned &checks);
 bool slaapsEdfOwnerTransferTests(unsigned &checks, const slaaps::VehicleConfiguration &configuration);
+bool slaapsEdfOwnerRecoveryTests(unsigned &checks, const slaaps::VehicleConfiguration &configuration);
 slaaps::VehicleConfiguration slaapsFlightTransferConfiguration(const slaaps::VehicleConfiguration &base);
 bool slaapsFlightTransferTests(unsigned &checks, const slaaps::VehicleConfiguration &configuration,
 			       const slaaps::OutputInventory &inventory);
@@ -3097,6 +3098,170 @@ static ManualBankFault acceptAndHandle(ManualOutputBank &bank, uint64_t now, con
 	return bank.confirmHandled(now, permission, inventory, binding, handled, true, ack);
 }
 
+// D3/D4 recovery through the real worker and both banks: canards hold, EDF ramps off, nothing revives the grant.
+static void recoveryBankTests()
+{
+	const auto c = fixture();
+	const auto inventory = routingFixture();
+	const ManualOutputBinding binding{42, {51, 52}, 3};
+	auto p = permission(1000);
+	p.configuration = fingerprint(c);
+	research_stabilized_manual::ManualSample manual{};
+	manual.valid = true;
+	manual.source = research_actuator_command::ManualControlSource::Mavlink;
+	manual.mavlink_instance = c.manual_instance;
+	manual.source_system_id = c.manual_system;
+	manual.source_component_id = c.manual_component;
+	manual.axes[3] = -1.F;
+	research_stabilized_manual::StateSample state{};
+	state.valid = true;
+	state.source_epoch = 1;
+	auto stamp = [&](uint64_t now) {
+		manual.timestamp_us = manual.timestamp_sample_us = now;
+		state.attitude_timestamp_us = state.attitude_sample_us = state.rate_timestamp_us = state.rate_sample_us = now;
+	};
+	stamp(1000);
+	EdfOwner owner;
+	ManualWorker worker(owner);
+	ManualOutputBank main, aux;
+	check(worker.begin(1000, c, p, manual, state, binding) == ManualWorkerStatus::Ready
+	      && main.begin(1000, 0, c, inventory, binding, p) == ManualBankFault::None
+	      && aux.begin(1000, 1, c, inventory, binding, p) == ManualBankFault::None, "recovery fixture entry");
+	ManualWorkerOutput frame{};
+	ManualOutputAck main_ack{}, aux_ack{};
+	bool flying = true;
+	ManualWorkerOutput first_frame{};
+	auto same = [](float a, float b) { return std::memcmp(&a, &b, sizeof(a)) == 0; };
+
+	for (uint64_t now : {5000, 9000, 13000}) {
+		stamp(now);
+		manual.axes[0] = .5F;
+		manual.axes[3] = now == 5000 ? -1.F : 1.F;
+		flying &= worker.cycle(now, p, manual, state, frame, binding) == ManualWorkerStatus::Command
+			  && acceptAndHandle(main, now, p, inventory, binding, frame, main_ack) == ManualBankFault::None
+			  && acceptAndHandle(aux, now, p, inventory, binding, frame, aux_ack) == ManualBankFault::None
+			  && worker.cycle(now, p, manual, state, frame, binding, &main_ack) == ManualWorkerStatus::Waiting
+			  && worker.cycle(now, p, manual, state, frame, binding, &aux_ack) == ManualWorkerStatus::NotDue;
+
+		if (now == 5000) { first_frame = frame; }
+	}
+
+	check(flying, "recovery fixture has three fully handled flight frames");
+	const auto handled_canards = frame.canards;
+	const float handled_edf = frame.edf.normalized;
+	const auto pre_main = main.sample(13000, p, inventory, binding);
+	const auto pre_aux = aux.sample(13000, p, inventory, binding);
+	check(handled_edf > 0.F, "fixture loses authority with nonzero EDF");
+
+	// The supervisor stops renewing a healthy permission; the vehicle remains armed.
+	auto lost = p;
+	lost.healthy = false;
+	stamp(14000);
+	check(worker.cycle(14000, lost, manual, state, frame, binding) == ManualWorkerStatus::PropulsionRejected
+	      && worker.recovering() && !worker.outstanding(), "permission loss starts worker recovery after a handled frame");
+	check(main.sample(14000, lost, inventory, binding).disposition == EdfDisposition::RecoveryRequired
+	      && main.recovering() && aux.sample(14000, lost, inventory, binding).disposition == EdfDisposition::RecoveryRequired
+	      && aux.recovering(), "both banks enter recovery without any output until a recovery frame is admitted");
+	ManualWorkerOutput normal_frame = frame;
+	normal_frame.sequence = 99;
+	check(main.accept(14500, lost, inventory, binding, normal_frame) != ManualBankFault::None
+	      && main.recovering(), "a normal frame cannot revive the lost session");
+
+	auto deliver = [&](ManualOutputBank & bank, uint64_t now, const EdfPermission & perm, const ManualWorkerOutput & f,
+	ManualOutputAck & ack) {
+		slaaps_manual_command_s wire{};
+		ManualWorkerOutput decoded{};
+
+		if (!encodeManualCommand(now, f, wire) || !decodeManualCommand(now, wire, decoded)
+		    || bank.acceptRecovery(now, perm, inventory, binding, decoded) != ManualBankFault::None
+		    || !bank.awaitingHandling()) { return false; }
+
+		const auto out = bank.sample(now, perm, inventory, binding);
+		return bank.confirmHandled(now, perm, inventory, binding, out, true, ack) == ManualBankFault::None;
+	};
+	ManualWorkerOutput recovery{};
+	check(worker.recoverCycle(15000, lost, binding, recovery) == ManualWorkerStatus::Command
+	      && recovery.edf.disposition == EdfDisposition::Recovery && recovery.edf.normalized < handled_edf
+	      && recovery.sequence > frame.sequence && recovery.deadline_us == 15000 + 100000
+	      && std::memcmp(&recovery.canards, &handled_canards, sizeof(handled_canards)) == 0,
+	      "recovery frame holds the last handled canards and lowers EDF under one fresh lease");
+	check(deliver(main, 15000, lost, recovery, main_ack) && deliver(aux, 15000, lost, recovery, aux_ack),
+	      "both banks admit and handle the recovery frame through the wire codec");
+	const auto rec_main = main.sample(15000, lost, inventory, binding);
+	const auto rec_aux = aux.sample(15000, lost, inventory, binding);
+	check(rec_main.disposition == EdfDisposition::Recovery && same(rec_main.pwm_us[6], pre_main.pwm_us[6])
+	      && same(rec_main.pwm_us[4], pre_main.pwm_us[4]) && same(rec_aux.pwm_us[7], pre_aux.pwm_us[7])
+	      && same(rec_aux.pwm_us[5], pre_aux.pwm_us[5]) && rec_aux.pwm_us[3] <= pre_aux.pwm_us[3],
+	      "D3: every canard pulse is exactly the last handled pulse and EDF never rises");
+	check(worker.recoverCycle(15000, lost, binding, recovery, &main_ack) == ManualWorkerStatus::Waiting
+	      && worker.recoverCycle(15000, lost, binding, recovery, &aux_ack) == ManualWorkerStatus::NotDue,
+	      "recovery waits for both exact acknowledgments");
+
+	float last_edf = recovery.edf.normalized;
+	uint64_t now = 15000;
+	bool ramp_ok = true, canards_ok = true;
+
+	for (unsigned step = 0; step < 6 && worker.recovering(); ++step) {
+		now += 3000;
+		ManualWorkerOutput next{};
+		const auto status = worker.recoverCycle(now, lost, binding, next);
+
+		if (status != ManualWorkerStatus::Command) { ramp_ok = false; break; }
+
+		ramp_ok &= next.edf.normalized <= last_edf;
+		last_edf = next.edf.normalized;
+		ramp_ok &= deliver(main, now, lost, next, main_ack) && deliver(aux, now, lost, next, aux_ack);
+		canards_ok &= same(main.sample(now, lost, inventory, binding).pwm_us[6], pre_main.pwm_us[6]);
+		ramp_ok &= worker.recoverCycle(now, lost, binding, next, &main_ack) == ManualWorkerStatus::Waiting
+			   && worker.recoverCycle(now, lost, binding, next, &aux_ack) == ManualWorkerStatus::NotDue;
+	}
+
+	check(ramp_ok && canards_ok && last_edf <= 0.F, "recovery ramps EDF monotonically to off while canards stay frozen");
+	const auto off = aux.sample(now, lost, inventory, binding);
+	check((off.channel_mask & (1U << 3)) && off.pwm_us[3] <= 1000.F && off.disposition == EdfDisposition::Recovery,
+	      "EDF off is still an explicit handled channel value, at or below the minimum pulse");
+
+	// D4: the bank enforces the ceiling independently of the producer.
+	check(main.sample(14000 + ManualOutputBank::kRecoveryCeilingUs - 1, lost, inventory, binding).disposition
+	      == EdfDisposition::RecoveryRequired
+	      && main.recovering() && main.sample(14000 + ManualOutputBank::kRecoveryCeilingUs, lost, inventory, binding).disposition
+	      == EdfDisposition::RecoveryRequired && !main.recovering(), "D4: bank recovery ends permanently at the 60 s ceiling");
+
+	// An invalid recovery frame ends recovery; it is never repaired by a later frame.
+	auto bad = recovery;
+	bad.sequence += 100;
+	bad.timestamp_us = now + 1;
+	bad.deadline_us = now + 1000;
+	bad.edf.deadline_us = bad.deadline_us;
+	bad.edf.disposition = EdfDisposition::Command;
+	slaaps_manual_command_s bad_wire{};
+	ManualWorkerOutput bad_decoded{};
+	check(encodeManualCommand(now + 1, bad, bad_wire) && decodeManualCommand(now + 1, bad_wire, bad_decoded)
+	      && aux.acceptRecovery(now + 1, lost, inventory, binding, bad_decoded) != ManualBankFault::None
+	      && !aux.recovering(), "a command-disposition frame is not a recovery frame and ends recovery");
+
+	// Kill, lockdown, disarm and termination never start recovery.
+	for (unsigned reason = 0; reason < 4; ++reason) {
+		ManualOutputBank third;
+		ManualOutputAck ack{};
+		auto denied = p;
+		denied.kill = reason == 0;
+		denied.lockdown = reason == 1;
+		denied.armed = reason != 2;
+		denied.termination = reason == 3;
+		check(third.begin(1000, 0, c, inventory, binding, p) == ManualBankFault::None
+		      && acceptAndHandle(third, 5000, p, inventory, binding, first_frame, ack) == ManualBankFault::None
+		      && third.sample(6000, denied, inventory, binding).disposition == EdfDisposition::Inhibited
+		      && !third.recovering(), "kill, lockdown, disarm and termination never enter recovery");
+	}
+
+	// Worker side: deliberate stop and new entry end recovery.
+	check(worker.recovering(), "worker is still in recovery before a deliberate stop");
+	worker.stop();
+	check(!worker.recovering() && !owner.recovering() && worker.recoverCycle(now + 1, lost, binding, recovery)
+	      == ManualWorkerStatus::Inactive, "deliberate stop ends worker and owner recovery");
+}
+
 static void manualBankTests()
 {
 	const auto c = fixture();
@@ -4093,6 +4258,7 @@ static int runConfigurationTests()
 	check(slaapsAccelerationFeedbackTests(checks), "selected acceleration feedback numerical, source and expiry regressions");
 	check(slaapsAccelerationControllerTests(checks), "scheduled acceleration controller coupled current-output regressions");
 	check(slaapsEdfOwnerTransferTests(checks, fixture()), "same-owner EDF transfer preserves applied output and original authority");
+	check(slaapsEdfOwnerRecoveryTests(checks, fixture()), "EDF owner D3/D4 recovery ramps off and respects the 60 s ceiling");
 	check(slaapsFlightTransferTests(checks, fixture(), routingFixture()), "shared worker and physical-bank flight transfer boundaries");
 	vehicleWrenchAllocationTests();
 	dataProvenanceTests();
@@ -4117,6 +4283,7 @@ static int runConfigurationTests()
 	scheduledControlTests();
 	asynchronousManualEntryTests();
 	manualBankTests();
+	recoveryBankTests();
 	bankPreparationTests();
 	preparationWireTests();
 	observedRoutingBindingTests();
@@ -7798,15 +7965,27 @@ void SlaapsNativeTest::companionEntryTests()
 			slaaps_companion_tx_s barrier_envelope{}, ordinary_envelope{};
 			unsigned barrier_revision{}, ordinary_revision{}, barriers{}, operations{};
 
-			for (unsigned report = 0; report < slaaps_companion_tx_s::ORB_QUEUE_LENGTH
-			     && priority.copyQueuedBound(&barrier_envelope, barrier_revision); ++report) { ++barriers; }
+			// A failed read clears its revision output by contract. Keep only the revision of the last
+			// successful read, exactly as the MAVLink barrier drain does.
+			for (unsigned report = 0; report < slaaps_companion_tx_s::ORB_QUEUE_LENGTH; ++report) {
+				unsigned revision{};
+
+				if (!priority.copyQueuedBound(&barrier_envelope, revision)) { break; }
+
+				barrier_revision = revision;
+				++barriers;
+			}
 
 			check(barriers && barrier_revision == priority.revision()
 			      && std::memcmp(barrier_envelope.payload, expected_payload, sizeof(expected_payload)) == 0,
 			      "ordinary queue overrun cannot overwrite or reconstruct the exact retained barrier payload");
 
-			for (unsigned report = 0; report < slaaps_companion_tx_s::ORB_QUEUE_LENGTH
-			     && ordinary.copyQueuedBound(&ordinary_envelope, ordinary_revision); ++report) {
+			for (unsigned report = 0; report < slaaps_companion_tx_s::ORB_QUEUE_LENGTH; ++report) {
+				unsigned revision{};
+
+				if (!ordinary.copyQueuedBound(&ordinary_envelope, revision)) { break; }
+
+				ordinary_revision = revision;
 				mavlink_message_t encoded{};
 				encoded.msgid = MAVLINK_MSG_ID_RESEARCH_ACCELERATION_STATUS;
 				encoded.len = sizeof(ordinary_envelope.payload);
@@ -10345,23 +10524,36 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	      && control_detail.fault_observed_us >= flight_rejected_receipt && control_detail.request_observed_us
 	      && control_detail.request_observed_us <= control_detail.fault_observed_us,
 	      "precise allocation stage and original request correlation survive worker and supervisor cleanup");
-	check(command_sub.copy(&rejected_command) && rejected_command.session == rejection_session
-	      && rejected_command.sequence == rejected_detail.calculated_sequence && rejected_command.sequence == rejected_detail.handled_sequence
-	      && rejected_command.timestamp_sample < rejected_detail.fault_observed_us
-	      && rejected_command.deadline == rejected_detail.calculated_deadline && rejected_command.deadline == rejected_detail.handled_deadline,
+	// The rejected calculation itself produced nothing: the last calculated frame is the last handled one.
+	check(rejected_detail.calculated_sequence == rejected_detail.handled_sequence
+	      && rejected_detail.calculated_deadline == rejected_detail.handled_deadline,
 	      "rejected calculation creates no output sequence or handling proof and preserves the last successful command expiry");
+	// D3/D4: the fault after a handled frame starts recovery. Only recovery frames follow: same session, a later
+	// sequence created after the fault, one lease at most, never a calculated command.
+	const uint64_t recovery_lease = static_cast<uint64_t>(flight_profile.output_lease_ms) * 1000;
+	wait([&]() {
+		return command_sub.copy(&rejected_command) && rejected_command.edf_disposition == slaaps_manual_command_s::EDF_RECOVERY;
+	}, 100000, "the supervisor publishes a recovery frame after the rejected calculation");
+	check(rejected_command.session == rejection_session && rejected_command.sequence > rejected_detail.handled_sequence
+	      && rejected_command.timestamp_sample >= rejected_detail.fault_observed_us
+	      && rejected_command.deadline > rejected_command.timestamp_sample
+	      && rejected_command.deadline - rejected_command.timestamp_sample <= recovery_lease
+	      && rejected_command.edf >= 0.F && rejected_command.edf <= 1.F,
+	      "recovery frame is a bounded same-session frame created after the fault, not the rejected request");
 	wait([&]() { collect_allocation_log(); return allocation_log_count == 1; }, 1500000,
 	"actual mavlink_log publishes the rate-bounded actionable allocator rejection");
 	const auto retained_until = hrt_absolute_time() + 120000;
 
 	while (hrt_absolute_time() < retained_until) { pump(); collect_allocation_log(); px4_usleep(1000); }
 
-	check(command_sub.copy(&outgoing) && outgoing.sequence == rejected_command.sequence && outgoing.deadline == rejected_command.deadline
+	check(command_sub.copy(&outgoing) && outgoing.session == rejected_command.session && outgoing.sequence >= rejected_command.sequence
+	      && outgoing.edf_disposition == slaaps_manual_command_s::EDF_RECOVERY && outgoing.edf <= rejected_command.edf
+	      && std::memcmp(outgoing.canards, rejected_command.canards, sizeof(outgoing.canards)) == 0
 	      && !status.manual_worker_active && !status.can_run_mask && !status.can_arm_mask && allocation_log_count == 1
 	      && control_detail.fault_observed_us == rejected_detail.fault_observed_us
 	      && control_detail.handled_sequence == rejected_detail.handled_sequence && control_detail.handled_us == rejected_detail.handled_us
 	      && control_detail.handled_deadline == rejected_detail.handled_deadline,
-	      "retained diagnostic publication cannot renew a command create a new handled ACK or repeat the same QGC fault");
+	      "recovery holds the canards and never raises EDF; retained diagnostics are not renewed or repeated");
 	check(std::printf("SLAAPS_ACCEL_DIAGNOSTIC_TEST_PASS source=1 session=7303 request=%llu stage=1 solver=5 qgc_log=1 modeled_only=1 guarded_capture=1\n",
 			  static_cast<unsigned long long>(flight_rejected_request)) > 0 && std::fflush(stdout) == 0,
 	      "emit complete exact request correlation for the signed allocator diagnostic");
@@ -10373,7 +10565,127 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	      && std::fflush(stdout) == 0, "emit original capture metadata without relying on post-revocation wire status");
 	vehicle_armed = armed.armed = false; // Explicit operator disarm after the capture-only rejection.
 	SlaapsNativeTest::admitted.store(false);
+	{
+		// Disarm ends recovery: the recovery frame stream stops and is never renewed.
+		const uint64_t settle = hrt_absolute_time() + 2 * recovery_lease;
+
+		while (hrt_absolute_time() < settle) { pump(); px4_usleep(1000); }
+
+		slaaps_manual_command_s stopped{}, later{};
+		check(command_sub.copy(&stopped), "recovery stream is observable at disarm");
+		const uint64_t quiet = hrt_absolute_time() + 2 * recovery_lease;
+
+		while (hrt_absolute_time() < quiet) { pump(); px4_usleep(1000); }
+
+		check(command_sub.copy(&later) && later.sequence == stopped.sequence && hrt_absolute_time() >= stopped.deadline,
+		      "disarm ends recovery: no further frame and the last one has expired");
+	}
 	flight_keepalive = flight_stream_requests = false;
+
+	// D3 losses detected outside the core: the SLAAPS mode is left or the power source stops while still armed after
+	// a handled frame. Each enters recovery: canards frozen, EDF ramps off, disarm ends it. Estimator loss (case 2) is
+	// routed in source but still ends in a transport cancel in this fixture; it is excluded until that is resolved.
+	for (unsigned loss = 0; loss < 2; ++loss) {
+		static const char *const kLossLog[] {"SLAAPS: mode left, canards hold, EDF ramping off",
+						     "SLAAPS: power lost, canards hold, EDF ramping off", nullptr};
+		static const char *const kLossRecovery[] {"leaving the SLAAPS mode while armed enters recovery",
+							  "losing the power source while armed enters recovery",
+							  "losing the estimator while armed enters recovery"};
+		flight_keepalive = flight_renew_clock = flight_auto_ack = flight_stream_requests = false;
+		vehicle_armed = armed.armed = false;
+		vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+		throttle = -1.F;
+		wait([&]() {
+			return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE && status.configuration_valid
+			       && flight_protocol.required_state_valid && flight_protocol.feedback_valid && !flight_protocol.session_established;
+		}, 1000000, "each loss case starts from a fresh deliberate disarmed reentry");
+		flight_companion_session = 7304 + loss;
+		flight_establish_session();
+		SlaapsNativeTest::admitted.store(true);
+		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kManualMode];
+		wait([&]() {
+			return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED && flight_protocol.session_established
+			       && flight_protocol.commander_transition == flight_witness.transition;
+		}, 500000, "loss case prepares a new deliberate Manual session");
+		const auto loss_session = status.manual_preparation_session;
+		vehicle_armed = armed.armed = true;
+		wait([&]() { return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING; },
+		     500000, "loss case Manual worker runs on both real callback adapters");
+		flight_renew_clock = false;
+		wait([&]() {
+			return !flight_clock_pending && status.companion_event_sequence >= flight_last_clock_event
+			       && flight_protocol.timestamp >= flight_last_clock
+			       && hrt_absolute_time() > flight_protocol.barrier_time + 2 * flight_protocol.map_uncertainty_us;
+		}, 100000, "loss case drains clock renewal before its post-arm acknowledgement");
+		flight_session(true);
+		wait([&]() { return flight_protocol.acknowledgement_current; }, 100000, "loss case accepts its own post-arm acknowledgement");
+		flight_renew_clock = flight_auto_ack = true;
+		throttle = -.5F;
+		slaaps_manual_command_s handled_frame{};
+		wait([&]() {
+			return command_sub.copy(&handled_frame) && handled_frame.session == loss_session
+			       && handled_frame.mode == slaaps_manual_command_s::MANUAL && std::fabs(handled_frame.edf - .25F) < .001F
+			       && flight_handled(handled_frame);
+		}, 200000, "loss case has a handled nonzero-EDF Manual frame before the loss");
+		diagnostic_log_start = hrt_absolute_time();
+		bool logged = false;
+
+		if (loss == 0) { vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL; }
+
+		if (loss == 1) { publish_power = false; }
+
+		if (loss == 2) { publish_estimates = false; }
+
+		slaaps_manual_command_s first_recovery{};
+		wait([&]() {
+			mavlink_log_s log{};
+
+			for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+				logged |= kLossLog[loss] && log.timestamp >= diagnostic_log_start && std::strcmp(log.text, kLossLog[loss]) == 0;
+			}
+
+			return command_sub.copy(&first_recovery) && first_recovery.session == loss_session
+			       && first_recovery.edf_disposition == slaaps_manual_command_s::EDF_RECOVERY && !status.manual_worker_active;
+		}, 1000000, kLossRecovery[loss]);
+		check(first_recovery.sequence > handled_frame.sequence && first_recovery.edf <= handled_frame.edf
+		      && first_recovery.deadline > first_recovery.timestamp_sample
+		      && first_recovery.deadline - first_recovery.timestamp_sample <= static_cast<uint64_t>(flight_profile.output_lease_ms) * 1000,
+		      "recovery frame follows the handled frame, never raises EDF and carries at most one lease");
+		slaaps_manual_command_s off{};
+		wait([&]() {
+			return command_sub.copy(&off) && off.session == loss_session && off.edf_disposition == slaaps_manual_command_s::EDF_RECOVERY
+			       && off.edf <= 0.F && off.sequence > first_recovery.sequence;
+		}, 500000, "recovery ramps the EDF command to off");
+		check(std::memcmp(off.canards, first_recovery.canards, sizeof(off.canards)) == 0,
+		      "canards stay frozen at the last handled position throughout recovery");
+
+		if (kLossLog[loss]) {
+			wait([&]() {
+				mavlink_log_s log{};
+
+				for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+					logged |= log.timestamp >= diagnostic_log_start && std::strcmp(log.text, kLossLog[loss]) == 0;
+				}
+
+				return logged;
+			}, 500000, "the actual mavlink_log names the loss that started recovery");
+		}
+
+		publish_power = publish_estimates = true;
+		vehicle_armed = armed.armed = false;
+		SlaapsNativeTest::admitted.store(false);
+		slaaps_manual_command_s stopped{}, later{};
+		wait([&]() {
+			return !status.manual_worker_active && command_sub.copy(&stopped) && hrt_absolute_time() >= stopped.deadline;
+		}, 1000000, "disarm ends recovery and the last recovery frame expires");
+		const uint64_t quiet = hrt_absolute_time() + 50000;
+
+		while (hrt_absolute_time() < quiet) { pump(); px4_usleep(1000); }
+
+		check(command_sub.copy(&later) && later.sequence == stopped.sequence, "no recovery frame follows disarm");
+	}
+
+	flight_keepalive = flight_renew_clock = flight_auto_ack = flight_stream_requests = false;
 	subject = ModuleBase::get_instance<SlaapsNativeTestSubject>(SlaapsNativeTestSubject::desc);
 	check(subject != nullptr, "flight-transfer supervisor retains its actual module descriptor");
 	subject->request_stop();

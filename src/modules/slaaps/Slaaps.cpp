@@ -123,6 +123,8 @@ private:
 	bool restoreStoppedProfile(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool actuator_fresh);
 	void updateManualActivation(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh);
 	void updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh);
+	void updateRecovery(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh);
+	bool publishRecoveryPermission(hrt_abstime now, const actuator_armed_s &armed);
 	bool capturedOrdinaryFlightDisarm(hrt_abstime now);
 	bool observePrearmInput(hrt_abstime now, bool armed = false);
 	void cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm = false
@@ -1373,13 +1375,29 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 	    || vehicle.arming_state != vehicle_status_s::ARMING_STATE_ARMED || !armed.armed
 	    || armed.kill || armed.lockdown || armed.termination || armed.in_esc_calibration_mode || _registration_fault
 	    || !_configuration.eligible() || _selected_use != 1 || !_routing_valid || !activation_lifetimes
-	    || !slaaps::ManualBankPreparation::flightMode(current_mode) || !slaaps::ManualBankPreparation::flightMode(selected_mode)
+	    || !slaaps::ManualBankPreparation::flightMode(current_mode)
 	    || _manual.commandRevision() != _prepared_request.command_revision || permissionRevision() != _prepared_request.permission_revision
 	    || !_preparation.revision() || !_preparation.transitionRevision()
 	    || (_manual_first_command_deadline && now >= _manual_first_command_deadline)
-	    || _preparation.pollActivationObservedLive(now, configuration, _routing_snapshot, _inventory_fault) != slaaps::ActivationStatus::Consumed
-	    || !observePower(now) || (configuration.schedule.enabled && !_condition_valid)) {
+	    || _preparation.pollActivationObservedLive(now, configuration, _routing_snapshot, _inventory_fault) != slaaps::ActivationStatus::Consumed) {
 		cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+		return;
+	}
+
+	// D3 losses while still armed and intact: the SLAAPS mode was left (pilot or failsafe), the power source or the
+	// scheduled operating condition is gone. Outside a Manual/Acceleration transfer these hold the canards and ramp
+	// EDF off; with no handled frame yet, or during a transfer, they cancel as before.
+	const char *loss = !slaaps::ManualBankPreparation::flightMode(selected_mode) ? "mode left" :
+			   !observePower(now) ? "power lost" : (configuration.schedule.enabled && !_condition_valid) ? "condition lost" : nullptr;
+
+	if (loss) {
+		if (_flight_transfer_target == slaaps::ControlMode::None) { _manual_status = _manual.abandon(slaaps::ManualWorkerStatus::ControlRejected); }
+
+		if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
+
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: %s, canards hold, EDF ramping off", loss);
+		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_REJECTED;
+		updateRecovery(hrt_absolute_time(), vehicle, armed, armed_fresh);
 		return;
 	}
 
@@ -1545,7 +1563,15 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 					       _manual_first_command_deadline, _condition_valid ? &_condition_sample : nullptr);
 	_acceleration_input = {};
 
-	if (!_manual.active()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
+	if (!_manual.active()) {
+		if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
+
+		// D3/D4: a core fault after at least one handled frame holds the canards and ramps EDF off.
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: control lost, canards hold, EDF ramping off");
+		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_REJECTED;
+		updateRecovery(hrt_absolute_time(), vehicle, armed, armed_fresh);
+		return;
+	}
 
 	slaaps::ManualWorkerOutput handled{};
 	uint64_t handled_us{};
@@ -1555,6 +1581,71 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 		_manual_first_command_deadline = 0;
 		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_RUNNING;
 	}
+}
+
+// Recovery needs only that the vehicle is still armed with no kill, lockdown or termination, and that every bound
+// lifetime is unchanged. The registered mode may have left SLAAPS (failsafe or pilot) and power or estimator health may
+// be gone: those are exactly the losses recovery exists for. Anything else cancels as before. The permission published
+// here is a denial: it grants no flight flag and renews nothing; banks use it only to see that arming continues.
+void Slaaps::updateRecovery(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh)
+{
+	const auto &configuration = _configuration.configuration();
+	const uint64_t authority_age = configuration.actuator_permission_age_us > 0 ?
+				       static_cast<uint64_t>(configuration.actuator_permission_age_us) : 0;
+	now = hrt_absolute_time();
+	bool lifetimes = true;
+
+	if (_prepared_request.binding.banks & 1U) {
+		lifetimes &= _manual_activation_revisions[0] && _main_activation_lifetime.revision() == _manual_activation_revisions[0];
+	}
+
+	if (_prepared_request.binding.banks & 2U) {
+		lifetimes &= _manual_activation_revisions[1] && _aux_activation_lifetime.revision() == _manual_activation_revisions[1];
+	}
+
+	if (!armed_fresh || !authority_age || !vehicle.timestamp || vehicle.timestamp > now || now - vehicle.timestamp > authority_age
+	    || !armed.timestamp || armed.timestamp > now || now - armed.timestamp > authority_age
+	    || vehicle.arming_state != vehicle_status_s::ARMING_STATE_ARMED || !armed.armed
+	    || armed.kill || armed.lockdown || armed.termination || armed.in_esc_calibration_mode || _registration_fault
+	    || !_configuration.eligible() || !_routing_valid || !lifetimes
+	    || _manual.commandRevision() != _prepared_request.command_revision || permissionRevision() != _prepared_request.permission_revision
+	    || !publishRecoveryPermission(now, armed)) {
+		cancelPreparation(now, slaaps::PreparationStatus::Rejected);
+		return;
+	}
+
+	_manual_status = _manual.recoverObserved(_manual_permission, _prepared_request.binding);
+
+	// Finished (EDF off or 60 s), or any transport fault: end the session and publish the invalid permission.
+	if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); }
+}
+
+bool Slaaps::publishRecoveryPermission(hrt_abstime now, const actuator_armed_s &armed)
+{
+	const auto &previous = _manual_permission;
+	const uint64_t lease = static_cast<uint64_t>(_configuration.configuration().output_lease_ms) * 1000;
+
+	if (!permissionRevision() || !_preparation_session || !lease || _permission_sequence == UINT64_MAX || now > UINT64_MAX - lease
+	    || previous.session != _preparation_session || !slaaps::ManualBankPreparation::flightMode(previous.mode)
+	    || now <= previous.timestamp_us) { return false; }
+
+	slaaps::ManualPermissionSample sample{};
+	auto &permission = sample.permission;
+	permission = previous;
+	permission.timestamp_us = now;
+	permission.deadline_us = now + lease;
+	permission.armed = true;
+	permission.flight_admitted = permission.healthy = permission.measured_condition_valid = false;
+	permission.commissioning_admitted = false;
+	permission.kill = permission.lockdown = permission.termination = false;
+	permission.prearmed = armed.prearmed;
+	sample.sequence = ++_permission_sequence;
+	slaaps_manual_permission_s wire{};
+
+	if (!slaaps::encodeManualPermission(now, sample, lease, wire) || !_permission.publish(wire)) { return false; }
+
+	_manual_permission = permission;
+	return true;
 }
 
 void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &vehicle,
@@ -1581,6 +1672,8 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 	}
 
 	if (_manual.active()) { updateFlightControl(now, vehicle, armed, armed_fresh); return; }
+
+	if (_manual.recovering()) { updateRecovery(now, vehicle, armed, armed_fresh); return; }
 
 	bool activation_lifetimes = true;
 

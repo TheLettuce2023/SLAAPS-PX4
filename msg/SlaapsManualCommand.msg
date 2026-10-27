@@ -25,4 +25,5 @@ uint8 EDF_BENCH = 4
 uint8 mode # Prepared mode or exact same-session flight transfer
 uint8 EDF_INHIBITED = 0
 uint8 EDF_COMMAND = 1
+uint8 EDF_RECOVERY = 3 # D3/D4 recovery frame: frozen canards, non-increasing EDF, hard 60 s ceiling
 uint8 edf_disposition # Servo bench requires inhibited and zero EDF

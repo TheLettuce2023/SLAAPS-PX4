@@ -23,6 +23,19 @@ EdfFault EdfOwner::reject(EdfFault fault)
 	return fault;
 }
 
+EdfFault EdfOwner::lose(uint64_t now, EdfFault fault)
+{
+	// Only a flight grant that was actually active can start recovery; bench and explicit rejects cannot.
+	if (_grant.mode == ControlMode::Manual || _grant.mode == ControlMode::Acceleration) {
+		_recovery_active = true;
+		_recovery_start_us = now;
+		_recovery_output = _output;
+		_recovery_last_us = _last_sample;
+	}
+
+	return reject(fault);
+}
+
 bool EdfOwner::permitted(uint64_t now, const EdfPermission &p) const
 {
 	return permitted(now, p, _grant);
@@ -44,6 +57,7 @@ EdfFault EdfOwner::begin(uint64_t now, const VehicleConfiguration &configuration
 {
 	// Failed replacement also revokes the old grant. No overlapping owners.
 	_active = false;
+	_recovery_active = false;
 	_received = false;
 	_output = 0.F;
 	_target = 0.F;
@@ -93,10 +107,10 @@ EdfFault EdfOwner::check(uint64_t now, const EdfPermission &permission)
 
 	_clock = now;
 
-	if (!permitted(now, permission)) { return reject(EdfFault::PermissionLost); }
+	if (!permitted(now, permission)) { return lose(now, EdfFault::PermissionLost); }
 
 	if ((_received && now >= _request.deadline_us)
-	    || (!_received && now - _started_us >= _lease_us)) { return reject(EdfFault::Expired); }
+	    || (!_received && now - _started_us >= _lease_us)) { return lose(now, EdfFault::Expired); }
 
 	return EdfFault::None;
 }
@@ -241,8 +255,55 @@ EdfCommand EdfOwner::sample(uint64_t now, const EdfPermission &permission)
 	return command;
 }
 
+void EdfOwner::abandon(uint64_t now)
+{
+	if (_recovery_active || (_grant.mode != ControlMode::Manual && _grant.mode != ControlMode::Acceleration)
+	    || !_grant.session) { return; }
+
+	_recovery_active = true;
+	_recovery_start_us = now < _clock ? _clock : now;
+	_recovery_output = _output;
+	_recovery_last_us = _last_sample;
+	reject(EdfFault::Revoked);
+}
+
+EdfCommand EdfOwner::recover(uint64_t now, const EdfPermission &permission)
+{
+	EdfCommand command{};
+
+	if (!_recovery_active) { return command; }
+
+	if (now == 0 || now < _clock) { return command; }
+
+	_clock = now;
+
+	if (inhibited(permission) || permission.session != _grant.session || permission.source != _grant.source
+	    || permission.configuration != _grant.configuration || permission.mode != _grant.mode
+	    || now - _recovery_start_us >= kRecoveryCeilingUs) {
+		// Disarm, kill, lockdown, termination, another session or the ceiling end recovery for good.
+		_recovery_active = false;
+		return command;
+	}
+
+	const float dt = static_cast<float>(now - _recovery_last_us) * kSecondsPerUs;
+	_recovery_output = math::max(0.F, _recovery_output - _configuration.edf_fall * dt);
+	_recovery_last_us = now;
+	command.disposition = EdfDisposition::Recovery;
+	command.normalized = _recovery_output;
+	command.session = _grant.session;
+	command.source = _grant.source;
+	command.configuration = _grant.configuration;
+	command.sequence = _request.sequence;
+	command.request_timestamp_us = _request.timestamp_us;
+	const uint64_t lease_end = now + _lease_us;
+	const uint64_t ceiling = _recovery_start_us + kRecoveryCeilingUs;
+	command.deadline_us = lease_end < ceiling ? lease_end : ceiling;
+	return command;
+}
+
 void EdfOwner::revoke()
 {
+	_recovery_active = false;
 	reject(EdfFault::Revoked);
 }
 } // namespace slaaps

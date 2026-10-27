@@ -19,7 +19,7 @@ class ManualWorkerTransport
 {
 public:
 	explicit ManualWorkerTransport(EdfOwner &edf) : _worker(edf) {}
-	~ManualWorkerTransport() { if (_active) { stop(); } }
+	~ManualWorkerTransport() { if (_active || _recovering) { stop(); } }
 	ManualWorkerTransport(const ManualWorkerTransport &) = delete;
 	ManualWorkerTransport &operator=(const ManualWorkerTransport &) = delete;
 
@@ -37,6 +37,64 @@ public:
 		return _advertisement_revision && _lifetime.revision() == _advertisement_revision ? _advertisement_revision : 0;
 	}
 	bool active() const { return _active; }
+	// D3/D4 recovery keeps command publication and acknowledgment subscriptions after a controller fault.
+	// The supervisor must call recoverObserved every cycle; stop() ends recovery for good.
+	bool recovering() const { return _recovering; }
+	// Loss detected outside the core. Recovery starts only if the core has a handled flight frame.
+	ManualWorkerStatus abandon(ManualWorkerStatus reason)
+	{
+		if (!_active || _bench_mode != ControlMode::None) { stop(); return reason; }
+
+		return failOrRecover(_worker.abandon(reason, hrt_absolute_time()));
+	}
+	ManualWorkerStatus recoverObserved(const EdfPermission &permission, const ManualOutputBinding &binding)
+	{
+		if (!_recovering) { return ManualWorkerStatus::Inactive; }
+
+		if (_lifetime.revision() != _revision) { return reject(); }
+
+		ManualOutputAck pending[2] {};
+		unsigned count{};
+
+		for (unsigned bank = 0; bank < 2; ++bank) {
+			if (!(_banks & (1U << bank))) { continue; }
+
+			slaaps_manual_ack_s wire{};
+			const auto read = acknowledgment(bank).read(wire);
+
+			if (read == BoundRead::Rejected) { return reject(); }
+
+			if (read == BoundRead::Waiting || (_have_ack[bank] && memcmp(&wire, &_last_ack[bank], sizeof(wire)) == 0)) { continue; }
+
+			if (!decodeManualAck(hrt_absolute_time(), bank, wire, pending[count])) { return reject(); }
+
+			memcpy(&_last_ack[bank], &wire, sizeof(wire));
+			_have_ack[bank] = true;
+
+			// A late reply to the frame pending at the loss is history, not a recovery acknowledgment.
+			if (pending[count].sequence > _worker.recoveryBaseSequence()) { ++count; }
+		}
+
+		const uint64_t now = hrt_absolute_time();
+		ManualWorkerOutput output{};
+		ManualWorkerStatus result{ManualWorkerStatus::Inactive};
+
+		for (unsigned i = 0; i < (count ? count : 1); ++i) {
+			result = _worker.recoverCycle(now, permission, binding, output, count ? &pending[i] : nullptr);
+
+			if (result == ManualWorkerStatus::Command) {
+				slaaps_manual_command_s wire{};
+
+				if (i + 1 < count || !encodeManualCommand(hrt_absolute_time(), output, wire) || !_command.publish(wire)) { return reject(); }
+
+			} else if (result != ManualWorkerStatus::Waiting && result != ManualWorkerStatus::NotDue) {
+				stop();
+				return result;
+			}
+		}
+
+		return result;
+	}
 	uint64_t handledSequence() const { return _active ? _worker.handledSequence() : 0; }
 	bool outstanding() const { return _active && _worker.outstanding(); }
 	uint64_t outputDeadline() const { return _active ? _worker.outputDeadline() : 0; }
@@ -160,7 +218,9 @@ public:
 	{
 		if (!_active) { return ManualWorkerStatus::Inactive; }
 
-		if (!_selected_session || !_selected_input.check(now, snapshot)) { stop(); return ManualWorkerStatus::ControlRejected; }
+		if (!_selected_session) { stop(); return ManualWorkerStatus::ControlRejected; }
+
+		if (!_selected_input.check(now, snapshot)) { return loseSelectedInput(snapshot); }
 
 		return cycleImpl(now, permission, snapshot.manual, &snapshot.state, binding, nullptr, 0, condition);
 	}
@@ -213,6 +273,7 @@ public:
 	void stop()
 	{
 		_active = false;
+		_recovering = false;
 		_selected_session = false;
 		_bench_mode = ControlMode::None;
 		_selected_input.stop();
@@ -315,7 +376,7 @@ private:
 
 			if (first_command_deadline_us && now >= first_command_deadline_us) { return reject(); }
 
-			if (observed && !_selected_input.check(now, *observed)) { stop(); return ManualWorkerStatus::ControlRejected; }
+			if (observed && !_selected_input.check(now, *observed)) { return loseSelectedInput(*observed); }
 		}
 
 		ManualWorkerOutput output{};
@@ -346,11 +407,33 @@ private:
 
 			} else if (result != ManualWorkerStatus::Waiting && result != ManualWorkerStatus::NotDue
 				   && !(monitor_only && result == ManualWorkerStatus::Ready)) {
-				stop();
-				return result;
+				return failOrRecover(result);
 			}
 		}
 
+		return result;
+	}
+	// Estimator/selected-state loss while still armed without kill, lockdown or termination is a D3 loss.
+	ManualWorkerStatus loseSelectedInput(const SelectedManualInput::Snapshot &snapshot)
+	{
+		const auto &armed = snapshot.permission;
+
+		if (snapshot.permission_fresh && armed.armed && !armed.kill && !armed.lockdown && !armed.termination
+		    && !armed.in_esc_calibration_mode) { return abandon(ManualWorkerStatus::ControlRejected); }
+
+		stop();
+		return ManualWorkerStatus::ControlRejected;
+	}
+	// A core fault that started recovery keeps the bound publication and acknowledgment state.
+	ManualWorkerStatus failOrRecover(ManualWorkerStatus result)
+	{
+		if (!_worker.recovering()) { stop(); return result; }
+
+		_active = false;
+		_recovering = true;
+		_selected_session = false;
+		_bench_mode = ControlMode::None;
+		_selected_input.stop();
 		return result;
 	}
 	ManualWorkerStatus publishResult(ManualWorkerStatus result, const ManualWorkerOutput &output, bool live)
@@ -387,6 +470,7 @@ private:
 	unsigned _advertisement_revision{};
 	uint8_t _banks{};
 	bool _active{};
+	bool _recovering{};
 };
 
 } // namespace slaaps

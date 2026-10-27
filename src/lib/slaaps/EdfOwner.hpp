@@ -11,7 +11,8 @@ enum class EdfFault : uint8_t {
 	None, InvalidGrant, InvalidConfiguration, PermissionLost, InvalidTime,
 	WrongOwner, InvalidRequest, NotLowThrottle, Expired, Revoked
 };
-enum class EdfDisposition : uint8_t { Inhibited, Command, RecoveryRequired };
+// Recovery is only produced by EdfOwner::recover(); wire and worker paths accept Command alone.
+enum class EdfDisposition : uint8_t { Inhibited, Command, RecoveryRequired, Recovery };
 
 // Supplied by the selected-input/controller adapter; never an actuator topic.
 // Session is the immutable monotonic HRT entry timestamp shared with permission;
@@ -83,6 +84,18 @@ public:
 	EdfFault transfer(uint64_t now, uint64_t transition_us, const EdfPermission &previous,
 			  const EdfPermission &next, const EdfRequest &request, EdfCommand &current);
 	EdfCommand sample(uint64_t now, const EdfPermission &permission);
+	// D3/D4 airborne recovery. After a flight grant is lost to PermissionLost or Expired the owner
+	// ramps EDF to off at SLA_EDF_FALL from its last sampled output, and forces off no later than
+	// kRecoveryCeilingUs after detection. It needs only an armed, non-kill, non-lockdown, non-termination
+	// permission of the same session; it never revives the grant, accepts requests or extends a lease.
+	// Each sample's deadline is one output lease from now, capped by the ceiling. The caller must still
+	// hold canards at their last handled position (D3); that bank action is not part of this class.
+	EdfCommand recover(uint64_t now, const EdfPermission &permission);
+	bool recovering() const { return _recovery_active; }
+	// Caller-detected loss (estimator, bank or control fault) of an actively granted flight session.
+	// Starts the same recovery as an owner-detected loss. The worker alone decides when to call it.
+	void abandon(uint64_t now);
+	static constexpr uint64_t kRecoveryCeilingUs = 60000000;
 	void revoke();
 	EdfFault fault() const { return _fault; }
 private:
@@ -90,6 +103,7 @@ private:
 	bool permitted(uint64_t now, const EdfPermission &permission, const EdfPermission &grant) const;
 	EdfFault check(uint64_t now, const EdfPermission &permission);
 	EdfFault reject(EdfFault fault);
+	EdfFault lose(uint64_t now, EdfFault fault);
 	VehicleConfiguration _configuration{};
 	EdfPermission _grant{};
 	EdfRequest _request{};
@@ -103,6 +117,10 @@ private:
 	float _output{};
 	bool _active{};
 	bool _received{};
+	bool _recovery_active{};
+	uint64_t _recovery_start_us{};
+	float _recovery_output{};
+	uint64_t _recovery_last_us{};
 	EdfFault _fault{EdfFault::Revoked};
 };
 

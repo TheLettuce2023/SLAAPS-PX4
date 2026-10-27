@@ -98,15 +98,25 @@ public:
 		}
 
 		// No session may start from an already armed, unprepared bank.
-		if (!_listening && !_bank.active()) { return fail(now, actually_armed); }
+		if (!_listening && !_bank.active() && !_bank.recovering()) { return fail(now, actually_armed); }
 
 		// Claim the retained stop frame as soon as an already-prepared bank
 		// observes arming, even while no command authority has been granted.
 		_claimed = true;
-		const bool awaiting_grant = !_bank.active();
+		const bool awaiting_grant = !_bank.active() && !_bank.recovering();
 		const bool granted = context(now, driver, ready, armed, awaiting_grant);
 
-		if (!granted && !_waiting_for_grant) { return fail(now, true); }
+		if (!granted && !_waiting_for_grant) {
+			// D3/D4: an active or recovering flight bank whose grant is lost continues only through its own
+			// recovery (frozen canards, recovery frames). The bank decides; anything else fails as before.
+			if (awaiting_grant || !recoveryLocal(now, driver, ready, armed)) { return fail(now, true); }
+
+			_candidate = _bank.dispatchLive(now, _permission, _routing.inventory, _request.binding);
+
+			if (!_bank.recovering()) { return fail(now, true); }
+
+			return _candidate.command_valid && _bank.awaitingHandling() ? SlaapsOutputStatus::Command : SlaapsOutputStatus::Waiting;
+		}
 
 		// Until activation consumes readiness, preserve every original prepare
 		// check/deadline while waiting across the independent permission queue.
@@ -135,6 +145,14 @@ public:
 
 		_candidate = _bank.dispatchLive(now, _permission, _routing.inventory, _request.binding);
 
+		// The bank may enter its own recovery here (its last frame expired under a still-fresh grant).
+		if (_bank.recovering()) {
+
+			if (!recoveryLocal(now, driver, ready, armed)) { return fail(now, true); }
+
+			return _candidate.command_valid && _bank.awaitingHandling() ? SlaapsOutputStatus::Command : SlaapsOutputStatus::Waiting;
+		}
+
 		if (_bank.fault() != slaaps::ManualBankFault::None) { return fail(now, true); }
 
 		if (!fresh(_vehicle_sample.timestamp, now) || !fresh(armed.timestamp, now)
@@ -150,8 +168,14 @@ public:
 	{
 		// The physical callback may have taken time. Re-read independent authority,
 		// configuration and inventory before acknowledging this exact saved ticket.
-		if (!context(now, driver, ready, armed)
-		    || !_bank.confirmHandledLive(now, _permission, _routing.inventory, _request.binding, _candidate, success)) {
+		const bool recovering = _bank.recovering();
+		const bool granted = context(now, driver, ready, armed);
+
+		const bool confirmed = (granted || (recovering && recoveryLocal(now, driver, ready, armed)))
+				       && _bank.confirmHandledLive(now, _permission, _routing.inventory, _request.binding, _candidate, success);
+
+
+		if (!confirmed) {
 			fail(now, true);
 			return false;
 		}
@@ -333,6 +357,21 @@ private:
 		const bool locally_enabled = servoBench() ? both_disarmed && armed.prearmed : both_armed;
 		const auto permission_read = awaiting_grant ? _permissions.awaitGrantLive(now, _permission, locally_enabled)
 					     : _permissions.readLive(now, _permission);
+
+		// The subscription latches on an expired or missing decision. A bank that already holds a session keeps
+		// only that session's identity, with every grant flag false, so its own recovery can still match it.
+		// Arming, kill, lockdown and termination below always come from the live local authority.
+		if (permission_read == slaaps::BoundRead::Data) {
+			_session_identity = _permission;
+
+		} else if (!awaiting_grant && _session_identity.session) {
+			_permission.session = _session_identity.session;
+			_permission.source = _session_identity.source;
+			_permission.configuration = _session_identity.configuration;
+			_permission.mode = _session_identity.mode;
+			_permission.transition_us = _session_identity.transition_us;
+		}
+
 		// All independent copies are complete. Recheck the retained samples at
 		// one final decision time; copying a later topic never renews an earlier one.
 		now = hrt_absolute_time();
@@ -394,6 +433,17 @@ private:
 		return permission_fresh && slaaps::ManualBankPreparation::permitted(_permission, _permission.mode);
 	}
 
+	// Local prerequisites for recovery output: the same physical driver, fresh both-armed authority with no kill,
+	// lockdown, termination or ESC calibration, a flight session and fresh routing reports. No grant is implied.
+	bool recoveryLocal(uint64_t now, uint64_t driver, bool ready, const actuator_armed_s &armed) const
+	{
+		return ready && !commissioning() && driver == _request.binding.driver[Bank] && _routing.driver[Bank] == driver
+		       && fresh(_vehicle_sample.timestamp, now) && fresh(armed.timestamp, now)
+		       && armed.armed && _vehicle_sample.arming_state == vehicle_status_s::ARMING_STATE_ARMED
+		       && !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode
+		       && fresh(_supervisor_sample.timestamp, now) && routingFresh(now);
+	}
+
 	bool routingFresh(uint64_t now) const
 	{
 		if (!_routing.captured_us || _routing.captured_us > now) { return false; }
@@ -426,6 +476,7 @@ private:
 
 		_bank.revoke();
 		_permissions.stop();
+		_session_identity = {};
 		_status_reader.revoke();
 		_listening = false;
 	}
@@ -434,6 +485,7 @@ private:
 	slaaps::ManualPreparationEndpoint<Bank> _endpoint;
 	slaaps::ManualPermissionSubscription _permissions{};
 	slaaps::EdfPermission _permission{};
+	slaaps::EdfPermission _session_identity{}; // Identity only; never a grant.
 	slaaps::ManualBankOutput _candidate{};
 	slaaps::Px4ConfigurationSource _parameters{};
 	slaaps::ParameterSnapshot _configuration{};

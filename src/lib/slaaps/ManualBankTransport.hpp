@@ -214,6 +214,8 @@ private:
 		// Poll before reading, including initial silence and duplicate traffic.
 		auto output = _consumer.sample(now, permission, inventory, binding);
 
+		if (_consumer.recovering()) { return recoverImpl(now, permission, inventory, binding, live, allow_command, output); }
+
 		if (_consumer.fault() != ManualBankFault::None) { return output; }
 
 		if (_ack_lifetime.revision() != _ack_revision) {
@@ -257,6 +259,47 @@ private:
 		} else if (_consumer.accept(now, permission, inventory, binding, frame) == ManualBankFault::None) {
 			memcpy(&_last, &wire, sizeof(wire));
 			_received = true;
+		}
+
+		if (live) { now = hrt_absolute_time(); }
+
+		return _consumer.sample(now, permission, inventory, binding);
+	}
+
+	// D3/D4: after the original session is lost the canards hold and only recovery frames are read.
+	// Retained traffic identical to the last accepted frame is ignored and cannot renew anything.
+	ManualBankOutput recoverImpl(uint64_t &now, const EdfPermission &permission, const OutputInventory &inventory,
+				     const ManualOutputBinding &binding, bool live, bool allow_command, const ManualBankOutput &current)
+	{
+		if (_ack_lifetime.revision() != _ack_revision) {
+			revoke();
+			return _consumer.sample(now, permission, inventory, binding);
+		}
+
+		if (!allow_command) { return current; }
+
+		auto &wire = _read_wire;
+		wire = {};
+		const auto result = _command.read(wire);
+
+		if (live) { now = hrt_absolute_time(); }
+
+		if (result == BoundRead::Waiting) { return current; }
+
+		auto &frame = _decoded_frame;
+		frame = {};
+
+		if (result != BoundRead::Data) {
+			revoke();
+
+		} else if (wire.sequence == _last.sequence) {
+			if (memcmp(&wire, &_last, sizeof(wire)) != 0) { revoke(); }
+
+		} else if (!decodeManualCommand(now, wire, frame)) {
+			revoke();
+
+		} else if (_consumer.acceptRecovery(now, permission, inventory, binding, frame) == ManualBankFault::None) {
+			memcpy(&_last, &wire, sizeof(wire));
 		}
 
 		if (live) { now = hrt_absolute_time(); }
@@ -335,6 +378,7 @@ private:
 public:
 	void revoke() { _preparation.cancel(); _command.revoke(); _consumer.revoke(); }
 	bool awaitingHandling() const { return _consumer.awaitingHandling(); }
+	bool recovering() const { return _consumer.recovering(); }
 	bool canCompleteAtTransition(uint64_t transition_us) const { return _consumer.canCompleteAtTransition(transition_us); }
 	ManualBankFault fault() const { return _consumer.fault(); }
 

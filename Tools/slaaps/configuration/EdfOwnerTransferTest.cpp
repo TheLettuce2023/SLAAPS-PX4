@@ -309,3 +309,120 @@ bool slaapsEdfOwnerTransferTests(unsigned &checks, const slaaps::VehicleConfigur
 	       "overflowing the original raw deadline rejects before arithmetic or request publication");
 	return passed;
 }
+
+// D3/D4 owner mechanism with explicitly synthetic timing; canard freeze is a bank action tested elsewhere.
+bool slaapsEdfOwnerRecoveryTests(unsigned &checks, const slaaps::VehicleConfiguration &configuration)
+{
+	using namespace slaaps;
+	bool passed = true;
+	auto expect = [&](bool condition, const char *description) {
+		++checks;
+
+		if (!condition) { std::fprintf(stderr, "FAIL EDF recovery: %s\n", description); passed = false; }
+	};
+	auto c = configuration;
+	c.edf_rise = 2.F;
+	c.edf_fall = 3.F;
+	c.output_lease_ms = 100;
+	constexpr uint64_t start = 1000000;
+	const uint64_t identity = fingerprint(c);
+	EdfPermission grant{};
+	grant.timestamp_us = grant.session = start;
+	grant.deadline_us = start + 100000;
+	grant.source = 17;
+	grant.configuration = identity;
+	grant.mode = ControlMode::Manual;
+	grant.armed = grant.flight_admitted = grant.healthy = grant.measured_condition_valid = true;
+	EdfRequest initial{start, 17, identity, 1, start, start + 100000, ControlMode::Manual, EdfUnits::Normalized, 0.F};
+	auto high = initial;
+	high.sequence = 2;
+	high.timestamp_us = start + 1000;
+	high.deadline_us = start + 90000;
+	high.value = .8F;
+	auto prime = [&](EdfOwner & owner) {
+		const bool ready = owner.begin(start, c, grant) == EdfFault::None
+				   && owner.accept(start, grant, initial) == EdfFault::None
+				   && owner.accept(start + 1000, grant, high) == EdfFault::None
+				   && std::fabs(owner.sample(start + 89000, grant).normalized - .176F) < 1.e-5F;
+		expect(ready, "recovery fixture has a real nonzero sampled output");
+	};
+	EdfOwner owner;
+	expect(owner.recover(start, grant).disposition == EdfDisposition::Inhibited && !owner.recovering(),
+	       "recovery cannot start without a lost flight grant");
+	prime(owner);
+	expect(owner.sample(start + 90000, grant).disposition == EdfDisposition::RecoveryRequired
+	       && owner.fault() == EdfFault::Expired && owner.recovering(),
+	       "strict sample still reports the loss and recovery begins");
+	auto first = owner.recover(start + 91000, grant);
+	expect(first.disposition == EdfDisposition::Recovery && std::fabs(first.normalized - .170F) < 1.e-5F
+	       && first.deadline_us == start + 191000 && first.session == start && first.source == 17,
+	       "recovery ramps down from the last sampled output at SLA_EDF_FALL under a fresh one-lease deadline");
+	const auto mid = owner.recover(start + 111000, grant);
+	expect(mid.disposition == EdfDisposition::Recovery && std::fabs(mid.normalized - .110F) < 1.e-5F,
+	       "ramp is time based and never rises");
+	expect(owner.recover(start + 160000, grant).normalized <= 0.F, "ramp reaches EDF off");
+	EdfRequest late = high;
+	late.sequence = 3;
+	late.timestamp_us = start + 160001;
+	late.deadline_us = start + 190000;
+	expect(owner.accept(start + 161000, grant, late) != EdfFault::None && owner.sample(start + 161000, grant).disposition ==
+	       EdfDisposition::RecoveryRequired, "recovery never accepts requests or revives the grant");
+	const auto edge = owner.recover(start + 90000 + EdfOwner::kRecoveryCeilingUs - 1, grant);
+	expect(edge.disposition == EdfDisposition::Recovery && edge.deadline_us == start + 90000 + EdfOwner::kRecoveryCeilingUs,
+	       "deadline is capped by the 60 s ceiling");
+	expect(owner.recover(start + 90000 + EdfOwner::kRecoveryCeilingUs, grant).disposition == EdfDisposition::Inhibited
+	       && !owner.recovering() && owner.recover(start + 91000 + EdfOwner::kRecoveryCeilingUs, grant).disposition ==
+	       EdfDisposition::Inhibited, "the ceiling ends recovery permanently");
+
+	for (unsigned scenario = 0; scenario < 5; ++scenario) {
+		EdfOwner other;
+		prime(other);
+		auto p = grant;
+		p.timestamp_us = start + 50000;
+		p.deadline_us = start + 100000;
+
+		if (scenario == 0) { p.healthy = false; }
+
+		other.sample(start + 90000, scenario == 0 ? p : grant);
+
+		if (scenario == 0) {
+			expect(other.fault() == EdfFault::PermissionLost && other.recovering(), "permission loss starts recovery");
+		}
+
+		auto q = grant;
+
+		if (scenario == 1) { q.kill = true; }
+
+		if (scenario == 2) { q.armed = false; }
+
+		if (scenario == 3) { q.session += 1; }
+
+		if (scenario == 4) { other.revoke(); }
+
+		const auto out = other.recover(start + 91000, q);
+		expect(scenario == 0 ? out.disposition == EdfDisposition::Recovery : out.disposition == EdfDisposition::Inhibited,
+		       "healthy-permission loss recovers; kill, disarm, another session and revoke give no recovery output");
+	}
+
+	EdfOwner bench;
+	auto bench_grant = grant;
+	bench_grant.mode = ControlMode::EdfBench;
+	bench_grant.flight_admitted = bench_grant.measured_condition_valid = false;
+	bench_grant.commissioning_admitted = true;
+	auto bench_config = c;
+	bench_config.edf_commission_max = .3F;
+	bench.begin(start, bench_config, bench_grant);
+	bench_grant.healthy = false;
+	bench.sample(start + 1000, bench_grant);
+	expect(!bench.recovering() && bench.recover(start + 2000, bench_grant).disposition == EdfDisposition::Inhibited,
+	       "bench commissioning never enters airborne recovery");
+	EdfOwner replaced;
+	prime(replaced);
+	replaced.sample(start + 90000, grant);
+	auto next = grant;
+	next.timestamp_us = next.session = start + 95000;
+	next.deadline_us = start + 195000;
+	replaced.begin(start + 95000, c, next);
+	expect(!replaced.recovering(), "a deliberate new session clears recovery");
+	return passed;
+}

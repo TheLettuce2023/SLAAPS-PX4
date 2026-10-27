@@ -21,7 +21,7 @@ inline bool validManualFrame(uint64_t now, const ManualWorkerOutput &frame)
 
 	if (!frame.timestamp_us || frame.timestamp_us > now || frame.deadline_us <= now || !frame.sequence
 	    || !validManualOutputBinding(frame.binding) || (!manual && !bench && !edf_bench)
-	    || (!bench ? edf.disposition != EdfDisposition::Command :
+	    || (!bench ? (edf.disposition != EdfDisposition::Command && !(edf.disposition == EdfDisposition::Recovery && manual)) :
 		(edf.disposition != EdfDisposition::Inhibited || !(edf.normalized >= 0.F && edf.normalized <= 0.F)))
 	    || !edf.session || !edf.source || !edf.configuration || !edf.sequence || !edf.request_timestamp_us
 	    || edf.request_timestamp_us > frame.timestamp_us || frame.deadline_us > edf.deadline_us
@@ -47,6 +47,7 @@ inline bool encodeManualCommand(uint64_t now, const ManualWorkerOutput &frame, s
 	static_assert(static_cast<unsigned>(ControlMode::EdfBench) == slaaps_manual_command_s::EDF_BENCH, "EDF bench command mode");
 	static_assert(static_cast<unsigned>(EdfDisposition::Inhibited) == slaaps_manual_command_s::EDF_INHIBITED, "inhibited EDF wire state");
 	static_assert(static_cast<unsigned>(EdfDisposition::Command) == slaaps_manual_command_s::EDF_COMMAND, "command EDF wire state");
+	static_assert(static_cast<unsigned>(EdfDisposition::Recovery) == slaaps_manual_command_s::EDF_RECOVERY, "recovery EDF wire state");
 
 	if (!validManualFrame(now, frame)) { return false; }
 

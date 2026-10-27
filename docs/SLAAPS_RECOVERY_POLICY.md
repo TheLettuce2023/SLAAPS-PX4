@@ -2,7 +2,20 @@
 
 Decided 2026-10-25 by the project lead, who is accountable for flight-test safety sign-off.
 Source and option analysis: [SLAAPS Airborne Recovery Policy](https://claude.ai/artifact/T2pu5bwyatsrRN7um2amXh).
-Implementation has not started. Until it lands and is verified, `flight_admitted` stays false.
+Implementation status (2026-10-27): D3/D4 library layer done and host-tested (not called by the supervisor yet):
+`EdfOwner::recover/abandon` (EDF ramp at SLA_EDF_FALL, hard 60 s ceiling), `ManualOutputBank` recovery (canards hold at the
+last handled pulses, only `Recovery` frames admitted, bank enforces the ceiling itself), wire value `EDF_RECOVERY = 3`,
+`ManualWorker::recoverCycle`, bank/worker transport recovery states. Supervisor wired (`Slaaps::updateRecovery`): a worker fault after a handled frame holds recovery while armed with no
+kill/lockdown/termination, publishes a non-granting armed permission, logs a critical QGC message; disarm or any integrity
+loss still cancels. Compiles/links native and 6X (image 1,948,260 B, 17.4 KB free); native supervisor run verifies recovery
+frames after an Acceleration allocator rejection, held canards, non-rising EDF and disarm ending recovery.
+An allocator rejection now enters D3 recovery as a stand-in until D1/D2 exist. Leaving the SLAAPS mode (pilot or
+failsafe) and power-source loss while armed now also enter recovery, verified natively through the real driver path
+(recovery frames acknowledged by both banks, canards frozen, EDF ramped off, critical QGC message, disarm ends it).
+The driver-side `SlaapsOutputPreparation` now hands a lost grant to the bank's recovery instead of revoking the bank.
+Estimator loss is routed in source but still ends in a worker-transport cancel in the native fixture; unresolved and
+excluded from the test. Not done: D1, D2, D5, D6, Commander failsafe path, estimator loss, a failed bank that carries
+the EDF channel. Until all land and are verified, `flight_admitted` stays false.
 
 ## Decisions
 

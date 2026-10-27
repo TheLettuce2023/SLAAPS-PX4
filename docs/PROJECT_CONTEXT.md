@@ -141,11 +141,11 @@ The controller and exclusive active handoff pass native capture tests; cold acce
 1. Complete acceleration authority diagnostics from port through worker/supervisor to logged status/QGC text.
    Verify a valid signed but infeasible demand and calculated-vs-handled ACK evidence; preserve admission behavior.
 2. Positive EDF Bench arming is DONE natively with synthetic inputs (see evidence log, October 25).
-   Full verifier is still blocked by the isolated-supervisor barrier failure below; fix that next,
-   then rerun the unmodified verifier. Physical vehicle health remains unqualified.
-   Isolated supervisor deterministically fails "ordinary queue overrun cannot overwrite or reconstruct
-   the exact retained barrier payload" on current checkout build `bp74v6k4` (companion priority barrier).
-3. Implement the decided recovery policy: D4 60 s EDF-off ceiling, D1/D3 owned recovery sequences,
+   Isolated-supervisor barrier failure FIXED 2026-10-27: test defect, not product. The drain loop kept the
+   revision from its final failed `copyQueuedBound` call, which clears revision by contract; payload and
+   production MAVLink drain were correct. Full native verifier PASS on build `slaaps-native-xc32ipac`
+   (binary bf9ae495, 6101 control checks); host suite PASS (4383/config). Physical health remains unqualified.
+3. Recovery policy: D3/D4 library layer and transports done (see decision record status); supervisor wired and runtime-verified natively (recovery frames, frozen canards, disarm ends it); mode-left and power loss also enter recovery through the real driver path (estimator loss unresolved); next estimator loss, then D1/D2/D5/D6. Original list: D4 60 s EDF-off ceiling, D1/D3 owned recovery sequences,
    D2 Manual handoff + QGC alarm, D5 armed Manual re-entry, D6 net-position parameters, closed
    Commander failsafe path. Resolve the record's open clarifications first where they change design.
 4. Close stock QGC operator workflow, working-base boot integration, runtime timing/stack
@@ -310,11 +310,10 @@ range 1..1999, minimum throttle or high failsafe as the off value are rejected; 
 `assembleOutputInventory` maps a DShot bank at 600 kbit/s to Dshot600 and anything else to Unsupported.
 The EDF command conversion already interpolates between the channel's reported minimum and maximum, so it needs no change.
 
-Not done: the DShot driver (`src/drivers/dshot/DShot.cpp`) does not report SLAAPS inventory and initializes only
-Motor1..Motor12 functions, so the SLAAPS EDF function (10104) gets no hardware output. Needed: map 10104 to a motor slot,
-report inventory like `PWMOut`, and keep DShot special commands (beep, EDT, settings) from running while SLAAPS owns the
-channel. Board layout to confirm: Pixhawk 6X has an IO board, so the FMU outputs are PWM_AUX; the EDF on a DShot600
-timer group of AUX (PWM_AUX_TIMx), servos on MAIN.
+Driver done (commit ebdb57d070, built for the 6X, not flashed or bench tested): `DShot.cpp` maps the SLAAPS EDF function (10104)
+to motor slot 0, reports inventory with protocol 1 and rate in kbit/s, and sends no special commands (beep, EDT, settings) while
+SLAAPS owns the channel. Still open: bench test of the DShot600 EDF output (needs separate hardware authorization) and the board
+layout (Pixhawk 6X: EDF on a DShot600 timer group of PWM_AUX, servos on MAIN).
 
 ## Flash use: optimize later (2026-10-27)
 

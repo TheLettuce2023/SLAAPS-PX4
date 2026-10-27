@@ -433,6 +433,8 @@ public:
 
 	void stop(ManualWorkerStatus failure = ManualWorkerStatus::Inactive, uint64_t observed_us = 0)
 	{
+		_recovering = false;
+
 		if (failure != ManualWorkerStatus::Inactive && _acceleration_diagnostic.state != AccelerationDiagnosticState::Inactive
 		    && _acceleration_diagnostic.state != AccelerationDiagnosticState::Rejected) {
 			_acceleration_diagnostic.state = AccelerationDiagnosticState::Rejected;
@@ -464,6 +466,57 @@ public:
 		_have_handled = false;
 	}
 	uint64_t handledSequence() const { return _active ? _handled_sequence : 0; }
+	bool recovering() const { return _recovering; }
+	uint64_t recoveryBaseSequence() const { return _recovering ? _recovery_base_sequence : 0; }
+	// Supervisor- or transport-detected loss (mode left, power, estimator) while the core itself is still
+	// healthy. Same entry as a core fault: recovery only with at least one handled flight frame.
+	ManualWorkerStatus abandon(ManualWorkerStatus reason, uint64_t now)
+	{
+		if (!_active) { return ManualWorkerStatus::Inactive; }
+
+		return reject(reason, now);
+	}
+	// One recovery cycle after a fault. Produces a recovery frame (frozen canards, EDF from the owner's
+	// recover()) only when every earlier recovery frame is acknowledged; ends recovery when the owner
+	// reports it finished. Acknowledgments of frames older than recovery are ignored.
+	ManualWorkerStatus recoverCycle(uint64_t now, const EdfPermission &permission, const ManualOutputBinding &binding,
+					ManualWorkerOutput &output, const ManualOutputAck *ack = nullptr)
+	{
+		if (!_recovering) { return ManualWorkerStatus::Inactive; }
+
+		if (now < _clock || !sameManualOutputBinding(binding, _binding)) { return endRecovery(ManualWorkerStatus::OutputRejected); }
+
+		_clock = now;
+
+		if (ack && ack->sequence <= _recovery_base_sequence) { ack = nullptr; }
+
+		if (!acceptAcknowledgment(now, permission, ack)) { return endRecovery(ManualWorkerStatus::OutputRejected); }
+
+		if (_pending_banks) { return ManualWorkerStatus::Waiting; }
+
+		if (now == _last_calculation) { return ManualWorkerStatus::NotDue; }
+
+		const auto edf = _edf.recover(now, permission);
+
+		if (edf.disposition != EdfDisposition::Recovery || edf.deadline_us <= now || _sequence == UINT64_MAX) {
+			return endRecovery(ManualWorkerStatus::Inactive);
+		}
+
+		ManualWorkerOutput candidate{};
+		candidate.timestamp_us = now;
+		candidate.deadline_us = edf.deadline_us;
+		candidate.sequence = ++_sequence;
+		candidate.canards = _recovery_canards;
+		candidate.edf = edf;
+		candidate.binding = _binding;
+		candidate.mode = _recovery_mode;
+		candidate.transition_us = _recovery_transition_us;
+		_deadline = candidate.deadline_us;
+		_last_calculation = now;
+		stage(candidate);
+		output = candidate;
+		return ManualWorkerStatus::Command;
+	}
 	bool outstanding() const { return _active && _pending_banks; }
 	uint64_t outputDeadline() const { return _active ? _deadline : 0; }
 	ControlMode mode() const { return _active ? _mode : ControlMode::None; }
@@ -673,7 +726,7 @@ private:
 			_handled_rate_setpoint = _pending_rate_setpoint;
 			_have_handled = true;
 
-			if (_pending_output.mode == ControlMode::Acceleration) {
+			if (_pending_output.mode == ControlMode::Acceleration && !_recovering) {
 				_acceleration_diagnostic.handled_sequence = _sequence;
 				_acceleration_diagnostic.handled_us = _acknowledged_us;
 				_acceleration_diagnostic.handled_deadline_us = _pending_output.deadline_us;
@@ -839,9 +892,27 @@ private:
 	{
 		return time > UINT64_MAX - age ? UINT64_MAX : time + age;
 	}
+	// A fault in an active flight session with at least one fully handled frame starts D3/D4 recovery:
+	// canards hold the last handled values and the shared EDF owner ramps propulsion off. Every other
+	// stop, including deliberate stop() and begin(), ends recovery.
 	ManualWorkerStatus reject(ManualWorkerStatus reason, uint64_t observed_us = 0)
 	{
+		const bool recover = _active && _have_handled && ManualBankPreparation::flightMode(_mode);
+		const auto canards = _handled_output.canards;
+		const auto mode = _mode;
+		const uint64_t transition = _handled_output.transition_us;
+		const uint64_t at = observed_us ? observed_us : _clock;
 		stop(reason, observed_us);
+
+		if (recover) {
+			_edf.abandon(at);
+			_recovering = true;
+			_recovery_canards = canards;
+			_recovery_mode = mode;
+			_recovery_transition_us = transition;
+			_recovery_base_sequence = _sequence;
+		}
+
 		return reason;
 	}
 	void observeAcceleration(const AccelerationControlInput &input)
@@ -851,6 +922,16 @@ private:
 		_acceleration_diagnostic.request_session = input.request.session;
 		_acceleration_diagnostic.request_sequence = input.request.sequence;
 	}
+	ManualWorkerStatus endRecovery(ManualWorkerStatus status)
+	{
+		_recovering = false;
+		_pending_banks = 0;
+		return status;
+	}
+	bool _recovering{};
+	research_stabilized_manual::CanardVector _recovery_canards{};
+	ControlMode _recovery_mode{ControlMode::None};
+	uint64_t _recovery_transition_us{}, _recovery_base_sequence{};
 	EdfOwner &_edf;
 	AccelerationControllerPort _acceleration{};
 	AccelerationControlDiagnostic _acceleration_diagnostic{};

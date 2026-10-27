@@ -49,6 +49,9 @@ public:
 		_awaiting_handling = false;
 		_handled_us = 0;
 		_pending_transition = 0;
+		_recovery = false;
+		_recovery_frame = false;
+		_have_handled = false;
 
 		if (!now || now < _clock) { return reject(ManualBankFault::InvalidTime); }
 
@@ -175,6 +178,8 @@ public:
 				       const ManualOutputBinding &binding, const ManualBankOutput &handled, bool success,
 				       ManualOutputAck &ack)
 	{
+		if (_recovery) { return confirmRecovery(now, permission, inventory, binding, handled, success, ack); }
+
 		if (poll(now, permission, inventory, binding) != ManualBankFault::None) { return _fault; }
 
 		if (!success || !_awaiting_handling || now < _accepted_us || !handled.command_valid
@@ -189,6 +194,9 @@ public:
 
 		_awaiting_handling = false;
 		_handled_us = now;
+		_handled = _candidate;
+		_handled_edf = _last_edf.normalized;
+		_have_handled = true;
 		ack = {_grant.session, _grant.source, _grant.configuration, _binding.routing, _binding.driver[_bank],
 		       _sequence, _last_timestamp, now, static_cast<uint8_t>(_bank)
 		      };
@@ -214,7 +222,8 @@ public:
 		ack = candidate;
 		return true;
 	}
-	bool awaitingHandling() const { return _active && _awaiting_handling; }
+	// A recovery frame is a write ticket too, although the original grant is no longer active.
+	bool awaitingHandling() const { return (_active || _recovery) && _awaiting_handling; }
 	bool canCompleteAtTransition(uint64_t transition_us) const
 	{
 		return _active && _awaiting_handling && transition_us && _accepted_us <= transition_us
@@ -224,7 +233,14 @@ public:
 	ManualBankOutput sample(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
 				const ManualOutputBinding &binding)
 	{
-		if (poll(now, permission, inventory, binding) == ManualBankFault::None && _received && !_pending_transition) {
+		if (_recovery && recoveryPoll(now, permission, inventory, binding) == ManualBankFault::None && _recovery_frame
+		    && now < _candidate.deadline_us) {
+			auto result = _candidate;
+			result.deadline_us = math::min(result.deadline_us, _recovery_start + kRecoveryCeilingUs);
+			return result;
+		}
+
+		if (!_recovery && poll(now, permission, inventory, binding) == ManualBankFault::None && _received && !_pending_transition) {
 			auto result = _candidate;
 			result.deadline_us = math::min(result.deadline_us, permission.deadline_us);
 			return result;
@@ -237,8 +253,70 @@ public:
 		return result;
 	}
 
-	void revoke() { reject(ManualBankFault::Revoked); }
+	void revoke() { _recovery = false; _recovery_frame = false; reject(ManualBankFault::Revoked); }
 	ManualBankFault fault() const { return _fault; }
+	// D3/D4. After a flight session loses permission or expires with an armed, non-kill permission and at least
+	// one handled frame, the canards stay at the last handled positions and only recovery frames are admitted.
+	// Recovery never revives the grant, accepts a normal frame or extends the original authority. It ends at
+	// kRecoveryCeilingUs, on disarm/kill/lockdown/termination, on a routing change or on an invalid frame.
+	bool recovering() const { return _recovery; }
+	static constexpr uint64_t kRecoveryCeilingUs = EdfOwner::kRecoveryCeilingUs;
+
+	ManualBankFault acceptRecovery(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
+				       const ManualOutputBinding &binding, const ManualWorkerOutput &frame)
+	{
+		if (!_recovery) { return _fault; }
+
+		if (recoveryPoll(now, permission, inventory, binding) != ManualBankFault::None) { return _fault; }
+
+		const auto &edf = frame.edf;
+		const uint64_t lease = static_cast<uint64_t>(_configuration.output_lease_ms) * 1000;
+
+		if (_awaiting_handling || frame.sequence <= _sequence || frame.timestamp_us <= _last_timestamp || frame.timestamp_us > now
+		    || frame.deadline_us <= now || frame.deadline_us - frame.timestamp_us > lease
+		    || frame.deadline_us > _recovery_start + kRecoveryCeilingUs || frame.deadline_us > edf.deadline_us
+		    || !sameManualOutputBinding(frame.binding, _binding) || frame.mode != _grant.mode
+		    || frame.transition_us != _grant.transition_us || frame.previous_handled_sequence || frame.previous_deadline_us
+		    || edf.disposition != EdfDisposition::Recovery || edf.session != _grant.session || edf.source != _grant.source
+		    || edf.configuration != _grant.configuration || !edf.sequence
+		    || !std::isfinite(edf.normalized) || edf.normalized < 0.F || edf.normalized > _recovery_edf) {
+			return endRecovery(ManualBankFault::InvalidFrame);
+		}
+
+		// Canards stay at this bank's own last handled pulses; frame canards are not an input here.
+		for (float value : frame.canards) {
+			if (!std::isfinite(value) || value < -1.F || value > 1.F) { return endRecovery(ManualBankFault::InvalidFrame); }
+		}
+
+		ManualBankOutput candidate = _handled;
+		candidate.disposition = EdfDisposition::Recovery;
+		candidate.command_valid = true;
+		candidate.deadline_us = frame.deadline_us;
+		candidate.sequence = frame.sequence;
+		candidate.command_timestamp_us = frame.timestamp_us;
+
+		if (_routing.edf_assigned && static_cast<unsigned>(_routing.edf.bank) == _bank) {
+			if (edf.normalized > 0.F) {
+				const float edf_pwm = _routing.edf.minimum_us + edf.normalized * (_routing.edf.maximum_us - _routing.edf.minimum_us);
+
+				if (!map(_routing.edf, edf_pwm, candidate)) { return endRecovery(ManualBankFault::InvalidFrame); }
+
+			} else {
+				// EDF off is the channel's explicit disarmed value, as for a stopped bench channel.
+				candidate.channel_mask |= 1U << _routing.edf.channel;
+				candidate.pwm_us[_routing.edf.channel] = _routing.edf.disarmed_us;
+			}
+		}
+
+		_candidate = candidate;
+		_recovery_frame = true;
+		_recovery_edf = edf.normalized;
+		_sequence = frame.sequence;
+		_last_timestamp = frame.timestamp_us;
+		_accepted_us = now;
+		_awaiting_handling = true;
+		return ManualBankFault::None;
+	}
 
 private:
 	bool map(const OutputChannel &channel, float pwm, ManualBankOutput &candidate) const
@@ -276,9 +354,9 @@ private:
 		    || permission.session != _grant.session || permission.source != _grant.source || permission.configuration != _grant.configuration
 		    || !permission.timestamp_us || permission.session > permission.timestamp_us
 		    || permission.timestamp_us > now || now >= permission.deadline_us
-		    || permission.deadline_us - permission.timestamp_us > lease) { return reject(ManualBankFault::PermissionLost); }
+		    || permission.deadline_us - permission.timestamp_us > lease) { return lose(now, permission, ManualBankFault::PermissionLost); }
 
-		if (now >= _deadline) { return reject(ManualBankFault::Expired); }
+		if (now >= _deadline) { return lose(now, permission, ManualBankFault::Expired); }
 
 		if (transfer) { _pending_transition = permission.transition_us; }
 
@@ -296,6 +374,73 @@ private:
 		_fault = fault;
 		return fault;
 	}
+	ManualBankFault endRecovery(ManualBankFault fault)
+	{
+		_recovery = false;
+		_recovery_frame = false;
+		_awaiting_handling = false;
+		return reject(fault);
+	}
+	// Loss of permission or expiry of an active flight session; the only way into recovery.
+	ManualBankFault lose(uint64_t now, const EdfPermission &permission, ManualBankFault fault)
+	{
+		if (_have_handled && ManualBankPreparation::flightMode(_grant.mode) && permission.armed && !permission.kill
+		    && !permission.lockdown && !permission.termination && permission.session == _grant.session
+		    && permission.source == _grant.source && permission.configuration == _grant.configuration
+		    && permission.timestamp_us <= now) {
+			_recovery = true;
+			_recovery_frame = false;
+			_recovery_start = now;
+			_recovery_edf = _handled_edf;
+			_awaiting_handling = false;
+		}
+
+		return reject(fault);
+	}
+	ManualBankFault recoveryPoll(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
+				     const ManualOutputBinding &binding)
+	{
+		if (!_recovery) { return _fault; }
+
+		if (now < _clock) { return endRecovery(ManualBankFault::InvalidTime); }
+
+		_clock = now;
+
+		if (!permission.armed || permission.kill || permission.lockdown || permission.termination
+		    || permission.session != _grant.session || permission.source != _grant.source
+		    || permission.configuration != _grant.configuration || permission.timestamp_us > now
+		    || now - _recovery_start >= kRecoveryCeilingUs) { return endRecovery(ManualBankFault::PermissionLost); }
+
+		RoutingPlan live{};
+
+		if (!sameManualOutputBinding(binding, _binding)
+		    || !makeRoutingPlan(_configuration, inventory, ManualBankPreparation::requiresEdf(_grant.mode), live).valid()
+		    || !sameRoutingPlan(live, _routing)) { return endRecovery(ManualBankFault::RoutingChanged); }
+
+		return ManualBankFault::None;
+	}
+	ManualBankFault confirmRecovery(uint64_t now, const EdfPermission &permission, const OutputInventory &inventory,
+					const ManualOutputBinding &binding, const ManualBankOutput &handled, bool success,
+					ManualOutputAck &ack)
+	{
+		if (recoveryPoll(now, permission, inventory, binding) != ManualBankFault::None) { return _fault; }
+
+		if (!success || !_awaiting_handling || !_recovery_frame || now < _accepted_us || !handled.command_valid
+		    || handled.mode != _grant.mode || handled.disposition != EdfDisposition::Recovery
+		    || handled.channel_mask != _candidate.channel_mask || handled.sequence != _candidate.sequence
+		    || handled.session != _grant.session || handled.source != _grant.source || handled.configuration != _grant.configuration
+		    || handled.command_timestamp_us != _last_timestamp || !sameManualOutputBinding(handled.binding, _binding)
+		    || handled.deadline_us <= now || handled.deadline_us > _candidate.deadline_us
+		    || std::memcmp(handled.pwm_us, _candidate.pwm_us, sizeof(handled.pwm_us)) != 0) {
+			return endRecovery(ManualBankFault::HandlingRejected);
+		}
+
+		_awaiting_handling = false;
+		ack = {_grant.session, _grant.source, _grant.configuration, _binding.routing, _binding.driver[_bank],
+		       _sequence, _last_timestamp, now, static_cast<uint8_t>(_bank)
+		      };
+		return ManualBankFault::None;
+	}
 	VehicleConfiguration _configuration{};
 	RoutingPlan _routing{};
 	ManualOutputBinding _binding{};
@@ -311,6 +456,10 @@ private:
 	bool _active{};
 	bool _received{};
 	bool _awaiting_handling{};
+	bool _recovery{}, _recovery_frame{}, _have_handled{};
+	uint64_t _recovery_start{};
+	float _recovery_edf{}, _handled_edf{};
+	ManualBankOutput _handled{};
 	uint64_t _accepted_us{};
 	uint64_t _handled_us{}, _pending_transition{};
 	ManualBankFault _fault{ManualBankFault::Revoked};
