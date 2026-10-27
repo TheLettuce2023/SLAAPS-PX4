@@ -1795,6 +1795,37 @@ static void routingTests()
 	bad = inventory;
 	bad.channels[4].disarmed_us = bad.channels[4].failsafe_us = 1000;
 	check(makeRoutingPlan(c, bad, true, plan).valid(), "EDF calibrated minimum off pulse supported");
+	{
+		auto dshot = inventory;
+		auto &edf = dshot.channels[4];
+		edf.protocol = OutputProtocol::Dshot600;
+		edf.rate_hz = kDshot600Kbit;
+		edf.minimum_us = 1;
+		edf.center_us = 1000;
+		edf.maximum_us = kDshotMaximumValue;
+		edf.disarmed_us = edf.failsafe_us = 0;
+		check(makeRoutingPlan(c, dshot, true, plan).valid() && plan.edf.protocol == OutputProtocol::Dshot600,
+		      "EDF on DShot600 with disarm frame 0 accepted");
+		auto reject = dshot;
+		reject.channels[4].rate_hz = 300;
+		check(makeRoutingPlan(c, reject, true, plan).fault == RoutingFault::UnsupportedProtocol, "DShot300 rejected");
+		reject = dshot;
+		reject.channels[0].protocol = OutputProtocol::Dshot600;
+		reject.channels[0].rate_hz = kDshot600Kbit;
+		check(makeRoutingPlan(c, reject, true, plan).fault == RoutingFault::UnsupportedProtocol, "servo on DShot rejected");
+		reject = dshot;
+		reject.channels[4].maximum_us = 2000;
+		check(makeRoutingPlan(c, reject, true, plan).fault == RoutingFault::InvalidCalibration, "DShot above driver range rejected");
+		reject = dshot;
+		reject.channels[4].minimum_us = 0;
+		check(makeRoutingPlan(c, reject, true, plan).fault == RoutingFault::InvalidCalibration, "DShot zero minimum rejected");
+		reject = dshot;
+		reject.channels[4].disarmed_us = reject.channels[4].failsafe_us = 1;
+		check(makeRoutingPlan(c, reject, true, plan).fault == RoutingFault::InvalidOffValue, "DShot minimum throttle as off value rejected");
+		reject = dshot;
+		reject.channels[4].failsafe_us = 1000;
+		check(makeRoutingPlan(c, reject, true, plan).fault == RoutingFault::InvalidOffValue, "DShot high failsafe rejected");
+	}
 	bad = inventory;
 	bad.channels[0].center_us = 1501;
 	check(makeRoutingPlan(c, bad, true, plan).fault == RoutingFault::InvalidCalibration, "QGC center mismatch rejected");
@@ -3486,6 +3517,37 @@ static void reportedRoutingTests()
 	      "failed inventory preserves caller snapshot");
 	check(assembleOutputInventory(1001000, banks, 2, 3, inventory) == InventoryFault::Stale, "driver heartbeat expires at boundary");
 	check(assembleOutputInventory(999, banks, 2, 3, inventory) == InventoryFault::Stale, "future driver report rejected");
+
+	{
+		auto dshot = banks[1];
+		dshot.protocol = 1;
+
+		for (unsigned i = 0; i < 16; ++i) {
+			dshot.rate_hz[i] = kDshot600Kbit;
+			dshot.minimum_us[i] = 1;
+			dshot.center_us[i] = 1000;
+			dshot.maximum_us[i] = kDshotMaximumValue;
+			dshot.disarmed_us[i] = dshot.failsafe_us[i] = 0;
+		}
+
+		slaaps_output_bank_s mixed[2] {banks[0], dshot};
+		check(assembleOutputInventory(2000, mixed, 2, 3, inventory) == InventoryFault::None
+		      && inventory.channels[16 - 1].protocol == OutputProtocol::Dshot600, "DShot600 bank reported as such");
+		check(makeRoutingPlan(fixture(), inventory, true, plan).fault == RoutingFault::UnsupportedProtocol,
+		      "servo on the DShot bank rejected");
+		mixed[0].function[1] = kCanardFunctionFirst + 1;
+		mixed[0].function[2] = kCanardFunctionFirst + 3;
+		mixed[1].function[2] = 0;
+		mixed[1].function[0] = 0;
+		check(assembleOutputInventory(2000, mixed, 2, 3, inventory) == InventoryFault::None
+		      && makeRoutingPlan(fixture(), inventory, true, plan).valid()
+		      && plan.edf.protocol == OutputProtocol::Dshot600 && plan.edf.bank == OutputBank::Aux && plan.edf.channel == 6,
+		      "servos on PWM bank plus EDF on DShot600 bank accepted");
+		mixed[1].rate_hz[6] = 300;
+		check(assembleOutputInventory(2000, mixed, 2, 3, inventory) == InventoryFault::None
+		      && makeRoutingPlan(fixture(), inventory, true, plan).fault == RoutingFault::UnsupportedProtocol,
+		      "DShot300 EDF channel rejected");
+	}
 	check(assembleOutputInventory(2000, nullptr, 2, 3, inventory) == InventoryFault::InvalidReport, "null report array rejected");
 	check(assembleOutputInventory(2000, banks, 3, 3, inventory) == InventoryFault::InvalidReport, "excess bank count bounded before access");
 	check(assembleOutputInventory(2000, banks, 2, 4, inventory) == InventoryFault::InvalidReport, "unsupported required bank rejected");
@@ -6681,6 +6743,10 @@ static void nativeDisarmedInputTests()
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/failsafe_flags.h>
 #include <uORB/topics/vehicle_command_ack.h>
+#include <uORB/topics/sensor_baro.h>
+#include <uORB/topics/sensor_gyro.h>
+#include <uORB/topics/sensor_mag.h>
+#include <uORB/topics/system_power.h>
 #include <atomic>
 #include <new>
 
@@ -6689,6 +6755,9 @@ static void nativeDisarmedInputTests()
 class NativeSlaapsSelectedInput final : public px4::ScheduledWorkItem
 {
 public:
+	// Raw device identities for the synthetic health inputs. Gyro and accel
+	// match the estimator fixture below, so Commander sees one coherent IMU.
+	static constexpr int32_t kHealthGyroId = 123, kHealthAccelId = 456, kHealthBaroId = 789, kHealthMagId = 1011;
 	NativeSlaapsSelectedInput() : ScheduledWorkItem("slaaps_selected_fixture", px4::wq_configurations::test1) {}
 	void start() { ScheduleOnInterval(4000); }
 	bool request(unsigned operation)
@@ -6726,6 +6795,8 @@ public:
 			 static_cast<unsigned long long>(_feedback_last_sample.load()));
 		PX4_INFO("SLAAPS_FEEDBACK_SOURCES bias_revision=%u raw_revision=%u synthetic=1 authority_publishers=0",
 			 _feedback_bias_revision.load(), _feedback_raw_revision.load());
+		PX4_INFO("SLAAPS_HEALTH_STATUS running=%u samples=%u synthetic=1 measured=0",
+			 _health_publishing.load() ? 1U : 0U, _health_samples.load());
 		PX4_INFO("SLAAPS_SELECTED_STATUS running=%u scenario=%u samples=%u failures=%u power_running=%u power_scenario=%u power_samples=%u synthetic=1 authority_publishers=0",
 			 _publishing.load() ? 1U : 0U, _scenario.load(), _samples.load(), _failures.load(),
 			 _power_publishing.load() ? 1U : 0U, _power_scenario.load(), _power_samples.load());
@@ -6799,6 +6870,10 @@ private:
 		}
 
 		if (request == 22) { _feedback_hold.store(true); }
+
+		if (request == 25) { _health_publishing.store(true); }
+
+		if (request == 26) { _health_publishing.store(false); }
 
 		if (request == 23) {
 			_feedback_hold.store(true);
@@ -6874,6 +6949,12 @@ private:
 			else { ++_failures; }
 		}
 
+		if (_health_publishing.load()) {
+			if (publishHealth(now)) { ++_health_samples; }
+
+			else { ++_failures; }
+		}
+
 		attitude.timestamp = attitude.timestamp_sample = now;
 		attitude.q[0] = scenario == 3 ? 0.F : 1.F;
 		rates.timestamp = rates.timestamp_sample = now;
@@ -6899,6 +6980,46 @@ private:
 		else { ++_failures; }
 
 		captureFirstEdfTerminal();
+	}
+	bool publishHealth(uint64_t now)
+	{
+		// Explicit synthetic raw sensors and avionics rail so Commander's
+		// unmodified ordinary checks have inputs. Stationary values only; these
+		// are not vehicle measurements and qualify no physical health.
+		bool accel_published = true;
+
+		if (!_feedback_enabled.load()) {
+			// Share the feedback publisher so raw accel keeps instance 0.
+			sensor_accel_s raw{};
+			raw.timestamp = raw.timestamp_sample = now;
+			raw.device_id = kHealthAccelId;
+			raw.z = -9.8F;
+			accel_published = _feedback_raw.publish(raw) && _feedback_raw.get_instance() == 0;
+		}
+
+		sensor_gyro_s gyro{};
+		gyro.timestamp = gyro.timestamp_sample = now;
+		gyro.device_id = kHealthGyroId;
+		gyro.temperature = 25.F;
+		gyro.samples = 1;
+		sensor_baro_s baro{};
+		baro.timestamp = baro.timestamp_sample = now;
+		baro.device_id = kHealthBaroId;
+		baro.pressure = 101325.F;
+		baro.temperature = 25.F;
+		sensor_mag_s mag{};
+		mag.timestamp = mag.timestamp_sample = now;
+		mag.device_id = kHealthMagId;
+		mag.x = .2F;
+		mag.z = .4F;
+		mag.temperature = 25.F;
+		system_power_s rail{};
+		rail.timestamp = now;
+		rail.voltage5v_v = 5.F;
+		rail.brick_valid = 1;
+		return accel_published && _health_gyro.publish(gyro) && _health_gyro.get_instance() == 0
+		       && _health_baro.publish(baro) && _health_baro.get_instance() == 0
+		       && _health_mag.publish(mag) && _health_mag.get_instance() == 0 && _health_rail.publish(rail);
 	}
 	bool publishFeedback(uint64_t now)
 	{
@@ -7060,6 +7181,10 @@ private:
 	uORB::PublicationMulti<sensor_accel_s> _feedback_raw{ORB_ID(sensor_accel)};
 	uORB::ResearchSubscription _feedback_raw_lifetime{ORB_ID(sensor_accel)};
 	uORB::ResearchSubscription _power_lifetime{ORB_ID(battery_status)};
+	uORB::PublicationMulti<sensor_gyro_s> _health_gyro{ORB_ID(sensor_gyro)};
+	uORB::PublicationMulti<sensor_baro_s> _health_baro{ORB_ID(sensor_baro)};
+	uORB::PublicationMulti<sensor_mag_s> _health_mag{ORB_ID(sensor_mag)};
+	uORB::Publication<system_power_s> _health_rail{ORB_ID(system_power)};
 	uORB::Subscription _observed_supervisor{ORB_ID(slaaps_status)}, _observed_vehicle{ORB_ID(vehicle_status)};
 	uORB::Subscription _observed_armed{ORB_ID(actuator_armed)}, _observed_failsafe{ORB_ID(failsafe_flags)};
 	uORB::Subscription _observed_power{ORB_ID(battery_status)}, _observed_permission{ORB_ID(slaaps_manual_permission)};
@@ -7077,6 +7202,8 @@ private:
 	std::atomic<uint64_t> _feedback_generation{0}, _feedback_last_sample{0};
 	std::atomic<unsigned> _feedback_bias_revision{0}, _feedback_raw_revision{0};
 	std::atomic<bool> _power_publishing{true};
+	std::atomic<bool> _health_publishing{false};
+	std::atomic<unsigned> _health_samples{0};
 	std::atomic<uint64_t> _power_window{0}, _power_last{0}, _power_previous{0}, _power_published{0};
 	std::atomic<uint64_t> _power_maximum_gap{0}, _power_gap_start{0}, _power_gap_end{0}, _edf_first_terminal{0};
 	std::atomic<unsigned> _power_regressions{0};
@@ -7112,10 +7239,24 @@ static int nativeSelectedCommand(const char *operation)
 
 	if (!strcmp(operation, "status")) { producer->printStatus(); return 0; }
 
+	if (!strcmp(operation, "health-valid")) {
+		// Bind calibration slots to the synthetic device IDs only. Offsets and
+		// scales keep their defaults; no measured calibration is claimed.
+		const char *names[] = {"CAL_ACC0_ID", "CAL_GYRO0_ID", "CAL_MAG0_ID", "CAL_MAG0_PRIO"};
+		const int32_t values[] = {NativeSlaapsSelectedInput::kHealthAccelId, NativeSlaapsSelectedInput::kHealthGyroId,
+					  NativeSlaapsSelectedInput::kHealthMagId, 50
+					 };
+
+		for (unsigned i = 0; i < 4; ++i) {
+			check(param_set(param_find(names[i]), &values[i]) == 0, "bind labeled synthetic calibration slots");
+		}
+	}
+
 	const char *operations[] = {"stop", "resume", "neutral", "offset", "throttle-high", "invalid-state", "wrong-source", "replace",
 				    "power-valid", "power-drop", "power-disconnected", "power-warning", "power-fault", "power-off",
 				    "power-low", "power-high", "power-id", "power-source", "power-replace", "estimator-only",
-				    "feedback-valid", "feedback-hold", "feedback-bias-replace", "feedback-raw-replace"
+				    "feedback-valid", "feedback-hold", "feedback-bias-replace", "feedback-raw-replace",
+				    "health-valid", "health-stop"
 				   };
 
 	for (unsigned i = 0; i < sizeof(operations) / sizeof(operations[0]); ++i) {

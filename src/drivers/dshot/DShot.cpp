@@ -116,6 +116,26 @@ void DShot::Run()
 
 	handle_vehicle_commands();
 
+#if defined(CONFIG_MODULES_SLAAPS)
+
+	if (_mixing_output.slaapsInventoryDue()) {
+		uint16_t rates[16] {};
+		uint32_t hardware_mask = 0;
+
+		// DShot rate is the timer-derived bit rate in kbit/s of the channels this driver initialized.
+		for (unsigned channel = 0; channel < DSHOT_MAXIMUM_CHANNELS; ++channel) {
+			if (_hardware_initialized && (_output_mask & (1U << channel)) && _dshot_frequency / 1000U <= UINT16_MAX) {
+				hardware_mask |= 1U << channel;
+				rates[channel] = _dshot_frequency / 1000U;
+			}
+		}
+
+		_mixing_output.reportSlaapsInventory(DSHOT_MAXIMUM_CHANNELS, hardware_mask, rates,
+						     _hardware_initialized && _motor_count > 0, 1);
+	}
+
+#endif
+
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)
 	_mixing_output.updateSubscriptions(true);
 
@@ -146,7 +166,14 @@ bool DShot::updateOutputs(float *outputs, unsigned num_outputs, unsigned num_con
 
 	_armed_prev = armed;
 
-	if (!armed) {
+	// While SLAAPS owns the EDF channel no DShot special command (beep, EDT, settings) may replace its frames.
+#if defined(CONFIG_MODULES_SLAAPS)
+	const bool slaaps_owned = slaapsOwnsOutputs(num_outputs);
+#else
+	const bool slaaps_owned = false;
+#endif
+
+	if (!armed && !slaaps_owned) {
 		// Select next command to send (if any)
 		if (_telemetry.telemetryResponseFinished() &&
 		    _current_command.finished() && _telemetry.commandResponseFinished()) {
@@ -1065,6 +1092,9 @@ void DShot::mixerChanged()
 		up_dshot_init(_output_mask, _bdshot_output_mask, _dshot_frequency, _bdshot_edt_enabled);
 		up_dshot_arm(true);
 		_hardware_initialized = true;
+#if defined(CONFIG_MODULES_SLAAPS)
+		_mixing_output.invalidateSlaapsInventory();
+#endif
 	}
 }
 

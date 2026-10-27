@@ -51,12 +51,17 @@ RoutingResult makeRoutingPlan(const VehicleConfiguration &c, const OutputInvento
 		// ownership. Other payload outputs need an explicit future allowlist.
 		if (!canard && channel.function != kEdfFunction) { return {RoutingFault::UnsupportedFunction, diagnostic}; }
 
-		if (channel.protocol != OutputProtocol::Pwm || channel.rate_hz == 0 || channel.rate_hz > kMaximumPwmRateHz) {
+		// DShot is accepted only for the EDF; a servo on DShot has no calibrated pulse.
+		const bool dshot = channel.protocol == OutputProtocol::Dshot600;
+
+		if (dshot ? (canard || channel.rate_hz != kDshot600Kbit)
+		    : (channel.protocol != OutputProtocol::Pwm || channel.rate_hz == 0 || channel.rate_hz > kMaximumPwmRateHz)) {
 			return {RoutingFault::UnsupportedProtocol, diagnostic};
 		}
 
-		if (!pulseValid(channel.minimum_us) || !pulseValid(channel.maximum_us) || channel.minimum_us >= channel.maximum_us
-		    || static_cast<unsigned>(channel.maximum_us) * channel.rate_hz >= kMicrosecondsPerSecond) {
+		if (dshot ? (channel.minimum_us == 0 || channel.maximum_us > kDshotMaximumValue || channel.minimum_us >= channel.maximum_us)
+		    : (!pulseValid(channel.minimum_us) || !pulseValid(channel.maximum_us) || channel.minimum_us >= channel.maximum_us
+		       || static_cast<unsigned>(channel.maximum_us) * channel.rate_hz >= kMicrosecondsPerSecond)) {
 			return {RoutingFault::InvalidCalibration, diagnostic};
 		}
 
@@ -85,7 +90,8 @@ RoutingResult makeRoutingPlan(const VehicleConfiguration &c, const OutputInvento
 
 			// Forward-only EDF: stopped output may be no pulse or minimum
 			// calibrated ESC pulse. A high failsafe or reversal is forbidden.
-			if (channel.reversed || (channel.disarmed_us != 0 && channel.disarmed_us != channel.minimum_us)
+			// DShot stops only on the disarm frame (0): its lowest throttle still spins the motor.
+			if (channel.reversed || (channel.disarmed_us != 0 && (dshot || channel.disarmed_us != channel.minimum_us))
 			    || channel.failsafe_us != channel.disarmed_us) {
 				return {RoutingFault::InvalidOffValue, diagnostic};
 			}

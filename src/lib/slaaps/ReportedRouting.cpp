@@ -39,8 +39,11 @@ InventoryFault assembleOutputInventory(uint64_t now, const slaaps_output_bank_s 
 			out.bank = report.bank == 0 ? OutputBank::Main : OutputBank::Aux;
 			out.channel = channel;
 			out.function = report.function[channel];
-			out.protocol = (report.hardware_mask & (1U << channel)) && report.rate_hz[channel] > 0
-				       ? OutputProtocol::Pwm : OutputProtocol::Unsupported;
+			const bool active = (report.hardware_mask & (1U << channel)) && report.rate_hz[channel] > 0;
+			out.protocol = !active ? OutputProtocol::Unsupported
+				       : report.protocol == 0 ? OutputProtocol::Pwm
+				       : report.protocol == 1 && report.rate_hz[channel] == kDshot600Kbit ? OutputProtocol::Dshot600
+				       : OutputProtocol::Unsupported;
 			out.rate_hz = report.rate_hz[channel];
 			out.minimum_us = report.minimum_us[channel];
 			out.center_us = report.center_us[channel];

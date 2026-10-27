@@ -1644,7 +1644,30 @@ def main():
                "-t", "127.0.0.1", "-m", "onboard", "-r", "10000")
         mode_link.callback(client, "mavlink", "stop-all", check=False)
         client("mavlink", "boot_complete")
-        ordinary_arming_results = []
+        # Labeled synthetic raw IMU/baro/mag and avionics rail feed Commander's
+        # unmodified ordinary checks. They qualify no physical vehicle health.
+        client("slaaps_control_test", "selected", "health-valid")
+        health_deadline = time.monotonic() + 2
+        while True:
+            health = re.search(r"SLAAPS_HEALTH_STATUS running=(\d+) samples=(\d+)",
+                               client("slaaps_control_test", "selected", "status"))
+            if health and health.group(1) == "1" and int(health.group(2)) > 0:
+                break
+            assert time.monotonic() < health_deadline, "Synthetic health inputs did not publish"
+            time.sleep(.02)
+        # Arm only after Commander's own report accepts the new inputs; an
+        # immediate arm was observed to precede that acceptance.
+        health_started = time.monotonic()
+        health_present = (1 << 1) | (1 << 27) | (1 << 28) | (1 << 29)  # baro, mag, accel, gyro
+        while True:
+            report = client("listener", "health_report", "1")
+            present = int(re.search(r"health_is_present_flags:\s+(\d+)", report).group(1))
+            errors = int(re.search(r"health_error_flags:\s+(\d+)", report).group(1))
+            if present & health_present == health_present and not errors:
+                break
+            assert time.monotonic() < health_started + 6, report
+            time.sleep(.1)
+        health_settle_seconds = round(time.monotonic() - health_started, 3)
         for edf_session in range(2):
             edf_before = client("slaaps_control_test", "mixing", "status")
             edf_before_counts = tuple(map(int, re.search(r"main_writes=(\d+) aux_writes=(\d+) nonzero=(\d+)",
@@ -1661,6 +1684,16 @@ def main():
             assert 0 < readiness_expiry <= power_expiry, edf_ready
             assert tuple(map(int, re.search(r"main_writes=(\d+) aux_writes=(\d+) nonzero=(\d+)",
                                             client("slaaps_control_test", "mixing", "status")).groups())) == edf_before_counts
+            # Commander learns Bench readiness through its 300 ms external
+            # arming-check poll; arm only once its failsafe flags reflect it.
+            prevent_deadline = time.monotonic() + 1.5
+            while True:
+                flags = client("listener", "failsafe_flags", "1")
+                prevent = int(re.search(r"mode_req_prevent_arming:\s+(\d+)", flags).group(1))
+                if not prevent & bench_mask:
+                    break
+                assert time.monotonic() < prevent_deadline, flags
+                time.sleep(.02)
             authority = client("listener", "vehicle_status", "1")
             assert re.search(r"\barming_state:\s+1\b", authority), authority
             before_arm = int(re.search(r"\btimestamp:\s+(\d+)", authority).group(1))
@@ -1673,14 +1706,11 @@ def main():
                     break
                 assert time.monotonic() < arm_deadline, acknowledgment
                 time.sleep(.02)
-            ordinary_arming_accepted = bool(re.search(r"result:\s+0\b", acknowledgment))
-            ordinary_arming_results.append(ordinary_arming_accepted)
-            if not ordinary_arming_accepted:
-                assert re.search(r"result:\s+[12]\b", acknowledgment), acknowledgment
-                # No-plant builds lack normal sensor/power health. Use stock internal
-                # forced arming ONLY in this capture-only test, with the limitation
-                # recorded below. Production gates/health checks are not modified.
-                client("commander", "arm", "-f")
+            # Ordinary arming only: no forced fallback. A rejection is a real
+            # Commander/SLAAPS gate failure and must fail this test.
+            assert re.search(r"result:\s+0\b", acknowledgment), (
+                acknowledgment, client("listener", "health_report", "1", check=False),
+                client("listener", "failsafe_flags", "1", check=False))
             wait_status(r"bench entry=16 active=1 target=5\b")
             authority = client("listener", "vehicle_status", "1")
             assert re.search(r"\barming_state:\s+2\b", authority), authority
@@ -1774,10 +1804,13 @@ def main():
                 wait_status(r"bench entry=0 active=0\b")
                 client("commander", "mode", f"ext{bench_id - 22}")
                 wait_status(r"bench entry=6 active=0\b")
+        # Later lifecycles keep their previous inputs, without these sensors.
+        client("slaaps_control_test", "selected", "health-stop")
         result["production_edf_commissioning"] = dict(passed=True, actual_commander=True, actual_supervisor=True,
             actual_mixer=True, synthetic_configuration=True, synthetic_selected_inputs=True, synthetic_permission=False,
-            hardware_interface="capture_only", ordinary_arming_accepted=all(ordinary_arming_results),
-            forced_internal_test_arm=not all(ordinary_arming_results), normal_vehicle_health_qualified=False,
+            hardware_interface="capture_only", ordinary_arming_accepted=True, forced_internal_test_arm=False,
+            synthetic_health_inputs=True, synthetic_health_settle_seconds=health_settle_seconds,
+            normal_vehicle_health_qualified=False,
             mode_id=bench_id, target=5, normalized_ceiling=.25, duration_seconds=10,
             disarmed_preparation_no_output=True, actual_armed_state=True, flight_admitted=False,
             measured_condition_valid=False, parked_canards=True, low_throttle_zero_command=True,

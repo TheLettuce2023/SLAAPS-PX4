@@ -111,11 +111,35 @@ private:
 	// Map output channel to motor index [0..DSHOT_MAX_MOTORS-1], or -1 if not a motor
 	int motor_index_from_output(int output_channel) const
 	{
+#if defined(CONFIG_MODULES_SLAAPS)
+
+		// The SLAAPS EDF is a DShot motor owned by the SLAAPS output path.
+		if (slaapsEdfOutput(output_channel)) { return 0; }
+
+#endif
+
 		if (!_mixing_output.isMotor(output_channel)) { return -1; }
 
 		int idx = (int)_mixing_output.outputFunction(output_channel) - (int)OutputFunction::Motor1;
 		return (idx >= 0 && idx < DSHOT_MAX_MOTORS) ? idx : -1;
 	}
+
+#if defined(CONFIG_MODULES_SLAAPS)
+	bool slaapsEdfOutput(int output_channel) const
+	{
+		return _mixing_output.isFunctionSet(output_channel)
+		       && _mixing_output.outputFunction(output_channel) == OutputFunction::SLAAPS_EDF;
+	}
+
+	bool slaapsOwnsOutputs(unsigned num_outputs) const
+	{
+		for (unsigned i = 0; i < num_outputs; ++i) {
+			if (slaapsEdfOutput(i)) { return true; }
+		}
+
+		return false;
+	}
+#endif
 
 	uint16_t esc_armed_mask(uint16_t *outputs, uint8_t num_outputs);
 

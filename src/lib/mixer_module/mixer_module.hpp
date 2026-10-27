@@ -248,7 +248,8 @@ public:
 	void invalidateSlaapsInventory() { _slaaps_inventory_invalidated = true; }
 	hrt_abstime slaapsServiceInterval() const { return _slaaps_preparation ? _lowrate_schedule_interval : 20000; }
 	SlaapsOutputStatus slaapsOutputStatus() const { return _slaaps_output_status; }
-	void reportSlaapsInventory(unsigned channel_count, uint32_t hardware_mask, const uint16_t rates[16], bool ready);
+	void reportSlaapsInventory(unsigned channel_count, uint32_t hardware_mask, const uint16_t rates[16], bool ready,
+				   uint8_t protocol = 0);
 #endif
 
 	void setLowrateSchedulingInterval(hrt_abstime interval) { _lowrate_schedule_interval = interval; }

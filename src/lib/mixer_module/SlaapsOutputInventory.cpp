@@ -8,7 +8,8 @@ bool MixingOutput::slaapsInventoryDue() const
 	return _slaaps_last_report == 0 || now < _slaaps_last_report || now - _slaaps_last_report >= 100000;
 }
 
-void MixingOutput::reportSlaapsInventory(unsigned channel_count, uint32_t hardware_mask, const uint16_t rates[16], bool ready)
+void MixingOutput::reportSlaapsInventory(unsigned channel_count, uint32_t hardware_mask, const uint16_t rates[16], bool ready,
+					  uint8_t protocol)
 {
 	static_assert(MAX_ACTUATORS <= 16, "SLAAPS bank message capacity");
 	slaaps_output_bank_s report{};
@@ -21,6 +22,7 @@ void MixingOutput::reportSlaapsInventory(unsigned channel_count, uint32_t hardwa
 	report.ready = ready && !_need_function_update && channel_count > 0 && channel_count <= _max_num_outputs;
 	report.channel_count = channel_count <= _max_num_outputs ? channel_count : _max_num_outputs;
 	report.hardware_mask = hardware_mask;
+	report.protocol = protocol;
 	report.reversed_mask = _reverse_output_mask;
 
 	for (unsigned i = 0; i < report.channel_count; ++i) {

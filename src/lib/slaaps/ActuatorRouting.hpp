@@ -10,9 +10,12 @@ constexpr uint16_t kCanardFunctionFirst = 10100;
 constexpr uint16_t kEdfFunction = 10104;
 constexpr unsigned kMaximumOutputChannels = 32;
 constexpr unsigned kMaximumChannelsPerBank = 16;
+// DShot values use the driver's units (1..1999 maps to DShot 48..2047); 0 is the disarm frame.
+constexpr uint16_t kDshot600Kbit = 600;
+constexpr uint16_t kDshotMaximumValue = 1999;
 
 enum class OutputBank : uint8_t { Main, Aux };
-enum class OutputProtocol : uint8_t { Pwm, Unsupported };
+enum class OutputProtocol : uint8_t { Pwm, Unsupported, Dshot600 };
 
 struct OutputChannel {
 	OutputBank bank{OutputBank::Main};
