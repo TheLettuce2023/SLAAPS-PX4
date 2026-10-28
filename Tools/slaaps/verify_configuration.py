@@ -72,6 +72,7 @@ def main():
     expected.update({name: {"default": 0} for name in
                      ("SLA_BENCH_EN", "SLA_BENCH_CH", "SLA_BENCH_SEC")})
     expected.update(SLA_CMP_ACT={"default": 0})
+    expected.update({name: {"default": 0} for name in ("SLA_NET_EN", "SLA_NET_N", "SLA_NET_E")})
     actual = {p.attrib["name"]: p for p in ET.parse(out / "parameters.xml").iter("parameter")}
     assert set(actual) == set(expected), (set(expected) - set(actual), set(actual) - set(expected))
     for name, item in expected.items():
@@ -87,6 +88,8 @@ def main():
         "SLA_CMP_ACT": {"0": "None", "1": "Prepare staged authenticated session",
                         "2": "Grant exact prepared session", "3": "Revoke session", "4": "Clear latched fault"},
         "SLA_SCH_EN": {"0": "Disabled", "1": "Empirical 2x2 table"},
+        "SLA_FLT_STAGE": {"0": "Off", "1": "Captive", "2": "Launcher"},
+        "SLA_LAUNCH_AS_I": {"-1": "Unconfigured", **{str(i): f"Instance {i}" for i in range(4)}},
         "SLA_PWR_INST": {"-1": "Unconfigured", **{str(i): f"Battery instance {i}" for i in range(3)}},
         "SLA_PWR_SRC": {"-1": "Unconfigured", "0": "Power module", "1": "External", "2": "ESC telemetry"},
         "SLA_SCH_BAT_INST": {"-1": "Unconfigured", **{str(i): f"Instance {i}" for i in range(3)}},

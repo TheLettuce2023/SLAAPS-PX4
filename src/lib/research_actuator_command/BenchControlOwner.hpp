@@ -8,7 +8,8 @@ namespace research_actuator_command
 // User-approved bench candidates, not qualified hardware timing or flight policy.
 constexpr RuntimeTimeUs kBenchIntervalUs{20000U};
 constexpr RuntimeTimeUs kBenchSampleAgeUs{500000U};
-constexpr float kBenchMaximumDeflectionDeg{13.0F};
+// Declared SLAAPS vehicle travel limit (project lead, 2026-10-27); was 13 deg. Commanded travel stays within SLA_Cn_MIN/MAX.
+constexpr float kBenchMaximumDeflectionDeg{15.0F};
 constexpr std::size_t kBenchCanardCount{4};
 constexpr std::size_t kBenchAxisCount{3};
 using BenchVector = FixedArray<float, kBenchCanardCount>;

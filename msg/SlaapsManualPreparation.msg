@@ -11,6 +11,7 @@ uint8 MANUAL = 1
 uint8 SERVO_BENCH = 3
 uint8 EDF_BENCH = 4
 uint8 mode # Immutable owner mode, echoed by every bank
+bool reentry # D5: deliberate armed re-entry into a fresh Manual session; set only by the supervisor's D5 path
 uint64 routing
 uint64[2] driver # MAIN/AUX output device lifetime tokens, not sensor IDs
 uint64 prepared # Zero on request; original successful bank preparation time on reply

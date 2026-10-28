@@ -94,8 +94,18 @@ public:
 	bool recovering() const { return _recovery_active; }
 	// Caller-detected loss (estimator, bank or control fault) of an actively granted flight session.
 	// Starts the same recovery as an owner-detected loss. The worker alone decides when to call it.
-	void abandon(uint64_t now);
-	static constexpr uint64_t kRecoveryCeilingUs = 60000000;
+	// A D3 escalation during a D1 hold passes the hold's start, so D4 still counts from the first loss.
+	void abandon(uint64_t now, uint64_t started_us = 0);
+	static constexpr uint64_t kRecoveryCeilingUs = kRecoveryLimitUs;
+	// D1 owned sequence target: the held command for SLA_REC_HOLD, then a SLA_REC_RAMP slew to
+	// SLA_REC_THR, never above the line that reaches zero at the D4 limit. The worker submits it as an
+	// ordinary new request; it is a decided response, never reuse of the lost demand.
+	static float holdTarget(const RecoveryConfiguration &recovery, float held, uint64_t elapsed_us);
+	// D1 entry. The lost input's last request may already have expired: its lease is the same bound that detects
+	// the loss. Install the first owned hold request at the current slewed output instead. The flight grant must
+	// still be fully permitted (a lost permission starts D3 as before); only that last request's expiry is passed
+	// over, once, while the owner is active. held receives the command the hold keeps.
+	EdfFault acceptHold(uint64_t now, const EdfPermission &permission, uint64_t deadline_us, float &held);
 	void revoke();
 	EdfFault fault() const { return _fault; }
 private:

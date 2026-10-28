@@ -56,6 +56,10 @@ def render():
             parameter.update(type="enum", values={0: "Unconfigured", 1: "RC only", 2: "Pinned MAVLink only"})
         elif item["name"] in ("SLA_R_INPUT", "SLA_P_INPUT", "SLA_Y_INPUT"):
             parameter.update(type="enum", values={-1: "Unconfigured", 0: "Roll", 1: "Pitch", 2: "Yaw"})
+        elif item["name"] == "SLA_FLT_STAGE":
+            parameter.update(type="enum", values={0: "Off", 1: "Captive", 2: "Launcher"})
+        elif item["name"] == "SLA_LAUNCH_AS_I":
+            parameter.update(type="enum", values={-1: "Unconfigured", **{i: f"Instance {i}" for i in range(4)}})
         elif item["name"] == "SLA_SCH_EN":
             parameter.update(type="enum", values={0: "Disabled", 1: "Empirical 2x2 table"})
         elif item["name"] == "SLA_WR_EN":
@@ -278,6 +282,21 @@ def render():
             type="enum", values={0: "None", 1: "Prepare staged authenticated session", 2: "Grant exact prepared session",
                                  3: "Revoke session", 4: "Clear latched fault"}, default=0),
     }
+    net_long = ("D6 operator reference only, outside the vehicle profile: no guidance, position control or geofence "
+                "is implied. The ground-station location is QGC's own position received over MAVLink FOLLOW_TARGET "
+                "(enable QGC Application Settings, Stream GCS Position). During a recovery the QGC alarm and "
+                "slaaps_status report the vehicle's distance and bearing to the net.")
+    groups["SLAAPS Recovery Net"] = {
+        "SLA_NET_EN": dict(
+            description=dict(short="Report the recovery net position", long=net_long),
+            type="enum", values={0: "Disabled", 1: "Report net position"}, default=0),
+        "SLA_NET_N": dict(
+            description=dict(short="Recovery net north of the ground station", long=net_long),
+            type="float", min=-5000.0, max=5000.0, default=0.0, unit="m", decimal=1),
+        "SLA_NET_E": dict(
+            description=dict(short="Recovery net east of the ground station", long=net_long),
+            type="float", min=-5000.0, max=5000.0, default=0.0, unit="m", decimal=1),
+    }
     # JSON is a YAML subset. Keep the artifact deterministic without a second
     # schema or a dependency on a particular YAML serializer.
     document = dict(module_name="SLAAPS",
@@ -296,7 +315,7 @@ def main():
     else:
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         OUTPUT.write_text(expected, encoding="utf-8", newline="\n")
-    print(f"SLAAPS metadata: {len(list(definitions()))} vehicle parameters plus 2 apply controls, 4 acceptance markers, 3 commissioning controls and 1 companion action")
+    print(f"SLAAPS metadata: {len(list(definitions()))} vehicle parameters plus 2 apply controls, 4 acceptance markers, 3 commissioning controls, 1 companion action and 3 net references")
 
 
 if __name__ == "__main__":

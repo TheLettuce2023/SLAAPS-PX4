@@ -2635,12 +2635,12 @@
         },
         "SLA_STATUS_AGE": {
           "description": {
-            "short": "Maximum selected estimator status and flags age; zero unconfigured",
+            "short": "Maximum selected estimator status and flags age; above the 1 s EKF2 flags period",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "int32",
           "min": 0,
-          "max": 1000000,
+          "max": 2000000,
           "default": 0,
           "unit": "us"
         },
@@ -2934,6 +2934,106 @@
           "max": 1.0,
           "default": 0.0,
           "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Recovery",
+      "definitions": {
+        "SLA_REC_HOLD": {
+          "description": {
+            "short": "D1 attitude and EDF hold after command loss; zero refuses flight",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 60.0,
+          "default": 0.0,
+          "unit": "s",
+          "decimal": 6
+        },
+        "SLA_REC_RAMP": {
+          "description": {
+            "short": "D1 normalized EDF ramp after the hold; zero refuses flight",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "1/s",
+          "decimal": 6
+        },
+        "SLA_REC_THR": {
+          "description": {
+            "short": "D1 normalized recovery EDF command; zero ends in EDF off",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.0,
+          "decimal": 6
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Flight",
+      "definitions": {
+        "SLA_FLT_STAGE": {
+          "description": {
+            "short": "Flight admission stage; 0 off 1 captive 2 launcher",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "enum",
+          "min": 0,
+          "max": 2,
+          "default": 0,
+          "values": {
+            "0": "Off",
+            "1": "Captive",
+            "2": "Launcher"
+          }
+        },
+        "SLA_LAUNCH_AS_I": {
+          "description": {
+            "short": "Launcher raw airspeed instance; -1 unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "enum",
+          "min": -1,
+          "max": 3,
+          "default": -1,
+          "values": {
+            "-1": "Unconfigured",
+            "0": "Instance 0",
+            "1": "Instance 1",
+            "2": "Instance 2",
+            "3": "Instance 3"
+          }
+        },
+        "SLA_LAUNCH_AS": {
+          "description": {
+            "short": "Measured minimum indicated airspeed for launcher attitude authority",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "float",
+          "min": 0.0,
+          "max": 100.0,
+          "default": 0.0,
+          "unit": "m/s",
+          "decimal": 6
+        },
+        "SLA_LAUNCH_AGE": {
+          "description": {
+            "short": "Maximum launcher airspeed sample age; zero unconfigured",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500,
+          "default": 0,
+          "unit": "ms"
         }
       }
     },
@@ -5674,6 +5774,47 @@
             "4": "Clear latched fault"
           },
           "default": 0
+        }
+      }
+    },
+    {
+      "group": "SLAAPS Recovery Net",
+      "definitions": {
+        "SLA_NET_EN": {
+          "description": {
+            "short": "Report the recovery net position",
+            "long": "D6 operator reference only, outside the vehicle profile: no guidance, position control or geofence is implied. The ground-station location is QGC's own position received over MAVLink FOLLOW_TARGET (enable QGC Application Settings, Stream GCS Position). During a recovery the QGC alarm and slaaps_status report the vehicle's distance and bearing to the net."
+          },
+          "type": "enum",
+          "values": {
+            "0": "Disabled",
+            "1": "Report net position"
+          },
+          "default": 0
+        },
+        "SLA_NET_N": {
+          "description": {
+            "short": "Recovery net north of the ground station",
+            "long": "D6 operator reference only, outside the vehicle profile: no guidance, position control or geofence is implied. The ground-station location is QGC's own position received over MAVLink FOLLOW_TARGET (enable QGC Application Settings, Stream GCS Position). During a recovery the QGC alarm and slaaps_status report the vehicle's distance and bearing to the net."
+          },
+          "type": "float",
+          "min": -5000.0,
+          "max": 5000.0,
+          "default": 0.0,
+          "unit": "m",
+          "decimal": 1
+        },
+        "SLA_NET_E": {
+          "description": {
+            "short": "Recovery net east of the ground station",
+            "long": "D6 operator reference only, outside the vehicle profile: no guidance, position control or geofence is implied. The ground-station location is QGC's own position received over MAVLink FOLLOW_TARGET (enable QGC Application Settings, Stream GCS Position). During a recovery the QGC alarm and slaaps_status report the vehicle's distance and bearing to the net."
+          },
+          "type": "float",
+          "min": -5000.0,
+          "max": 5000.0,
+          "default": 0.0,
+          "unit": "m",
+          "decimal": 1
         }
       }
     }

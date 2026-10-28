@@ -2,22 +2,46 @@
 
 Decided 2026-10-25 by the project lead, who is accountable for flight-test safety sign-off.
 Source and option analysis: [SLAAPS Airborne Recovery Policy](https://claude.ai/artifact/T2pu5bwyatsrRN7um2amXh).
-Implementation status (2026-10-27): D3/D4 library layer done and host-tested (not called by the supervisor yet):
-`EdfOwner::recover/abandon` (EDF ramp at SLA_EDF_FALL, hard 60 s ceiling), `ManualOutputBank` recovery (canards hold at the
-last handled pulses, only `Recovery` frames admitted, bank enforces the ceiling itself), wire value `EDF_RECOVERY = 3`,
-`ManualWorker::recoverCycle`, bank/worker transport recovery states. Supervisor wired (`Slaaps::updateRecovery`): a worker fault after a handled frame holds recovery while armed with no
-kill/lockdown/termination, publishes a non-granting armed permission, logs a critical QGC message; disarm or any integrity
-loss still cancels. Compiles/links native and 6X (image 1,851,788 B after the board trim, 114.3 KB free); native supervisor run verifies recovery
-frames after an Acceleration allocator rejection, held canards, non-rising EDF and disarm ending recovery.
-An allocator rejection now enters D3 recovery as a stand-in until D1/D2 exist. Leaving the SLAAPS mode (pilot or
-failsafe) and power-source loss while armed now also enter recovery, verified natively through the real driver path
-(recovery frames acknowledged by both banks, canards frozen, EDF ramped off, critical QGC message, disarm ends it).
-The driver-side `SlaapsOutputPreparation` now hands a lost grant to the bank's recovery instead of revoking the bank.
-Estimator loss also enters recovery (verified natively, three consecutive supervisor runs). Its last frame can expire
-first (estimator-capped lease), so a bank may recover before the supervisor notices; a recovering bank therefore never
-re-enters the driver's granted flow, and a pre-loss normal frame or ticket arriving after recovery starts is ignored,
-never applied or acknowledged. Pilot input loss also enters D3 recovery (stand-in until D1). Not done: D1, D2, D5, D6,
-Commander failsafe path, a failed bank that carries the EDF channel. Until all land and are verified, `flight_admitted` stays false.
+Implementation status (2026-10-27, second update). Host-verified (Debug/Release/ASan-UBSan); native build and runtime
+verification of this increment pending. Not flashed, not bench- or flight-tested.
+
+- **D3/D4** (earlier today, natively verified): canards freeze at the last handled pulses, EDF ramps off at SLA_EDF_FALL,
+  hard 60 s limit, only `Recovery` frames admitted. Entered on estimator loss, a worker fault, leaving the SLAAPS mode,
+  power or schedule-condition loss.
+- **D1** done: `ManualWorker::hold/holdCycle`. Pilot input lost or unusable in Manual, companion lost in Acceleration, or
+  an infeasible companion demand (allocator rejection) holds the current attitude with the stabilized controller in hold-only
+  mode, in the same session with ordinary frames. EDF holds the current command for SLA_REC_HOLD, then follows the owned
+  `EdfOwner::holdTarget` sequence toward SLA_REC_THR at SLA_REC_RAMP, below the line that reaches zero at the D4 limit. The
+  lost input never resumes the session. A later fault escalates to D3 with D4 still counted from the hold start. Without
+  complete D1 data (`validateRecoveryConfiguration`) command loss falls back to D3. Lead values: hold 2 s, ramp 0.5/s,
+  thrust 0 (2026-10-27).
+- **D2** done: companion loss always raises a critical QGC alarm and event. The vehicle holds (D1), and when the selected
+  pilot input is fresh and centered the supervisor requests SLAAPS Manual from Commander (`VEHICLE_CMD_SET_NAV_STATE`, up to
+  10 tries at 100 ms). The ordinary exclusive Acceleration-to-Manual transfer then takes over from the handled hold frame.
+  Centered sticks are required because the Manual controller's own entry check rejects off-center sticks.
+- **D4**: one 60 s limit across D1, D3 and escalations, counted from the first loss.
+- **D6** done: SLA_NET_EN/N/E (outside the vehicle profile) with QGC's own position from FOLLOW_TARGET (QGC Application
+  Settings, Stream GCS Position). Distance and bearing to the net appear in the recovery alarm and in `slaaps_flight_status`.
+  Operator reference only.
+- **Clarification 4** done: during D3 a bank that stops confirming while the other still does is dropped after one maximum
+  cycle; the other bank keeps frozen canards. EDF on a dropped bank is assumed off and not relied on.
+- **Commander failsafe** done: on a SLAAPS airframe a failsafe never selects a stock flight mode. It keeps the selected mode,
+  so the supervisor applies its decided response, or it terminates (`Commander.cpp`, `failsafe_mode`).
+- **Launch** done: SLA_FLT_STAGE 0 off, 1 captive (no airspeed gate), 2 launcher. In the launcher stage canards stay at trim
+  with non-integrating controller history until the selected raw airspeed reaches SLA_LAUNCH_AS; the gate then latches open.
+  A launcher-stage profile without a fresh airspeed source is not admitted.
+- **Flight admission**: production now sets the flight flags. `flight_admitted` needs `validateFlightConfiguration` (stage 1
+  or 2, complete D1 data, SLA_DATA_STATE Calibrated or Qualified with a record ID) plus the launcher airspeed source when
+  staged; Acceleration also needs `validateAccelerationControlConfiguration`. `healthy` needs fresh selected estimator
+  metadata, routing, an eligible profile and no registration fault. `measured_condition_valid` needs a valid power sample
+  inside SLA_PWR_VMIN/VMAX.
+- **D5** done (2026-10-28, natively verified): seamless bank handover, decided by the lead. With SLAAPS Manual selected and
+  the returning pilot input fresh, centered and at or below SLA_EDF_ENTRY for 200 ms, during a D1 hold or D3 recovery, the
+  supervisor ends the lost session without disabling the profile and prepares a fresh session while armed (preparation
+  proposal flag `reentry`). The output driver accepts that proposal while its bank is latched or recovering. Nothing is
+  written while preparing, so the hardware keeps the last handled pulses until the fresh session's first frame; no lease is
+  renewed. Every admission check of a new session applies. If re-entry fails after the old session ended, outputs stay
+  unwritten until disarm (canards hold, EDF receives no commands).
 
 ## Decisions
 
@@ -26,7 +50,7 @@ Commander failsafe path, a failed bank that carries the EDF channel. Until all l
 | D1 | Pilot or companion commands lost; estimator and both banks healthy | A: hold current attitude (existing quaternion hold) and last EDF throttle for a bounded time, then ramp to a measured recovery thrust |
 | D2 | Companion lost in Acceleration mode | A: automatic handoff to Manual when pilot input is fresh, always with a QGC alarm; otherwise D1 |
 | D3 | Attitude loop unusable (estimator invalid or a bank not confirming) | B: canards freeze at last position, EDF ramps down to off |
-| D4 | Hold limit and end state | End state is EDF off; EDF is off no later than 60 s after recovery starts (no ceiling from launch) |
+| D4 | Hold limit and end state | End state is EDF off; EDF is off no later than 60 s after recovery starts; no ceiling from launch |
 | D5 | Regaining control in flight | B: re-entry into Manual is allowed when the lost input returns and every admission check passes again |
 | D6 | Recovery hardware | Net landing area near the ground control station; its position is set in QGC relative to the GCS location |
 | Launch | Entering flight | Captive (tethered/rig) powered tests first, then a launcher/rail |

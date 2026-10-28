@@ -12,7 +12,7 @@ px4_add_module(
 	MODULE_CONFIG module.yaml
 	COMPILE_FLAGS -Wno-address-of-packed-member -Wno-cast-align
 	INCLUDES ${CMAKE_BINARY_DIR}/mavlink ${CMAKE_BINARY_DIR}/mavlink/${CONFIG_MAVLINK_DIALECT}
-	DEPENDS slaaps_configuration slaaps_companion_protocol px4_work_queue mavlink_c_generate
+	DEPENDS slaaps_configuration slaaps_companion_protocol px4_work_queue mavlink_c_generate geo
 )
 
 if(CONFIG_SLAAPS_ROUTING_TEST)
@@ -29,7 +29,7 @@ if(CONFIG_SLAAPS_ROUTING_TEST)
 			${PX4_SOURCE_DIR}/Tools/slaaps/configuration/AccelerationControllerTest.cpp
 			${PX4_SOURCE_DIR}/Tools/slaaps/configuration/EdfOwnerTransferTest.cpp
 			${PX4_SOURCE_DIR}/Tools/slaaps/configuration/FlightTransferTest.cpp
-		DEPENDS slaaps_configuration slaaps_companion_protocol output_functions_header mixer_module px4_work_queue mavlink_c_generate
+		DEPENDS slaaps_configuration slaaps_companion_protocol output_functions_header mixer_module px4_work_queue mavlink_c_generate geo
 		COMPILE_FLAGS -Wno-address-of-packed-member -Wno-cast-align
 		INCLUDES ${CMAKE_BINARY_DIR}/src/lib/mixer_module
 			${CMAKE_BINARY_DIR}/mavlink ${CMAKE_BINARY_DIR}/mavlink/${CONFIG_MAVLINK_DIALECT}

@@ -60,6 +60,7 @@ set(msg_files
 	CellularStatus.msg
 	CollisionConstraints.msg
 	SlaapsStatus.msg
+	SlaapsFlightStatus.msg
 	SlaapsAccelerationStatus.msg
 	SlaapsCompanionPacket.msg
 	SlaapsCompanionControl.msg

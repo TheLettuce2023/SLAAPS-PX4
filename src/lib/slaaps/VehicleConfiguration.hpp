@@ -18,6 +18,8 @@ constexpr unsigned kWrenchInputs = kCanards + 1;
 // BatteryStatus v1 declares three instances. The native observer asserts this
 // portable configuration bound against the generated topic definition.
 constexpr int32_t kPowerBatteryInstances = 3;
+// D4: EDF is off no later than this long after any airborne recovery starts.
+constexpr uint64_t kRecoveryLimitUs = 60000000;
 
 enum class ManualInputSource : int32_t { Unconfigured, RcOnly, MavlinkOnly };
 enum class DataAssessment : int32_t { Incomplete = 0, Calibrated = 1, Qualified = 2 };
@@ -175,6 +177,25 @@ struct AccelerationControllerConfiguration {
 	float correction_limit[kAxes] {}; // Body-FRD inertial acceleration correction [m/s^2].
 };
 
+// Decided airborne responses (docs/SLAAPS_RECOVERY_POLICY.md). Values come from
+// the project lead; unset values refuse flight admission, never a default.
+struct RecoveryConfiguration {
+	float hold_s{}; // D1: attitude and last EDF held this long after command loss.
+	float ramp{}; // D1: normalized EDF command/s toward thrust after the hold.
+	float thrust{}; // D1: normalized recovery command; zero ends in EDF off.
+};
+
+// Flight admission staging (policy "Launch"). Captive rig tests admit flight modes without an airspeed
+// gate. On the launcher the attitude loop has no canard authority until the selected raw airspeed has
+// reached the measured minimum; that gate latches open for the session.
+enum class FlightStage : int32_t { Off = 0, Captive = 1, Launcher = 2 };
+struct LaunchConfiguration {
+	int32_t stage{};
+	int32_t airspeed_instance{-1}; // Raw airspeed.indicated_airspeed_m_s, never groundspeed.
+	float minimum_airspeed_m_s{};
+	int32_t airspeed_age_ms{};
+};
+
 struct VehicleConfiguration {
 	int32_t data_schema_version{1}; // SLAAPS profile schema, not an external record format.
 	// Operator-declared external record reference. Parameters do not verify the
@@ -229,13 +250,16 @@ struct VehicleConfiguration {
 	WrenchConfiguration wrench{};
 	AccelerationFeedbackConfiguration feedback{};
 	AccelerationControllerConfiguration acceleration_control{};
+	RecoveryConfiguration recovery{};
+	LaunchConfiguration launch{};
 };
 
 enum class ConfigurationUse : uint8_t { Bench, StabilizedManual, EdfCommissioning = 2 };
 enum class ConfigurationFault : uint8_t {
 	None, ParameterRange, MissingRecord, InvalidInertia, InvalidServo,
 	InvalidTiming, InvalidEffectiveness, InvalidController, InvalidThrustCurve,
-	Active, NoCandidate, InvalidWrench, InvalidFeedback, InvalidAccelerationControl
+	Active, NoCandidate, InvalidWrench, InvalidFeedback, InvalidAccelerationControl, InvalidRecovery,
+	InvalidFlight
 };
 
 struct ConfigurationResult {
@@ -297,6 +321,15 @@ bool companionClockRenewalConfigured(const CompanionConfiguration &configuration
 				     uint64_t *observation_slack_us = nullptr);
 bool makeCompanionContractConfiguration(const VehicleConfiguration &configuration,
 					research_acceleration::ContractConfig &contract);
+
+// D1 sequence completeness. The hold plus a full-range ramp must end by the D4
+// limit. Incomplete values may be staged; they refuse flight admission and make
+// command loss fall back to the D3 response.
+ConfigurationResult validateRecoveryConfiguration(const VehicleConfiguration &configuration);
+
+// Profile half of flight admission: a captive or launcher stage, complete D1 data and an operator-declared
+// calibrated record. Runtime health, power and the launcher airspeed source are checked separately.
+ConfigurationResult validateFlightConfiguration(const VehicleConfiguration &configuration);
 
 // Servo-bench profiles may stage scalar-valid incomplete power fields. EDF
 // commissioning and stabilized manual require the complete explicit group.

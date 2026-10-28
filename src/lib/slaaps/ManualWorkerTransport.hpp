@@ -95,6 +95,43 @@ public:
 
 		return result;
 	}
+	// D1 after companion loss in Acceleration: hold the current attitude in this session. Without a
+	// handled flight frame or complete recovery data the worker falls back to D3 or an ordinary stop.
+	ManualWorkerStatus holdAcceleration(const EdfPermission &permission, const SelectedManualInput::Snapshot &snapshot,
+					    const ManualOutputBinding &binding, const OperatingConditionSample *condition = nullptr)
+	{
+		if (!_active || _bench_mode != ControlMode::None || _worker.mode() != ControlMode::Acceleration) { stop(); return ManualWorkerStatus::ControlRejected; }
+
+		if (_lifetime.revision() != _revision) { return reject(); }
+
+		const auto result = _worker.hold(hrt_absolute_time(), permission, snapshot.state, condition);
+
+		if (result != ManualWorkerStatus::Ready) { return failOrRecover(result); }
+
+		return holdObserved(permission, snapshot, binding, condition);
+	}
+	// One live D1 cycle. A Manual session keeps its selected-input guard. An Acceleration session observes
+	// state through the companion state binding, so only the worker's own state checks apply, as they do
+	// for ordinary Acceleration cycles. Loss of arming metadata or state is a D3 loss.
+	ManualWorkerStatus holdObserved(const EdfPermission &permission, const SelectedManualInput::Snapshot &snapshot,
+					const ManualOutputBinding &binding, const OperatingConditionSample *condition = nullptr)
+	{
+		if (!_active || !_worker.holding()) { return ManualWorkerStatus::Inactive; }
+
+		const auto &armed = snapshot.permission;
+
+		if (!snapshot.state.valid || !snapshot.permission_fresh || !armed.armed || armed.kill || armed.lockdown
+		    || armed.termination || armed.in_esc_calibration_mode) { return loseSelectedInput(snapshot); }
+
+		const bool guarded = _worker.mode() == ControlMode::Manual && _selected_session;
+		return cycleImpl(0, permission, snapshot.manual, &snapshot.state, binding, guarded ? &snapshot : nullptr, 0, condition,
+				 nullptr, false, true, true);
+	}
+	bool holding() const { return _active && _worker.holding(); }
+	uint8_t failedBanks() const { return _recovering ? _worker.failedBanks() : 0; }
+	bool attitudeGateClosed() const { return _active && _worker.attitudeGateClosed(); }
+	void openAttitudeGate() { if (_active) { _worker.openAttitudeGate(); } }
+	uint64_t holdStart() const { return _active ? _worker.holdStart() : 0; }
 	uint64_t handledSequence() const { return _active ? _worker.handledSequence() : 0; }
 	bool outstanding() const { return _active && _worker.outstanding(); }
 	uint64_t outputDeadline() const { return _active ? _worker.outputDeadline() : 0; }
@@ -340,13 +377,14 @@ private:
 				     const research_stabilized_manual::StateSample *state, const ManualOutputBinding &binding,
 				     const SelectedManualInput::Snapshot *observed = nullptr, uint64_t first_command_deadline_us = 0,
 				     const OperatingConditionSample *condition = nullptr,
-				     const AccelerationControlInput *acceleration = nullptr, bool monitor_only = false, bool acceleration_live = true)
+				     const AccelerationControlInput *acceleration = nullptr, bool monitor_only = false, bool acceleration_live = true,
+				     bool hold_live = false)
 	{
 		if (!_active) { return ManualWorkerStatus::Inactive; }
 
 		if (_lifetime.revision() != _revision) { return reject(); }
 
-		const bool live = observed || _bench_mode != ControlMode::None || monitor_only || (acceleration && acceleration_live);
+		const bool live = observed || _bench_mode != ControlMode::None || monitor_only || (acceleration && acceleration_live) || hold_live;
 		ManualOutputAck pending[2] {};
 		unsigned count{};
 

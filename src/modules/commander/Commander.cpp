@@ -2613,8 +2613,20 @@ bool Commander::handleModeIntentionAndFailsafe()
 					     _failsafe_flags);
 	_failsafe_user_override_request = false;
 
+	// SLAAPS airframe: the decided airborne responses (docs/SLAAPS_RECOVERY_POLICY.md) live in the SLAAPS
+	// supervisor, which detects each loss itself. A failsafe never moves the vehicle into a stock flight
+	// mode; it keeps the selected mode, so the supervisor applies D1/D3, or it terminates.
+	const bool slaaps_airframe = _health_and_arming_checks.isSlaapsAirframe();
+	const auto failsafe_mode = [&](uint8_t intended) {
+		if (!slaaps_airframe) { return FailsafeBase::modeFromAction(_failsafe.selectedAction(), intended); }
+
+		return _failsafe.selectedAction() == FailsafeBase::Action::Terminate ?
+		       static_cast<uint8_t>(vehicle_status_s::NAVIGATION_STATE_TERMINATION) : intended;
+	};
+
 	// Force intended mode if changed by the failsafe state machine
-	if (state.user_intended_mode != updated_user_intented_mode) {
+	if (state.user_intended_mode != updated_user_intented_mode
+	    && (!slaaps_airframe || updated_user_intented_mode == vehicle_status_s::NAVIGATION_STATE_TERMINATION)) {
 		_user_mode_intention.change(updated_user_intented_mode, ModeChangeSource::User, false, true);
 		_user_mode_intention.getHadModeChangeAndClear();
 	}
@@ -2623,8 +2635,7 @@ bool Commander::handleModeIntentionAndFailsafe()
 	_mode_management.setFailsafeState(_failsafe.selectedAction() > FailsafeBase::Action::Warn);
 	_vehicle_status.nav_state_user_intention = _mode_management.getNavStateReplacementIfValid(_user_mode_intention.get(),
 			false);
-	_vehicle_status.nav_state =
-		_mode_management.getNavStateReplacementIfValid(FailsafeBase::modeFromAction(_failsafe.selectedAction(), _user_mode_intention.get()));
+	_vehicle_status.nav_state = _mode_management.getNavStateReplacementIfValid(failsafe_mode(_user_mode_intention.get()));
 #if defined(CONFIG_MODULES_SLAAPS)
 	observeSlaapsVehicleState();
 #endif

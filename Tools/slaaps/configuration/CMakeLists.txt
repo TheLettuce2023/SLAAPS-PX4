@@ -68,6 +68,31 @@ if(SLAAPS_SANITIZERS)
 	target_compile_options(slaaps_configuration_test PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
 	target_link_options(slaaps_configuration_test PRIVATE -fsanitize=address,undefined)
 endif()
+# QGC parameter-file checker against the same validators; a tool, not a test.
+add_executable(slaaps_profile_check
+	ProfileCheck.cpp
+	"${PX4_ROOT}/src/lib/slaaps/VehicleConfiguration.cpp"
+	"${PX4_ROOT}/src/lib/slaaps/WrenchAllocator.cpp"
+	"${PX4_ROOT}/src/lib/slaaps/VehicleWrenchAllocation.cpp"
+	"${PX4_ROOT}/src/lib/slaaps/AccelerationFeedback.cpp"
+	"${PX4_ROOT}/src/lib/research_acceleration/FrameMath.cpp"
+	"${PX4_ROOT}/src/lib/research_stabilized_manual/CanardAllocator.cpp"
+	"${PX4_ROOT}/src/lib/research_stabilized_manual/StabilizedManualControl.cpp"
+	"${PX4_ROOT}/src/lib/research_stabilized_manual/StabilizedInputValidation.cpp"
+	"${PX4_ROOT}/src/lib/rate_control/rate_control.cpp"
+	"${PX4_ROOT}/src/lib/research_actuator_command/ManualControlInput.cpp"
+	"${PX4_ROOT}/src/lib/research_actuator_command/CommandLimiter.cpp"
+	"${PX4_ROOT}/src/lib/research_actuator_command/BenchControlOwner.cpp"
+	"${PX4_ROOT}/src/lib/research_actuator_command/BenchOutputLease.cpp"
+)
+target_compile_features(slaaps_profile_check PRIVATE cxx_std_17)
+target_compile_definitions(slaaps_profile_check PRIVATE __EXPORT=)
+target_include_directories(slaaps_profile_check PRIVATE
+	"${PX4_ROOT}/src" "${PX4_ROOT}/src/lib" "${PX4_ROOT}/src/lib/matrix"
+	"${PX4_ROOT}/platforms/common" "${PX4_ROOT}/platforms/ros2/include"
+	"${CMAKE_CURRENT_BINARY_DIR}/generated"
+)
+target_compile_options(slaaps_profile_check PRIVATE -Wall -Wextra -Werror -Wpedantic)
 add_test(NAME slaaps_configuration COMMAND slaaps_configuration_test)
 add_test(NAME slaaps_parameter_metadata
 	COMMAND "${Python3_EXECUTABLE}" "${PX4_ROOT}/Tools/slaaps/generate_parameters.py" --check)

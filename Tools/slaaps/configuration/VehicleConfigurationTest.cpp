@@ -777,10 +777,12 @@ static void manualTimingConfigurationTests()
 	--boundary.activation_ack_timeout_us;
 	check(manualActivationTimingConfigured(boundary) && validate(boundary, ConfigurationUse::StabilizedManual).valid(),
 	      "one microsecond below the activation timeout boundary remains structurally configurable");
-	boundary.selected_status_age_us = boundary.actuator_permission_age_us = 1000000;
+	boundary.selected_status_age_us = 2000000;
+	boundary.actuator_permission_age_us = 1000000;
 	check(manualActivationTimingConfigured(boundary), "declared metadata age upper bounds are inclusive");
-	boundary.selected_status_age_us = 1000001;
+	boundary.selected_status_age_us = 2000001;
 	check(!manualActivationTimingConfigured(boundary), "status metadata age above its declared maximum rejects");
+	boundary.selected_status_age_us = 1000000;
 	boundary = c;
 	boundary.actuator_permission_age_us = 1000001;
 	check(!manualActivationTimingConfigured(boundary), "arming metadata age above its declared maximum rejects");
@@ -986,8 +988,10 @@ static void profileTests()
 	bad.canard[0].pwm_neutral = 1500.5F;
 	check(!validate(bad, ConfigurationUse::Bench).valid(), "fractional PWM calibration rejected");
 	bad = c;
-	bad.canard[0].maximum_deflection_deg = 14.F;
-	check(!validate(bad, ConfigurationUse::Bench).valid(), "preserve existing bench travel limit");
+	bad.canard[0].maximum_deflection_deg = 15.5F;
+	check(!validate(bad, ConfigurationUse::Bench).valid(), "preserve the declared 15 deg bench travel limit");
+	bad.canard[0].maximum_deflection_deg = 15.F;
+	check(validate(bad, ConfigurationUse::Bench).valid(), "the declared 15 deg vehicle travel is accepted");
 	bad = c;
 	bad.output_lease_ms = 99;
 	check(!validate(bad, ConfigurationUse::Bench).valid(), "lease shorter than admitted bench gap rejected");
@@ -3098,6 +3102,311 @@ static ManualBankFault acceptAndHandle(ManualOutputBank &bank, uint64_t now, con
 	return bank.confirmHandled(now, permission, inventory, binding, handled, true, ack);
 }
 
+// D1 command-loss hold through the real worker and both banks: the attitude hold keeps commanding canards,
+// EDF holds and then follows the decided ramp, the lost input never resumes the session, any later fault
+// escalates to D3 counted from the hold start, and the session ends at the D4 limit.
+static void holdTests()
+{
+	auto c = fixture();
+	{
+		auto bad = c;
+		auto result = validateRecoveryConfiguration(bad);
+		check(result.fault == ConfigurationFault::InvalidRecovery && std::strcmp(result.parameter, "SLA_REC_HOLD") == 0,
+		      "D1: an unset hold refuses the recovery data");
+		bad.recovery.hold_s = 1.F;
+		result = validateRecoveryConfiguration(bad);
+		check(result.fault == ConfigurationFault::InvalidRecovery && std::strcmp(result.parameter, "SLA_REC_RAMP") == 0,
+		      "D1: an unset ramp refuses the recovery data");
+		bad.recovery.ramp = bad.edf_fall * 2.F;
+		check(!validateRecoveryConfiguration(bad).valid(), "D1: a ramp faster than the owner's fall slew is refused");
+		bad.recovery.ramp = bad.edf_fall;
+		bad.recovery.hold_s = 59.9F;
+		check(!validateRecoveryConfiguration(bad).valid(), "D1: hold plus a full ramp past the D4 limit is refused");
+		bad.recovery.hold_s = 1.F;
+		check(validateRecoveryConfiguration(bad).valid(), "D1: complete recovery data validates");
+	}
+	{
+		RecoveryConfiguration r{};
+		r.hold_s = 1.F;
+		r.ramp = .5F;
+		r.thrust = 0.F;
+		const auto near = [](float a, float b) { return std::fabs(a - b) < 1.e-5F; };
+		check(near(EdfOwner::holdTarget(r, .6F, 500000), .6F) && near(EdfOwner::holdTarget(r, .6F, 1500000), .35F)
+		      && near(EdfOwner::holdTarget(r, .6F, 3000000), 0.F), "D1 target: hold, decided ramp, then the recovery command");
+		r.thrust = .3F;
+		check(near(EdfOwner::holdTarget(r, .1F, 1200000), .2F) && near(EdfOwner::holdTarget(r, .6F, 5000000), .3F)
+		      && near(EdfOwner::holdTarget(r, .6F, kRecoveryLimitUs - 200000), .1F)
+		      && near(EdfOwner::holdTarget(r, .6F, kRecoveryLimitUs), 0.F),
+		      "D1 target: ramps toward a nonzero recovery command, then reaches off exactly at the D4 limit");
+	}
+
+	c.recovery.hold_s = .02F;
+	c.recovery.ramp = c.edf_fall;
+	c.recovery.thrust = 0.F;
+	// Banks bound Manual EDF requests by the input age; keep it below the output lease so hold frames must honor it.
+	c.manual_age_ms = 60;
+	const auto inventory = routingFixture();
+	const ManualOutputBinding binding{42, {51, 52}, 3};
+	auto p = permission(1000);
+	p.configuration = fingerprint(c);
+	research_stabilized_manual::ManualSample manual{};
+	manual.valid = true;
+	manual.source = research_actuator_command::ManualControlSource::Mavlink;
+	manual.mavlink_instance = c.manual_instance;
+	manual.source_system_id = c.manual_system;
+	manual.source_component_id = c.manual_component;
+	manual.axes[3] = -1.F;
+	research_stabilized_manual::StateSample state{};
+	state.valid = true;
+	state.source_epoch = 1;
+	auto stamp_state = [&](uint64_t now) {
+		state.attitude_timestamp_us = state.attitude_sample_us = state.rate_timestamp_us = state.rate_sample_us = now;
+	};
+	auto stamp = [&](uint64_t now) {
+		manual.timestamp_us = manual.timestamp_sample_us = now;
+		stamp_state(now);
+	};
+	auto fly = [&](EdfOwner & owner, ManualWorker & worker, ManualOutputBank & main, ManualOutputBank & aux) {
+		stamp(1000);
+		manual.valid = true;
+		manual.axes = {};
+		manual.axes[3] = -1.F;
+		bool ok = worker.begin(1000, c, p, manual, state, binding) == ManualWorkerStatus::Ready
+			  && main.begin(1000, 0, c, inventory, binding, p) == ManualBankFault::None
+			  && aux.begin(1000, 1, c, inventory, binding, p) == ManualBankFault::None;
+		ManualWorkerOutput frame{};
+		ManualOutputAck main_ack{}, aux_ack{};
+
+		for (uint64_t now : {5000, 9000, 13000}) {
+			stamp(now);
+			manual.axes[0] = .5F;
+			manual.axes[3] = now == 5000 ? -1.F : 1.F;
+			ok &= worker.cycle(now, p, manual, state, frame, binding) == ManualWorkerStatus::Command
+			      && acceptAndHandle(main, now, p, inventory, binding, frame, main_ack) == ManualBankFault::None
+			      && acceptAndHandle(aux, now, p, inventory, binding, frame, aux_ack) == ManualBankFault::None
+			      && worker.cycle(now, p, manual, state, frame, binding, &main_ack) == ManualWorkerStatus::Waiting
+			      && worker.cycle(now, p, manual, state, frame, binding, &aux_ack) == ManualWorkerStatus::NotDue;
+		}
+
+		(void)owner;
+		return ok ? frame.edf.normalized : -1.F;
+	};
+	auto step = [&](ManualWorker & worker, ManualOutputBank & main, ManualOutputBank & aux, uint64_t now,
+	const EdfPermission & perm, ManualWorkerOutput & frame) {
+		ManualOutputAck main_ack{}, aux_ack{};
+		return worker.cycle(now, perm, manual, state, frame, binding) == ManualWorkerStatus::Command
+		       && acceptAndHandle(main, now, perm, inventory, binding, frame, main_ack) == ManualBankFault::None
+		       && acceptAndHandle(aux, now, perm, inventory, binding, frame, aux_ack) == ManualBankFault::None
+		       && worker.cycle(now, perm, manual, state, frame, binding, &main_ack) == ManualWorkerStatus::Waiting
+		       && worker.cycle(now, perm, manual, state, frame, binding, &aux_ack) == ManualWorkerStatus::NotDue;
+	};
+
+	{
+		EdfOwner owner;
+		ManualWorker worker(owner);
+		ManualOutputBank main, aux;
+		const float held = fly(owner, worker, main, aux);
+		check(held > 0.F, "D1 fixture loses pilot input with nonzero EDF after handled frames");
+
+		// The pilot sample becomes unusable; estimator, permission and banks stay healthy.
+		manual.valid = false;
+		stamp_state(17000);
+		ManualWorkerOutput frame{};
+		check(step(worker, main, aux, 17000, p, frame) && worker.holding() && !worker.recovering()
+		      && frame.edf.disposition == EdfDisposition::Command && frame.edf.normalized >= held
+		      && worker.holdStart() == 17000, "D1: pilot loss holds attitude and the current EDF in the same session");
+		const float hold_value = frame.edf.normalized;
+		check(!main.recovering() && !aux.recovering(), "D1: banks keep ordinary handled frames, never bank recovery");
+
+		bool holding = true, ramp = true, canards = true;
+		float last = frame.edf.normalized;
+
+		for (uint64_t now = 21000; now <= 33000; now += 4000) {
+			stamp_state(now);
+			holding &= step(worker, main, aux, now, p, frame) && worker.holding();
+			holding &= std::fabs(frame.edf.normalized - hold_value) < 1.e-6F;
+
+			for (float value : frame.canards) { canards &= std::isfinite(value) && value >= -1.F && value <= 1.F; }
+		}
+
+		check(holding && canards, "D1: EDF is held for SLA_REC_HOLD while the attitude hold keeps commanding canards");
+
+		// The pilot returns during the hold: the lost input cannot resume this session.
+		manual.valid = true;
+		manual.axes = {};
+		manual.axes[0] = .9F;
+		manual.axes[3] = 1.F;
+
+		for (uint64_t now = 41000; now <= 69000; now += 4000) {
+			manual.timestamp_us = manual.timestamp_sample_us = now;
+			stamp_state(now);
+			const uint64_t previous = now - 4000;
+			ramp &= step(worker, main, aux, now, p, frame) && worker.holding();
+			ramp &= frame.edf.normalized <= last + 1.e-6F
+				&& frame.edf.normalized >= last - c.recovery.ramp * static_cast<float>(now - previous) * 1.e-6F - 1.e-5F;
+			last = frame.edf.normalized;
+		}
+
+		check(ramp && last < hold_value, "D1: after the hold EDF follows the decided ramp and a returning pilot cannot resume");
+
+		// A later estimator loss escalates to D3; D4 still counts from the hold start.
+		state.valid = false;
+		stamp_state(73000);
+		check(worker.cycle(73000, p, manual, state, frame, binding) == ManualWorkerStatus::ControlRejected
+		      && worker.recovering() && !worker.holding(), "D1 to D3: estimator loss during the hold starts recovery");
+		auto lost = p;
+		lost.healthy = false;
+		ManualWorkerOutput recovery{};
+		check(worker.recoverCycle(74000, lost, binding, recovery) == ManualWorkerStatus::Command
+		      && recovery.edf.disposition == EdfDisposition::Recovery && recovery.edf.normalized <= last,
+		      "D3 escalation ramps EDF off from the held value with frozen canards");
+		state.valid = true;
+		auto late = lost;
+		late.timestamp_us = 17000 + kRecoveryLimitUs - 1000;
+		late.deadline_us = late.timestamp_us + 100000;
+		check(owner.recover(17000 + kRecoveryLimitUs, late).disposition == EdfDisposition::Inhibited && !owner.recovering(),
+		      "D4: an escalated recovery ends 60 s after the original hold start, not after the escalation");
+		worker.stop();
+	}
+	{
+		// D4: an uninterrupted hold ends the session at the limit with EDF already off.
+		EdfOwner owner;
+		ManualWorker worker(owner);
+		ManualOutputBank main, aux;
+		check(fly(owner, worker, main, aux) > 0.F, "D4 fixture flies");
+		manual.valid = false;
+		ManualWorkerOutput frame{};
+		bool ok = true;
+		uint64_t now = 17000;
+
+		for (; ok && now < 17000 + kRecoveryLimitUs; now += 10000) {
+			auto fresh = p;
+			fresh.timestamp_us = now;
+			fresh.deadline_us = now + 100000;
+			stamp_state(now);
+			ok &= step(worker, main, aux, now, fresh, frame);
+		}
+
+		check(ok && frame.edf.normalized <= 0.F && frame.deadline_us <= 17000 + kRecoveryLimitUs,
+		      "D4: the hold's last frames carry EDF off and never outlive the limit");
+		auto fresh = p;
+		fresh.timestamp_us = now;
+		fresh.deadline_us = now + 100000;
+		stamp_state(now);
+		check(worker.cycle(now, fresh, manual, state, frame, binding) == ManualWorkerStatus::Inactive
+		      && !worker.holding() && !worker.recovering(), "D4: the hold ends the session at the limit");
+	}
+	{
+		// Without complete recovery data, pilot loss is a D3 loss.
+		auto unset = c;
+		unset.recovery = {};
+		const auto saved = c;
+		c = unset;
+		p.configuration = fingerprint(c);
+		EdfOwner owner;
+		ManualWorker worker(owner);
+		ManualOutputBank main, aux;
+		check(fly(owner, worker, main, aux) > 0.F, "unset-recovery fixture flies");
+		manual.valid = false;
+		stamp_state(17000);
+		ManualWorkerOutput frame{};
+		check(worker.cycle(17000, p, manual, state, frame, binding) == ManualWorkerStatus::ControlRejected
+		      && worker.recovering() && !worker.holding(), "D1 data unset: pilot loss falls back to D3");
+		worker.stop();
+		c = saved;
+		p.configuration = fingerprint(c);
+	}
+	{
+		// Before any handled frame there is no flight to hold.
+		EdfOwner owner;
+		ManualWorker worker(owner);
+		stamp(1000);
+		manual.valid = true;
+		manual.axes = {};
+		manual.axes[3] = -1.F;
+		check(worker.begin(1000, c, p, manual, state, binding) == ManualWorkerStatus::Ready, "unhandled fixture entry");
+		manual.valid = false;
+		stamp_state(5000);
+		ManualWorkerOutput frame{};
+		check(worker.cycle(5000, p, manual, state, frame, binding) != ManualWorkerStatus::Command
+		      && !worker.holding() && !worker.recovering() && !worker.handledSequence(),
+		      "D1: input loss before the first handled frame is an ordinary stop");
+	}
+	{
+		// D1 by staleness: the pilot simply stops sending. The pilot's own EDF request expires at the input-age bound
+		// before (or exactly when) the sample is declared stale; that expiry must start the hold, never D3.
+		EdfOwner owner;
+		ManualWorker worker(owner);
+		ManualOutputBank main, aux;
+		check(fly(owner, worker, main, aux) > 0.F, "stale-pilot fixture flies");
+		const uint64_t last_sample = manual.timestamp_sample_us;
+		ManualWorkerOutput frame{};
+		bool flying = true;
+		uint64_t now = last_sample;
+		bool held = false;
+
+		while (flying && !held && now < last_sample + 200000) {
+			now += 4000;
+			stamp_state(now);
+			flying = step(worker, main, aux, now, p.deadline_us > now ? p : [&]() {
+				auto fresh = p;
+				fresh.timestamp_us = now;
+				fresh.deadline_us = now + 100000;
+				return fresh;
+			}(), frame);
+			held = worker.holding();
+		}
+
+		check(flying && held && !worker.recovering() && frame.edf.disposition == EdfDisposition::Command
+		      && now + static_cast<uint64_t>(c.cycle_max_us) >= last_sample + static_cast<uint64_t>(c.manual_age_ms) * 1000
+		      && now < last_sample + static_cast<uint64_t>(c.manual_age_ms) * 1000,
+		      "D1: a pilot that stops sending is held one cycle before its request expires, with ordinary frames, never D3");
+		worker.stop();
+	}
+	{
+		// Clarification 4: a bank that stops confirming during D3 is dropped; the other keeps frozen canards.
+		EdfOwner owner;
+		ManualWorker worker(owner);
+		ManualOutputBank main, aux;
+		check(fly(owner, worker, main, aux) > 0.F, "failed-bank fixture flies");
+		auto lost = p;
+		lost.healthy = false;
+		stamp(17000);
+		ManualWorkerOutput frame{};
+		check(worker.cycle(17000, lost, manual, state, frame, binding) == ManualWorkerStatus::PropulsionRejected
+		      && worker.recovering(), "failed-bank fixture enters D3");
+		check(main.sample(17000, lost, inventory, binding).disposition == EdfDisposition::RecoveryRequired && main.recovering(),
+		      "failed-bank fixture: the surviving bank enters recovery");
+		auto deliver = [&](ManualOutputBank & bank, uint64_t now, const ManualWorkerOutput & f, ManualOutputAck & ack) {
+			slaaps_manual_command_s wire{};
+			ManualWorkerOutput decoded{};
+
+			if (!encodeManualCommand(now, f, wire) || !decodeManualCommand(now, wire, decoded)
+			    || bank.acceptRecovery(now, lost, inventory, binding, decoded) != ManualBankFault::None) { return false; }
+
+			const auto out = bank.sample(now, lost, inventory, binding);
+			return bank.confirmHandled(now, lost, inventory, binding, out, true, ack) == ManualBankFault::None;
+		};
+		ManualOutputAck main_ack{};
+		ManualWorkerOutput recovery{};
+		check(worker.recoverCycle(18000, lost, binding, recovery) == ManualWorkerStatus::Command
+		      && deliver(main, 18000, recovery, main_ack)
+		      && worker.recoverCycle(18000, lost, binding, recovery, &main_ack) == ManualWorkerStatus::Waiting,
+		      "only the surviving bank confirms the first recovery frame");
+		check(worker.recoverCycle(18000 + static_cast<uint64_t>(c.cycle_max_us), lost, binding, recovery) == ManualWorkerStatus::Waiting
+		      && !worker.failedBanks(), "a missing confirmation within one maximum cycle is still awaited");
+		const uint64_t dropped = 18001 + static_cast<uint64_t>(c.cycle_max_us);
+		check(worker.recoverCycle(dropped, lost, binding, recovery) == ManualWorkerStatus::Command
+		      && worker.failedBanks() == 2U && recovery.edf.disposition == EdfDisposition::Recovery,
+		      "the non-confirming bank is dropped after one maximum cycle and recovery continues");
+		check(deliver(main, dropped, recovery, main_ack)
+		      && worker.recoverCycle(dropped, lost, binding, recovery, &main_ack) == ManualWorkerStatus::NotDue,
+		      "the surviving bank alone completes each later recovery frame");
+		worker.stop();
+		check(!worker.failedBanks(), "stop clears the failed-bank record");
+	}
+}
+
 // D3/D4 recovery through the real worker and both banks: canards hold, EDF ramps off, nothing revives the grant.
 static void recoveryBankTests()
 {
@@ -4284,6 +4593,7 @@ static int runConfigurationTests()
 	asynchronousManualEntryTests();
 	manualBankTests();
 	recoveryBankTests();
+	holdTests();
 	bankPreparationTests();
 	preparationWireTests();
 	observedRoutingBindingTests();
@@ -10694,6 +11004,107 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		while (hrt_absolute_time() < quiet) { pump(); px4_usleep(1000); }
 
 		check(command_sub.copy(&later) && later.sequence == stopped.sequence, "no recovery frame follows disarm");
+	}
+
+	// D1 then D5 through the actual supervisor, both banks and the real driver adapters: pilot input lost in Manual
+	// holds attitude in the same session; when it returns centered with low throttle the vehicle re-enters Manual in a
+	// fresh session while armed, with no disarm and no disarmed preparation window.
+	{
+		flight_keepalive = flight_renew_clock = flight_auto_ack = flight_stream_requests = false;
+		vehicle_armed = armed.armed = false;
+		vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+		throttle = -1.F;
+		roll = 0.F;
+		publish_power = publish_estimates = publish_manual = true;
+		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE; }, 1000000,
+		     "D5 case starts disarmed and inactive");
+		auto reentry_profile = flight_profile;
+		reentry_profile.data_record_id = 1;
+		reentry_profile.data_assessment = static_cast<int32_t>(DataAssessment::Calibrated);
+		reentry_profile.recovery.hold_s = 5.F;
+		reentry_profile.recovery.ramp = 1.F;
+		reentry_profile.recovery.thrust = 0.F;
+		reentry_profile.launch.stage = static_cast<int32_t>(FlightStage::Captive);
+		check(validateFlightConfiguration(reentry_profile).valid(), "D5 fixture profile is a complete captive flight profile");
+		installNativeMixerConfiguration(reentry_profile);
+		const int32_t reentry_apply = 312;
+		check(param_set(param_find("SLA_CFG_APPLY"), &reentry_apply) == 0, "apply the D5 captive profile while disarmed");
+		wait([&]() {
+			return status.configuration_valid && status.apply_counter == reentry_apply
+			       && status.configuration_identity == fingerprint(reentry_profile);
+		}, 2000000, "the supervisor accepts the D5 captive profile");
+		wait([&]() {
+			return flight_protocol.required_state_valid && flight_protocol.feedback_valid && !flight_protocol.session_established;
+		}, 1000000, "D5 case has fresh companion state without a session");
+		flight_companion_session = 7310;
+		flight_establish_session();
+		SlaapsNativeTest::admitted.store(true);
+		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kManualMode];
+		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED; }, 500000,
+		     "D5 case prepares a deliberate disarmed Manual session");
+		const auto held_session = status.manual_preparation_session;
+		vehicle_armed = armed.armed = true;
+		wait([&]() { return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING; },
+		     500000, "D5 case Manual worker runs on both real callback adapters");
+		throttle = -.5F;
+		slaaps_manual_command_s before_loss{};
+		wait([&]() {
+			return command_sub.copy(&before_loss) && before_loss.session == held_session
+			       && before_loss.mode == slaaps_manual_command_s::MANUAL && before_loss.edf > 0.F && flight_handled(before_loss);
+		}, 200000, "D5 case has a handled nonzero-EDF Manual frame before the pilot loss");
+
+		// D1: the pilot input stops; estimator, power and banks stay healthy.
+		diagnostic_log_start = hrt_absolute_time();
+		publish_manual = false;
+		const uint64_t loss_started = hrt_absolute_time();
+		slaaps_manual_command_s holding{};
+		wait([&]() {
+			return command_sub.copy(&holding) && holding.session == held_session
+			       && holding.edf_disposition == slaaps_manual_command_s::EDF_COMMAND
+			       && holding.timestamp_sample > loss_started + static_cast<uint64_t>(reentry_profile.manual_age_ms) * 1000
+			       && flight_handled(holding) && status.manual_worker_active;
+		}, 1000000, "D1: after pilot loss the same session keeps commanding handled hold frames, never D3 recovery");
+		bool hold_logged = false;
+		wait([&]() {
+			mavlink_log_s log{};
+
+			for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+				hold_logged |= log.timestamp >= diagnostic_log_start
+					       && std::strncmp(log.text, "SLAAPS: pilot input lost, holding attitude", 42) == 0;
+			}
+
+			return hold_logged;
+		}, 500000, "D1 raises the critical QGC hold alarm");
+
+		// D5: the pilot returns centered with low throttle and holds it; a fresh session takes over while armed.
+		roll = 0.F;
+		throttle = -1.F;
+		publish_manual = true;
+		const uint64_t returned = hrt_absolute_time();
+		bool reentry_logged = false;
+		wait([&]() {
+			mavlink_log_s log{};
+
+			for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+				reentry_logged |= log.timestamp >= returned
+						  && std::strncmp(log.text, "SLAAPS: pilot input back, re-entering Manual", 44) == 0;
+			}
+
+			return reentry_logged && status.manual_preparation_session > held_session && status.manual_worker_active
+			       && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING;
+		}, 3000000, "D5: a returning centered low-throttle pilot re-enters Manual in a fresh session while armed");
+		check(vehicle_armed && armed.armed && hrt_absolute_time() - returned >= 200000,
+		      "D5 re-entry needed the stable 200 ms pilot condition and never disarmed");
+		slaaps_manual_command_s reentered{};
+		wait([&]() {
+			return command_sub.copy(&reentered) && reentered.session == status.manual_preparation_session
+			       && reentered.mode == slaaps_manual_command_s::MANUAL && flight_handled(reentered);
+		}, 200000, "D5: both banks handle frames of the fresh session");
+		check(reentered.session > held_session && reentered.edf <= reentry_profile.edf_entry_max + 1.e-6F,
+		      "D5: the fresh session is newer and entered at low throttle");
+		vehicle_armed = armed.armed = false;
+		SlaapsNativeTest::admitted.store(false);
+		wait([&]() { return !status.manual_worker_active; }, 1000000, "disarm ends the re-entered session");
 	}
 
 	flight_keepalive = flight_renew_clock = flight_auto_ack = flight_stream_requests = false;

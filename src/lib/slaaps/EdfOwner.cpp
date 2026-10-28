@@ -255,16 +255,75 @@ EdfCommand EdfOwner::sample(uint64_t now, const EdfPermission &permission)
 	return command;
 }
 
-void EdfOwner::abandon(uint64_t now)
+void EdfOwner::abandon(uint64_t now, uint64_t started_us)
 {
 	if (_recovery_active || (_grant.mode != ControlMode::Manual && _grant.mode != ControlMode::Acceleration)
 	    || !_grant.session) { return; }
 
 	_recovery_active = true;
 	_recovery_start_us = now < _clock ? _clock : now;
+
+	if (started_us && started_us >= _grant.session && started_us < _recovery_start_us) { _recovery_start_us = started_us; }
+
 	_recovery_output = _output;
 	_recovery_last_us = _last_sample;
 	reject(EdfFault::Revoked);
+}
+
+float EdfOwner::holdTarget(const RecoveryConfiguration &recovery, float held, uint64_t elapsed_us)
+{
+	const float elapsed = static_cast<float>(elapsed_us) * kSecondsPerUs;
+	const float limit = static_cast<float>(kRecoveryCeilingUs) * kSecondsPerUs;
+	float target = held;
+
+	if (elapsed >= recovery.hold_s) {
+		const float step = recovery.ramp * (elapsed - recovery.hold_s);
+		target = held + math::constrain(recovery.thrust - held, -step, step);
+	}
+
+	return math::constrain(math::min(target, recovery.ramp * (limit - elapsed)), 0.F, 1.F);
+}
+
+EdfFault EdfOwner::acceptHold(uint64_t now, const EdfPermission &permission, uint64_t deadline_us, float &held)
+{
+	if (!_active) { return _fault; }
+
+	if (!_received || (_grant.mode != ControlMode::Manual && _grant.mode != ControlMode::Acceleration)
+	    || _request.sequence == UINT64_MAX) { return reject(EdfFault::InvalidRequest); }
+
+	if (now == 0 || now < _clock) { return reject(EdfFault::InvalidTime); }
+
+	_clock = now;
+
+	if (!permitted(now, permission)) { return lose(now, EdfFault::PermissionLost); }
+
+	const float dt = static_cast<float>(now - _last_sample) * kSecondsPerUs;
+	const float output = _output + math::constrain(_target - _output, -_configuration.edf_fall * dt, _configuration.edf_rise * dt);
+
+	if (!std::isfinite(output) || output < 0.F || output > 1.F || deadline_us <= now || deadline_us - now > _lease_us
+	    || deadline_us > permission.deadline_us) { return reject(EdfFault::InvalidRequest); }
+
+	EdfRequest request{};
+	request.session = _grant.session;
+	request.source = _grant.source;
+	request.configuration = _grant.configuration;
+	request.sequence = _request.sequence + 1;
+	request.timestamp_us = now;
+	request.deadline_us = deadline_us;
+	request.mode = _grant.mode;
+	request.units = _grant.mode == ControlMode::Manual ? EdfUnits::Normalized : EdfUnits::Newtons;
+	request.value = output;
+
+	if (_grant.mode == ControlMode::Acceleration && !commandToThrust(_configuration, output, request.value)) {
+		return reject(EdfFault::InvalidRequest);
+	}
+
+	_output = output;
+	_target = output;
+	_last_sample = now;
+	_request = request;
+	held = output;
+	return EdfFault::None;
 }
 
 EdfCommand EdfOwner::recover(uint64_t now, const EdfPermission &permission)

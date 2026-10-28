@@ -13,6 +13,8 @@ constexpr uint64_t kUsPerMs = 1000;
 constexpr float kMinimumServoPulse = 500.F;
 constexpr float kMaximumServoPulse = 2500.F;
 constexpr int32_t kMaximumMetadataAgeUs = 1000000;
+// EKF2 republishes unchanged estimator_status_flags only once per second, so its age bound must exceed 1 s.
+constexpr int32_t kMaximumStatusAgeUs = 2000000;
 constexpr int32_t kMaximumCycleUs = 500000;
 constexpr int32_t kMaximumManualReadyWaitS = 60; // Software operator-wait bound, not timing qualification.
 constexpr int32_t kMaximumRelativeDriftPpm = 100000;
@@ -106,7 +108,7 @@ bool validThrustCurve(const VehicleConfiguration &c)
 ConfigurationResult activationTiming(const VehicleConfiguration &c, uint64_t minimum, uint64_t maximum,
 				     const char *cycle_parameter)
 {
-	if (c.selected_status_age_us <= 0 || c.selected_status_age_us > kMaximumMetadataAgeUs) {
+	if (c.selected_status_age_us <= 0 || c.selected_status_age_us > kMaximumStatusAgeUs) {
 		return {ConfigurationFault::InvalidTiming, "SLA_STATUS_AGE"};
 	}
 
@@ -576,6 +578,55 @@ bool companionClockRenewalConfigured(const CompanionConfiguration &c, uint64_t &
 	if (observation_slack_us) { *observation_slack_us = interval - spent - lead; }
 
 	return true;
+}
+
+ConfigurationResult validateRecoveryConfiguration(const VehicleConfiguration &c)
+{
+	const auto scalar = scalarRanges(c);
+
+	if (!scalar.valid()) { return scalar; }
+
+	if (!positive(c.recovery.hold_s)) { return {ConfigurationFault::InvalidRecovery, "SLA_REC_HOLD"}; }
+
+	// The owner's own fall slew must be able to follow the decided ramp.
+	if (!positive(c.recovery.ramp) || c.recovery.ramp > c.edf_fall) { return {ConfigurationFault::InvalidRecovery, "SLA_REC_RAMP"}; }
+
+	// Worst case starts at full EDF: hold, ramp to the recovery command, and the
+	// final ramp from it to off together take hold + 1/ramp.
+	const double end_s = static_cast<double>(c.recovery.hold_s) + 1.0 / static_cast<double>(c.recovery.ramp);
+
+	if (!(end_s <= static_cast<double>(kRecoveryLimitUs) * 1.e-6)) { return {ConfigurationFault::InvalidRecovery, "SLA_REC_HOLD"}; }
+
+	return {};
+}
+
+ConfigurationResult validateFlightConfiguration(const VehicleConfiguration &c)
+{
+	const auto scalar = scalarRanges(c);
+
+	if (!scalar.valid()) { return scalar; }
+
+	const auto stage = static_cast<FlightStage>(c.launch.stage);
+
+	if (stage != FlightStage::Captive && stage != FlightStage::Launcher) { return {ConfigurationFault::InvalidFlight, "SLA_FLT_STAGE"}; }
+
+	if (c.data_assessment < static_cast<int32_t>(DataAssessment::Calibrated) || c.data_record_id <= 0) {
+		return {ConfigurationFault::InvalidFlight, "SLA_DATA_STATE"};
+	}
+
+	const auto recovery = validateRecoveryConfiguration(c);
+
+	if (!recovery.valid()) { return recovery; }
+
+	if (stage == FlightStage::Launcher) {
+		if (c.launch.airspeed_instance < 0) { return {ConfigurationFault::InvalidFlight, "SLA_LAUNCH_AS_I"}; }
+
+		if (!positive(c.launch.minimum_airspeed_m_s)) { return {ConfigurationFault::InvalidFlight, "SLA_LAUNCH_AS"}; }
+
+		if (c.launch.airspeed_age_ms <= 0) { return {ConfigurationFault::InvalidFlight, "SLA_LAUNCH_AGE"}; }
+	}
+
+	return {};
 }
 
 ConfigurationResult validateAccelerationControlConfiguration(const VehicleConfiguration &c)

@@ -87,6 +87,17 @@ public:
 
 		if (_stop_complete && vehicle_fresh && actuator_fresh && !actually_armed) { _stop_complete = false; }
 
+		// D5: a deliberate armed re-entry proposal for a fresh, newer Manual session may replace a flight session
+		// this bank has lost or is recovering. It is prepared like any proposal, with every check repeated, and is
+		// non-actuating. Nothing is written while preparing, so the hardware keeps the bank's last handled
+		// (recovery) pulses until the fresh session's first frame; no lease is renewed.
+		if (actually_armed && !commissioning() && (_fault_latched || _bank.recovering()) && ready && driver && vehicle_fresh
+		    && !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode && reentryProposal(now, driver)) {
+			_fault_latched = false;
+			_claimed = false;
+			return prepare(now, driver, true);
+		}
+
 		if (_fault_latched) { return SlaapsOutputStatus::RecoveryRequired; }
 
 		if (!_initialized || !ready || !driver || !vehicle_fresh) { return fail(now, actually_armed); }
@@ -285,7 +296,20 @@ private:
 		       && _supervisor_sample.mode_id[commissioning() ? 2 : 0] <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8;
 	}
 
-	SlaapsOutputStatus prepare(uint64_t now, uint64_t driver)
+	bool reentryProposal(uint64_t &now, uint64_t driver)
+	{
+		unsigned revision{};
+		uint64_t prepared{};
+		slaaps::ManualPreparationRequest incoming{};
+		const bool copied = _proposal.copyBound(&_proposal_wire, revision);
+		now = hrt_absolute_time();
+
+		return copied && slaaps::decodeManualPreparation(now, slaaps_manual_preparation_s::REQUEST_BANK, _proposal_wire, incoming, prepared)
+		       && incoming.reentry && incoming.mode == slaaps::ControlMode::Manual && incoming.session > _session
+		       && incoming.binding.driver[Bank] == driver && (incoming.binding.banks & (1U << Bank));
+	}
+
+	SlaapsOutputStatus prepare(uint64_t now, uint64_t driver, bool reentry = false)
 	{
 		unsigned revision{};
 		uint64_t prepared{};
@@ -294,7 +318,8 @@ private:
 		now = hrt_absolute_time();
 
 		if (!copied || !slaaps::decodeManualPreparation(now, slaaps_manual_preparation_s::REQUEST_BANK, _proposal_wire, _incoming, prepared)
-		    || _incoming.binding.driver[Bank] != driver || !(_incoming.binding.banks & (1U << Bank))) { return fail(now, false); }
+		    || _incoming.binding.driver[Bank] != driver || !(_incoming.binding.banks & (1U << Bank))
+		    || _incoming.reentry != reentry) { return fail(now, reentry); }
 
 		const bool new_session = _incoming.session != _session;
 

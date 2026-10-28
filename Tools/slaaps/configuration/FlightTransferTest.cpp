@@ -310,6 +310,89 @@ bool slaapsFlightTransferTests(unsigned &checks, const slaaps::VehicleConfigurat
 	      && handle(rig->aux, kStart + 28200, returning, inventory, rig->binding, rig->frame, b),
 	      "reverse frame reaches both banks under the next exact marker");
 
+	// D1 after companion loss in Acceleration, then the D2 exclusive handoff to Manual from that hold.
+	auto hc = c;
+	hc.recovery.hold_s = .02F;
+	hc.recovery.ramp = hc.edf_fall;
+	hc.recovery.thrust = 0.F;
+	auto holder = std::make_unique<Rig>(hc, inventory);
+	check(holder->prime(), "D1/D2 fixture primes genuine Manual history");
+	auto hnext = holder->accelerationPermission();
+	ManualWorkerOutput hprevious{};
+	uint64_t hhandled{};
+	float hthrust{};
+	check(holder->worker.handledOutput(hprevious, hhandled) && commandToThrust(hc, hprevious.edf.normalized, hthrust),
+	      "D1/D2 fixture has a handled EDF coordinate");
+	auto hin = input(hc, kStart + 17000, hthrust);
+	check(holder->worker.transferAcceleration(hin.now_us, kEdge, hc, holder->p, hnext, hin, holder->binding, holder->frame)
+	      == ManualWorkerStatus::Command
+	      && handle(holder->main, kStart + 17200, hnext, inventory, holder->binding, holder->frame, a)
+	      && handle(holder->aux, kStart + 17300, hnext, inventory, holder->binding, holder->frame, b), "D1/D2 fixture enters Acceleration");
+	refresh(hin, kStart + 17400);
+	check(holder->worker.cycleAcceleration(hin.now_us, hnext, hin, holder->frame, holder->binding, &a) == ManualWorkerStatus::Waiting
+	      && holder->worker.cycleAcceleration(hin.now_us, hnext, hin, holder->frame, holder->binding, &b) == ManualWorkerStatus::NotDue,
+	      "D1/D2 fixture has a handled Acceleration frame");
+	check(holder->worker.handledOutput(hprevious, hhandled), "D1/D2 fixture keeps the handled Acceleration frame");
+	holder->stamp(kStart + 22000, -.5F);
+	check(holder->worker.hold(kStart + 22000, hnext, holder->state, &holder->operating) == ManualWorkerStatus::Ready
+	      && holder->worker.holding() && holder->worker.holdStart() == kStart + 22000,
+	      "D1: companion loss holds in the same Acceleration session");
+	check(holder->worker.accelerationDiagnostic().state == AccelerationDiagnosticState::Rejected
+	      && holder->worker.accelerationDiagnostic().worker_status == ManualWorkerStatus::AccelerationRejected,
+	      "D1: the hold records the lost companion demand in the acceleration diagnostic");
+	check(holder->worker.holdCycle(kStart + 22000, hnext, holder->state, holder->frame, holder->binding, nullptr, &holder->operating)
+	      == ManualWorkerStatus::Command && holder->frame.mode == ControlMode::Acceleration
+	      && holder->frame.edf.disposition == EdfDisposition::Command && holder->frame.transition_us == kEdge
+	      && std::fabs(holder->frame.edf.normalized - hprevious.edf.normalized) < 1.e-4F,
+	      "D1: the first hold frame keeps the session mode and the current EDF");
+	check(handle(holder->main, kStart + 22100, hnext, inventory, holder->binding, holder->frame, a)
+	      && handle(holder->aux, kStart + 22200, hnext, inventory, holder->binding, holder->frame, b)
+	      && holder->worker.holdCycle(kStart + 22300, hnext, holder->state, holder->frame, holder->binding, &a, &holder->operating)
+	      == ManualWorkerStatus::Waiting
+	      && holder->worker.holdCycle(kStart + 22300, hnext, holder->state, holder->frame, holder->binding, &b, &holder->operating)
+	      == ManualWorkerStatus::NotDue, "D1: both banks handle the hold frame as an ordinary command");
+	check(holder->worker.handledOutput(hprevious, hhandled) && hprevious.sequence == holder->frame.sequence,
+	      "D1: hold frames become the handled history a D2 transfer seeds from");
+	auto hreturning = hnext;
+	hreturning.mode = ControlMode::Manual;
+	hreturning.transition_us = kStart + 24000;
+	hreturning.timestamp_us = kStart + 27000;
+	holder->stamp(kStart + 28000, -.5F);
+	check(holder->worker.transferManual(kStart + 28000, hreturning.transition_us, hc, hnext, hreturning, holder->raw, holder->state,
+					    holder->binding, holder->frame, &holder->operating) == ManualWorkerStatus::Command
+	      && !holder->worker.holding() && holder->worker.mode() == ControlMode::Manual
+	      && holder->frame.previous_handled_sequence == hprevious.sequence
+	      && std::memcmp(holder->frame.canards.data(), hprevious.canards.data(), sizeof(float) * kCanards) == 0,
+	      "D2: the exclusive transfer leaves the hold for Manual from the handled hold frame");
+
+	// An infeasible companion demand with healthy state and banks is a D1 hold, never D3.
+	auto infeasible = std::make_unique<Rig>(hc, inventory);
+	check(infeasible->prime(), "infeasible-demand fixture primes Manual");
+	auto inext = infeasible->accelerationPermission();
+	ManualWorkerOutput iprevious{};
+	uint64_t ihandled{};
+	float ithrust{};
+	check(infeasible->worker.handledOutput(iprevious, ihandled) && commandToThrust(hc, iprevious.edf.normalized, ithrust),
+	      "infeasible-demand fixture has a handled EDF coordinate");
+	auto iin = input(hc, kStart + 17000, ithrust);
+	check(infeasible->worker.transferAcceleration(iin.now_us, kEdge, hc, infeasible->p, inext, iin, infeasible->binding, infeasible->frame)
+	      == ManualWorkerStatus::Command
+	      && handle(infeasible->main, kStart + 17200, inext, inventory, infeasible->binding, infeasible->frame, a)
+	      && handle(infeasible->aux, kStart + 17300, inext, inventory, infeasible->binding, infeasible->frame, b),
+	      "infeasible-demand fixture enters Acceleration");
+	refresh(iin, kStart + 17400);
+	check(infeasible->worker.cycleAcceleration(iin.now_us, inext, iin, infeasible->frame, infeasible->binding, &a) == ManualWorkerStatus::Waiting
+	      && infeasible->worker.cycleAcceleration(iin.now_us, inext, iin, infeasible->frame, infeasible->binding, &b) == ManualWorkerStatus::NotDue,
+	      "infeasible-demand fixture has a handled Acceleration frame");
+	refresh(iin, kStart + 22000);
+	iin.request.acceleration_frd_m_s2(1) = 50.F;
+	const auto infeasible_status = infeasible->worker.cycleAcceleration(iin.now_us, inext, iin, infeasible->frame, infeasible->binding);
+	const auto &infeasible_detail = infeasible->worker.accelerationDiagnostic();
+	check(infeasible_status == ManualWorkerStatus::Waiting && infeasible->worker.holding() && !infeasible->worker.recovering()
+	      && infeasible_detail.state == AccelerationDiagnosticState::Rejected
+	      && infeasible_detail.fault == AccelerationControlFault::AllocationRejected,
+	      "D1: an infeasible demand holds attitude with the allocator rejection retained in diagnostics");
+
 	auto crossing = std::make_unique<Rig>(c, inventory);
 	check(crossing->prime(), "mode-edge pending-ticket fixture has genuine outgoing history");
 	crossing->stamp(kStart + 16000, -.5F);

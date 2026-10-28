@@ -325,3 +325,84 @@ GPS, magnetometers, RC protocols, airspeed sensors and power monitors. Image 1,9
 is now unused but harmless.
 Build result 2026-10-27: DShot600 commit ebdb57d070 compiles and links for the 6X in a WSL copy
 (/var/tmp/slaaps-6x, CRLF cleaned there only). Not flashed, not bench tested.
+
+## Flight-readiness increment (2026-10-27, goal: flight-ready SLAAPS airframe, all modes)
+
+Recovery policy D1, D2, D4, D6, the Commander failsafe path, clarification 4, launch staging and production flight
+admission are implemented; see the status block in [SLAAPS_RECOVERY_POLICY.md](SLAAPS_RECOVERY_POLICY.md). D5 remains.
+New topic `slaaps_flight_status` (logged at 10 Hz) carries stage, launcher gate, recovery state, dropped banks and net
+distance/bearing. `slaaps_status` is unchanged because the logger's format limit was already reached.
+NuttX RNG/HSI48 fix (approved by the lead): local commit 9e4150bb7e on NuttX branch `slaaps/px4_firmware_nuttx-12.12.0+`,
+gitlink committed in 269afdf220. Creating the TheLettuce2023/NuttX fork was blocked by the session's permission
+classifier; the lead must create it, push that branch and point `.gitmodules` at it before anyone else can clone.
+Other changes: bench deflection limit 13 -> 15 deg (lead, 2026-10-27; travel still clamped by SLA_Cn_MIN/MAX at 12 deg);
+SLA_STATUS_AGE may now be up to 2 s because EKF2 republishes unchanged estimator_status_flags only once per second. A
+1 s bound would expire the flags in steady flight and trigger D3.
+`Tools/slaaps/configuration/ProfileCheck.cpp` (`slaaps_profile_check <file.params>`) runs every profile validator on a QGC
+parameter file.
+
+### Verification (2026-10-28)
+Host suite PASS 4452 checks (Debug/Release/ASan-UBSan). Sealed native build /var/tmp/slaaps-native-1nt_xt1n
+(binary 103b46a3) PASS for both verify_native.py (evidence slaaps-native-runtime-jzcgyt6q) and --signed-flight
+(slaaps-native-runtime-svc5_tl1). The first run (h8cll6op) failed: measured_condition_valid was set while disarmed. Fixed so
+all three flight flags require armed. The native scenarios do not yet exercise D1/D2/D6, launch staging or failed-bank recovery
+at runtime; those are host-tested only.
+
+### Lead decisions recorded 2026-10-27
+D1 recovery thrust 0, hold 2 s, ramp 0.5/s. Pilot input is the QGC joystick on TELEM1 (SLA_IN_SOURCE 2, SLA_IN_INST 0,
+QGC IDs 255/190). The EDF pack is measured by the POWER1 power module (SLA_PWR_INST 0, ID 1, source 0). Flight admission is
+staged by SLA_FLT_STAGE (captive first; the launcher needs the pitot). Modeled starting values may be derived for review.
+
+### Modeled starting values (added to the QGC parameter file, pending lead review; not measured)
+Rate loop per axis from b = M_SCALE / I (normalized moment authority): roll 0.019/0.0072 = 2.64, pitch and yaw
+0.077/0.0595 = 1.29 rad/s^2. Crossover wc = 5 rad/s roll, 4 rad/s pitch/yaw, below 1/(3 x 50 ms servo lag). RATE_P = wc/b
+(1.89 / 3.09 / 3.09), RATE_I = RATE_P x wc/5 (1.89 / 2.47 / 2.47), RATE_D 0 (lag-dominated), I_LIM 0.3, M_LIM 1,
+WEIGHT 1. ATT_P = wc/3.5 (1.43 / 1.14 / 1.14). Stick rates 2 / 1 / 1 rad/s; SP_ACC = 0.7 b (1.85 / 0.91 / 0.91 rad/s^2);
+validity bounds MEAS_R 15 rad/s, MEAS_A 1000 rad/s^2. The gains assume the 13 m/s modeled authority. Authority scales with
+dynamic pressure and no schedule is active, so expect retuning from captive tests.
+Timing from PX4 publication rates: SLA_ARM_AGE 0.8 s (Commander republishes every 0.5 s), SLA_STATUS_AGE 1.5 s (EKF2 flags
+1 s), SLA_IN_AGE 300 ms (joystick over radio), SLA_STATE_AGE 20 ms, SLA_STATE_SKEW 10 ms, SLA_CYCLE_MIN/MAX 4/12 ms,
+SLA_FIRST_CMD_US 8 ms, SLA_ACT_ACK_US 3 ms, SLA_OUT_LEASE 100 ms, SLA_BENCH_GAP 50 ms, SLA_MAN_WAIT 30 s, SLA_PWR_AGE 0.5 s.
+Control: SLA_STK_ENTER/EXIT 0.05/0.08, SLA_BENCH_DZ 0.05, SLA_QUAT_TOL 0.01, allocator REG 0.001, ROW 0.1, IND 0.1,
+TOL 0.02. SLA_EDF_ENTRY 0.05. SLA_AOA/BETA 0 and SLA_TEST_THR 0 (modeled derivatives, no EDF dependence). SLA_FLT_STAGE 1,
+SLA_LAUNCH_AS 12 m/s (the data sheet's airfoil minimum speed), SLA_LAUNCH_AGE 100 ms.
+With SLA_DATA_REC/REV/STATE declared, `slaaps_profile_check` reports the SLAAPS Manual flight profile complete.
+
+### Still open for the lead
+- Declare the data record (SLA_DATA_REC, SLA_DATA_REV, SLA_DATA_STATE Calibrated) when you accept the data; flight
+  admission requires it and the firmware never infers it.
+- SLA_EDF_BMAX (EDF commissioning ceiling) is unset, so armed EDF Bench stays denied until it is set.
+- Acceleration flight needs the 2x2 measured schedule (SLA_SCH_*), which needs the pitot airspeed source, plus the wrench
+  model (including EDF reaction torque), feedback and companion source parameters.
+- D5 decided (seamless bank handover, pilot centers sticks with low throttle); implementation pending.
+- Rear-fin force model: specified, not yet in the effectiveness model. The fins only add static stability and the
+  allocator uses canard effectiveness alone, so this mainly affects future gain derivation.
+
+### D5 increment (2026-10-28)
+Implemented. Host suite PASS 4454. Final sealed native build /var/tmp/slaaps-native-huzzhn5x PASS for verify_native.py
+(evidence slaaps-native-runtime-4gmg0crv) and --signed-flight (slaaps-native-runtime-41v6gpkq), including D1-then-D5.
+The first hold frame repeats the last all-bank handled canards when the controller is not yet due, so heavier load cannot
+let the last pilot frame expire first. The re-entry readiness check does cheap mode checks first, captures input once and
+validates the profile only when the pilot condition holds.
+The D3 power-loss and mode-left checks failed once each under WSL load and passed on rerun of the same binary; treat them as
+timing-sensitive.
+- An armed re-entry publishes a positive grant while preparing, so it runs at control cadence (`_reentry` in control_due
+  and the schedule interval); a stale grant is a bank fault.
+- Trigger (`Slaaps::reentryReady`): SLAAPS Manual selected, the selected pilot input fresh and centered with throttle at or
+  below SLA_EDF_ENTRY, a complete flight profile, held continuously for 200 ms. It is checked during a Manual D1 hold and
+  during D3 recovery.
+- `Slaaps::beginReentry` ends the lost session but keeps the accepted profile active, then runs the normal preparation in
+  armed mode (`_reentry`, 1 s bound, armed input binding). Activation reuses the active profile.
+- Preparation message field `reentry` (Manual only). Driver (`SlaapsOutputPreparation`): such a proposal for a newer
+  session may clear the armed latch or replace a recovering bank and prepare while armed. Nothing is written while
+  preparing, so the hardware keeps the last handled pulses until the fresh first frame; no lease is renewed.
+- Known failure mode: if re-entry fails after the old session ended, outputs stay unwritten until disarm (canards hold the
+  last pulses, EDF receives no commands), close to the D3 end state.
+- D1 fixes found by the native D5 run: hold frames now use min(SLA_OUT_LEASE, SLA_IN_AGE) for Manual EDF requests, like the
+  banks. `EdfOwner::acceptHold` installs the first hold request. The hold now starts two controller periods (2 x SLA_CYCLE_MIN)
+  before the pilot's own EDF request expires, counting the sample offered in that cycle, and only when the session's profile
+  has complete D1 data. Effective pilot-loss timeout = min(SLA_OUT_LEASE, SLA_IN_AGE) - 2 x SLA_CYCLE_MIN (92 ms with the
+  QGC parameter file).
+- Native scenario: block "D1 then D5" before the flight-transfer supervisor stop in VehicleConfigurationTest.cpp.
+- After native PASS: rebuild the 6X image (scratchpad build_6x.sh / collect_6x.sh flow, clean build dir), replace the
+  image in build/slaaps_firmware/flight-readiness-20261028, and update its README.

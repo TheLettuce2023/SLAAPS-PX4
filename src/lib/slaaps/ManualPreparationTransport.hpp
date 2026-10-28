@@ -15,7 +15,7 @@ inline bool sameManualPreparation(const ManualPreparationRequest &a, const Manua
 {
 	return a.timestamp_us == b.timestamp_us && a.deadline_us == b.deadline_us && a.session == b.session
 	       && a.source == b.source && a.configuration == b.configuration && a.command_revision == b.command_revision
-	       && a.permission_revision == b.permission_revision && a.mode == b.mode
+	       && a.permission_revision == b.permission_revision && a.mode == b.mode && a.reentry == b.reentry
 	       && a.acknowledgment_revisions[0] == b.acknowledgment_revisions[0]
 	       && a.acknowledgment_revisions[1] == b.acknowledgment_revisions[1] && sameManualOutputBinding(a.binding, b.binding);
 }
@@ -44,6 +44,7 @@ inline bool encodeManualPreparation(uint64_t now, const ManualPreparationRequest
 	candidate.source = request.source;
 	candidate.configuration = request.configuration;
 	candidate.mode = static_cast<uint8_t>(request.mode);
+	candidate.reentry = request.reentry;
 	candidate.command_revision = request.command_revision;
 	candidate.permission_revision = request.permission_revision;
 	candidate.routing = request.binding.routing;
@@ -74,6 +75,7 @@ inline bool decodeManualPreparation(uint64_t now, unsigned expected_bank, const 
 	candidate.source = message.source;
 	candidate.configuration = message.configuration;
 	candidate.mode = static_cast<ControlMode>(message.mode);
+	candidate.reentry = message.reentry;
 	candidate.command_revision = message.command_revision;
 	candidate.permission_revision = message.permission_revision;
 	candidate.binding.routing = message.routing;

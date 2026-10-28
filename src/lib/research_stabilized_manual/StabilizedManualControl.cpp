@@ -96,6 +96,7 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 	_last_observed_us = 0;
 	_rate_setpoint.zero();
 	_handled_entry = false;
+	_hold_only = false;
 	_fault = Status::Ok;
 	_state = State::Ready;
 	return Status::Ok;
@@ -178,10 +179,95 @@ Status StabilizedManualControl::inspect(TimeUs now, const ManualSample &manual, 
 	research_actuator_command::RuntimeInput discarded{};
 	research_actuator_command::ManualControlReport input_report{};
 
-	if (_manual.evaluate(now, manual, discarded, input_report) != research_actuator_command::ManualControlStatus::Ok) { return reject(Status::InputRejected); }
+	if (!_hold_only && _manual.evaluate(now, manual, discarded, input_report) != research_actuator_command::ManualControlStatus::Ok) { return reject(Status::InputRejected); }
 
 	_last_sample = sample;
 	_last_observed_us = now;
+	return Status::Ok;
+}
+
+Status StabilizedManualControl::checkInput(TimeUs now, const ManualSample &manual)
+{
+	if (!eligible() || _hold_only) { return Status::InvalidState; }
+
+	research_actuator_command::RuntimeInput discarded{};
+	research_actuator_command::ManualControlReport input_report{};
+
+	// ManualControlInput changes nothing on a rejected sample.
+	return _manual.evaluate(now, manual, discarded, input_report) == research_actuator_command::ManualControlStatus::Ok ?
+	       Status::Ok : Status::InputRejected;
+}
+
+Status StabilizedManualControl::resetHistory(TimeUs now, const StateSample &sample)
+{
+	if (!eligible() || _hold_only) { return Status::InvalidState; }
+
+	if (now <= _last_cycle_us || now < _last_observed_us || now - _last_cycle_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
+
+	Quaternion attitude;
+	const Status status = validateState(now, sample, attitude);
+
+	if (status != Status::Ok) { return reject(status); }
+
+	_rate_control.resetIntegral();
+	_reference = attitude;
+	_rate_setpoint.zero();
+	_last_command = _configuration.allocation.trim;
+	_last_sample = sample;
+	_last_cycle_us = now;
+	_last_observed_us = now;
+	_handled_entry = false;
+	_state = State::Hold;
+	return Status::Ok;
+}
+
+Status StabilizedManualControl::holdCurrent(TimeUs now, const StateSample &sample)
+{
+	if (!eligible()) { return Status::InvalidState; }
+
+	if (now < _last_observed_us || now - _last_cycle_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
+
+	Quaternion attitude;
+	const Status status = validateState(now, sample, attitude);
+
+	if (status != Status::Ok) { return reject(status); }
+
+	_reference = attitude;
+	_last_sample = sample;
+	_last_observed_us = now;
+	_state = State::Hold;
+	_hold_only = true;
+	return Status::Ok;
+}
+
+Status StabilizedManualControl::enableHoldFromHandled(TimeUs now, const StateSample &sample, TimeUs handled_us,
+		const CanardVector &canards, const Vector3f &rate_setpoint)
+{
+	if (_state != State::Ready) { return Status::InvalidState; }
+
+	if (now == 0 || !handled_us || handled_us > now || now - handled_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
+
+	if (!boundedVector(rate_setpoint, _configuration.maximum_rate_rad_s)) { return reject(Status::InvalidState); }
+
+	for (unsigned i = 0; i < canards.size(); ++i) {
+		if (!std::isfinite(canards[i]) || canards[i] < _configuration.allocation.minimum[i]
+		    || canards[i] > _configuration.allocation.maximum[i]) { return reject(Status::InvalidState); }
+	}
+
+	Quaternion attitude;
+	const Status status = validateState(now, sample, attitude);
+
+	if (status != Status::Ok) { return reject(status); }
+
+	_reference = attitude;
+	_last_sample = sample;
+	_last_command = canards;
+	_rate_setpoint = rate_setpoint;
+	_last_cycle_us = handled_us;
+	_last_observed_us = now;
+	_handled_entry = true;
+	_hold_only = true;
+	_state = State::Hold;
 	return Status::Ok;
 }
 
@@ -223,9 +309,9 @@ Status StabilizedManualControl::cycleImpl(TimeUs now, const ManualSample &manual
 	State next = _state;
 	Quaternion reference = _reference;
 
-	if (_state == State::Hold && !centered(manual, _configuration.centered_exit)) { next = State::Rate; }
+	if (!_hold_only && _state == State::Hold && !centered(manual, _configuration.centered_exit)) { next = State::Rate; }
 
-	if (_state == State::Rate && centered(manual, _configuration.centered_enter)) { next = State::Hold; reference = attitude; }
+	if (!_hold_only && _state == State::Rate && centered(manual, _configuration.centered_enter)) { next = State::Hold; reference = attitude; }
 
 	Vector3f rate_setpoint{};
 
@@ -336,6 +422,7 @@ void StabilizedManualControl::disable()
 	_last_observed_us = 0;
 	_state = State::Disabled;
 	_handled_entry = false;
+	_hold_only = false;
 	_fault = Status::Ok;
 }
 

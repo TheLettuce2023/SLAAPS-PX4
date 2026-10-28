@@ -109,6 +109,22 @@ public:
 	// Validate live input while output acknowledgment is pending, without
 	// integrating PID, changing hold reference or advancing allocation history.
 	Status monitor(TimeUs now, const ManualSample &manual, const StateSample &sample);
+	// Non-latching selected-input check for an eligible owner. A rejected sample
+	// changes no controller state, so the caller can choose the decided D1 hold.
+	Status checkInput(TimeUs now, const ManualSample &manual);
+	// D1 command-loss hold of the current attitude. Afterwards every monitor/cycle
+	// ignores its manual argument and stays in Hold until disable(); pilot input
+	// can never resume this session. State validity is still required each cycle.
+	Status holdCurrent(TimeUs now, const StateSample &sample);
+	// D1 entry without a stabilized-manual history (Acceleration). Seeded from an
+	// exact all-bank handled command like enableFromHandled, then hold-only.
+	Status enableHoldFromHandled(TimeUs now, const StateSample &sample, TimeUs handled_us,
+				     const CanardVector &canards, const Vector3f &rate_setpoint);
+	bool holdOnly() const { return _hold_only; }
+	// Launcher gate closed: keep the owner fresh without integrating. The reference follows the current
+	// attitude, integrators and rate setpoint stay zero and the allocation history is trim, so the first
+	// cycle after the gate opens starts from actual state rather than accumulated rail history.
+	Status resetHistory(TimeUs now, const StateSample &sample);
 	void disable();
 	State state() const { return _state; }
 	Status fault() const { return _fault; }
@@ -131,6 +147,7 @@ private:
 	TimeUs _last_cycle_us{};
 	TimeUs _last_observed_us{};
 	bool _handled_entry{};
+	bool _hold_only{};
 	State _state{State::Disabled};
 	Status _fault{Status::Ok};
 };

@@ -17,6 +17,9 @@ struct ManualPreparationRequest {
 	ManualOutputBinding binding{};
 	unsigned permission_revision{};
 	ControlMode mode{ControlMode::Manual};
+	// D5 armed re-entry into a fresh Manual session. Grants nothing; every preparation and activation check
+	// still applies. It only lets a driver that lost or is recovering a flight session prepare while armed.
+	bool reentry{};
 };
 
 // Non-actuating driver preparation. No EdfPermission, PWM candidate or command
@@ -83,6 +86,7 @@ public:
 		if (!request.timestamp_us || request.timestamp_us > now || !request.session || request.session > request.timestamp_us
 		    || request.deadline_us <= now || request.deadline_us - request.timestamp_us > maximumPreparationUs(request.mode)
 		    || !request.source || !request.configuration || !request.command_revision || !request.permission_revision || !validMode(request.mode)
+		    || (request.reentry && request.mode != ControlMode::Manual)
 		    || !validManualOutputBinding(request.binding)) { return false; }
 
 		for (unsigned i = 0; i < 2; ++i) {

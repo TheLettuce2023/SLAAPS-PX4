@@ -97,7 +97,7 @@ void configuration()
 
 		case 10: c.servos[0].neutral_pwm_us = 1700.0F; break;
 
-		case 11: c.servos[0].maximum_deflection_deg = 13.01F; break;
+		case 11: c.servos[0].maximum_deflection_deg = 15.01F; break;
 
 		case 12: c.servos[0].maximum_deflection_deg = 0.0F; break;
 

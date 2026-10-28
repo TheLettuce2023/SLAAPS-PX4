@@ -108,6 +108,10 @@ public:
 		_deadline = expiry(now, _cycle_age_us);
 		_new_throttle = false;
 		_acceleration_diagnostic = {}; // A successfully admitted new session clears historical diagnostics.
+		_trim = control.allocation.trim;
+		_gate_closed = static_cast<FlightStage>(configuration.launch.stage) == FlightStage::Launcher;
+		// Transfers keep this exact profile (same fingerprint), so the D1 data decision holds for the session.
+		_hold_configured = validateRecoveryConfiguration(configuration).valid();
 		_active = true;
 		return ManualWorkerStatus::Ready;
 	}
@@ -203,10 +207,31 @@ public:
 	{
 		if (!_active) { return ManualWorkerStatus::Inactive; }
 
+		if (_holding) { return holdCycle(now, permission, state, output, binding, ack, condition); }
+
 		if (_mode != ControlMode::Manual || !sameManualOutputBinding(binding, _binding)
 		    || now >= _deadline) { return reject(ManualWorkerStatus::OutputRejected); }
 
 		_clock = math::max(_clock, now);
+
+		// D1: lost or unusable pilot input with a healthy estimator and banks. Before the first handled
+		// frame there is no flight to hold, so hold() itself falls back to an ordinary stop.
+		// The pilot's EDF request bounds every frame, so the hold must begin two controller periods before that request
+		// expires: the stabilized controller cycles once per period, and its first hold frame must precede the expiry of
+		// the last pilot frame (and the banks' output). The sample offered in this cycle counts: its request is only
+		// created further down.
+		const uint64_t pilot_lease = static_cast<uint64_t>(math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+		const uint64_t margin = 2 * static_cast<uint64_t>(_configuration.cycle_min_us);
+		const uint64_t pilot_deadline = math::max(_latest_request.deadline_us,
+						manual.valid && manual.timestamp_sample_us <= now ? expiry(manual.timestamp_sample_us, pilot_lease) : 0);
+
+		if (_control.checkInput(now, manual) == research_stabilized_manual::Status::InputRejected
+		    || (_hold_configured && _have_handled && pilot_deadline
+			&& now >= pilot_deadline - math::min(pilot_deadline, margin))) {
+			const auto held = hold(now, permission, state, condition);
+
+			return held == ManualWorkerStatus::Ready ? holdCycle(now, permission, state, output, binding, ack, condition) : held;
+		}
 
 		if (_control.monitor(now, manual, state) != research_stabilized_manual::Status::Ok) {
 			return reject(ManualWorkerStatus::ControlRejected);
@@ -255,7 +280,18 @@ public:
 			return reject(ManualWorkerStatus::ConditionRejected);
 		}
 
-		const auto control = _schedule_enabled ? _control.cycle(now, manual, state, report, scheduled.control) :
+		// Launcher gate closed: no canard authority. Trim output with fresh, non-integrating history.
+		const bool gated = _gate_closed;
+
+		if (gated && now - _last_calculation < static_cast<uint64_t>(_configuration.cycle_min_us)) { return ManualWorkerStatus::NotDue; }
+
+		if (gated) {
+			report.allocation.command = _trim;
+			report.rate_setpoint_rad_s.zero();
+		}
+
+		const auto control = gated ? _control.resetHistory(now, state) :
+				     _schedule_enabled ? _control.cycle(now, manual, state, report, scheduled.control) :
 				     _control.cycle(now, manual, state, report);
 
 		if (control == research_stabilized_manual::Status::NotDue) { return ManualWorkerStatus::NotDue; }
@@ -434,6 +470,10 @@ public:
 	void stop(ManualWorkerStatus failure = ManualWorkerStatus::Inactive, uint64_t observed_us = 0)
 	{
 		_recovering = false;
+		_holding = false;
+		_gate_closed = false;
+		_hold_configured = false;
+		_failed_banks = 0;
 
 		if (failure != ManualWorkerStatus::Inactive && _acceleration_diagnostic.state != AccelerationDiagnosticState::Inactive
 		    && _acceleration_diagnostic.state != AccelerationDiagnosticState::Rejected) {
@@ -467,6 +507,7 @@ public:
 	}
 	uint64_t handledSequence() const { return _active ? _handled_sequence : 0; }
 	bool recovering() const { return _recovering; }
+	uint8_t failedBanks() const { return _recovering ? _failed_banks : 0; }
 	uint64_t recoveryBaseSequence() const { return _recovering ? _recovery_base_sequence : 0; }
 	// Supervisor- or transport-detected loss (mode left, power, estimator) while the core itself is still
 	// healthy. Same entry as a core fault: recovery only with at least one handled flight frame.
@@ -475,6 +516,215 @@ public:
 		if (!_active) { return ManualWorkerStatus::Inactive; }
 
 		return reject(reason, now);
+	}
+	// D1: pilot (Manual) or companion (Acceleration) commands lost while the estimator and every bound bank
+	// are healthy. Holds the current attitude with the stabilized controller and submits the owned EDF
+	// hold/ramp sequence as ordinary requests in this same session. Any later fault escalates to D3 with
+	// the original start; the session ends at the D4 limit. The lost input never resumes this session:
+	// regaining control is a D2 transfer (Acceleration only) or a fresh D5 session.
+	ManualWorkerStatus hold(uint64_t now, const EdfPermission &permission, const research_stabilized_manual::StateSample &state,
+				const OperatingConditionSample *condition = nullptr)
+	{
+		if (!_active || _holding || !ManualBankPreparation::flightMode(_mode)) { return ManualWorkerStatus::Inactive; }
+
+		if (now < _clock) { return reject(ManualWorkerStatus::OutputRejected); }
+
+		_clock = now;
+
+		// On the launcher before the airspeed gate there is no flight to hold: abort with D3.
+		if (!_have_handled || _gate_closed || !validateRecoveryConfiguration(_configuration).valid()) { return reject(ManualWorkerStatus::ControlRejected, now); }
+
+		// Banks bound a Manual EDF request by the selected-input age as well as the output lease.
+		const uint64_t lease = static_cast<uint64_t>(_mode == ControlMode::Acceleration ? _configuration.output_lease_ms :
+				       math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+		float held{};
+
+		if (_edf.acceptHold(now, permission, math::min(expiry(now, lease), permission.deadline_us), held) != EdfFault::None) {
+			return reject(ManualWorkerStatus::PropulsionRejected, now);
+		}
+
+		if (_mode == ControlMode::Manual) {
+			if (_control.holdCurrent(now, state) != research_stabilized_manual::Status::Ok) { return reject(ManualWorkerStatus::ControlRejected, now); }
+
+		} else {
+			research_stabilized_manual::Configuration control{};
+
+			if (!makeManualConfiguration(_configuration, control)) { return reject(ManualWorkerStatus::ConfigurationRejected, now); }
+
+			control.fixed_simulated_thrust_n = 0.F;
+			_schedule_enabled = _configuration.schedule.enabled == 1;
+
+			if (_schedule_enabled) {
+				ControlSchedule::Step initial{};
+
+				if (!condition || !_schedule.begin(now, _configuration, *condition, held, initial)) { return reject(ManualWorkerStatus::ConditionRejected, now); }
+
+				control.rate_p = initial.control.rate_p;
+				control.rate_i = initial.control.rate_i;
+				control.rate_d = initial.control.rate_d;
+				control.allocation.effectiveness = initial.control.effectiveness;
+			}
+
+			_control.disable();
+
+			if (_control.configure(control) != research_stabilized_manual::Status::Ok
+			    || _control.enableHoldFromHandled(now, state, _handled_us, _handled_output.canards, _handled_rate_setpoint)
+			    != research_stabilized_manual::Status::Ok) { return reject(ManualWorkerStatus::ControlRejected, now); }
+
+			// The companion demand is gone and the numerical controller owns nothing during the hold.
+			_acceleration.disable();
+
+			if (_acceleration_diagnostic.state != AccelerationDiagnosticState::Inactive
+			    && _acceleration_diagnostic.state != AccelerationDiagnosticState::Rejected) {
+				_acceleration_diagnostic.state = AccelerationDiagnosticState::Rejected;
+				_acceleration_diagnostic.worker_status = ManualWorkerStatus::AccelerationRejected;
+				_acceleration_diagnostic.fault_us = now;
+			}
+
+			_state_age_us = control.maximum_state_age_us;
+			_cycle_age_us = control.maximum_cycle_us;
+		}
+
+		_observed_state = state;
+		_hold_start_us = now;
+		_hold_edf = held;
+		_hold_frame_staged = false;
+		_holding = true;
+		return ManualWorkerStatus::Ready;
+	}
+	bool holding() const { return _active && _holding; }
+	bool attitudeGateClosed() const { return _active && _gate_closed; }
+	// Latches launcher attitude authority on for the rest of this session; the supervisor calls it once the
+	// selected raw airspeed has reached the measured minimum.
+	void openAttitudeGate() { _gate_closed = false; }
+	uint64_t holdStart() const { return holding() ? _hold_start_us : 0; }
+	// One D1 cycle: attitude hold canards plus the next EDF request of the owned sequence.
+	ManualWorkerStatus holdCycle(uint64_t now, const EdfPermission &permission, const research_stabilized_manual::StateSample &state,
+				     ManualWorkerOutput &output, const ManualOutputBinding &binding, const ManualOutputAck *ack = nullptr,
+				     const OperatingConditionSample *condition = nullptr)
+	{
+		if (!_active || !_holding) { return ManualWorkerStatus::Inactive; }
+
+		// D4: the session ends at the limit; the owned sequence has already brought EDF to off. Hold frame
+		// deadlines are capped at the limit, so this precedes the ordinary output-deadline fault.
+		if (now >= _clock && now - _hold_start_us >= kRecoveryLimitUs) { stop(); return ManualWorkerStatus::Inactive; }
+
+		if (!sameManualOutputBinding(binding, _binding) || now < _clock || now >= _deadline) { return reject(ManualWorkerStatus::OutputRejected, now); }
+
+		_clock = now;
+
+		const research_stabilized_manual::ManualSample ignored{};
+
+		if (_control.monitor(now, ignored, state) != research_stabilized_manual::Status::Ok) { return reject(ManualWorkerStatus::ControlRejected, now); }
+
+		_observed_state = state;
+		const auto observed_edf = _edf.sample(now, permission);
+
+		if (observed_edf.disposition != EdfDisposition::Command) { return reject(ManualWorkerStatus::PropulsionRejected, now); }
+
+		if (_schedule_enabled) {
+			if (!condition || !_schedule.observe(now, *condition, observed_edf.normalized)) {
+				_schedule_status = condition ? _schedule.status() : ControlScheduleStatus::Stale;
+				return reject(ManualWorkerStatus::ConditionRejected, now);
+			}
+
+			_schedule_status = ControlScheduleStatus::Ready;
+		}
+
+		if (!acceptAcknowledgment(now, permission, ack)) { return reject(ManualWorkerStatus::OutputRejected, now); }
+
+		if (_pending_banks) { return ManualWorkerStatus::Waiting; }
+
+		if (now == _last_calculation) { return ManualWorkerStatus::NotDue; }
+
+		research_stabilized_manual::Report report{};
+		ControlSchedule::Step scheduled{};
+
+		if (_schedule_enabled && !_schedule.evaluate(now, scheduled)) {
+			_schedule_status = _schedule.status();
+			return reject(ManualWorkerStatus::ConditionRejected, now);
+		}
+
+		auto control = _schedule_enabled ? _control.cycle(now, ignored, state, report, scheduled.control) :
+			       _control.cycle(now, ignored, state, report);
+
+		// The first hold frame cannot wait for the controller's period: the last pilot frame expires with the pilot's
+		// request. It repeats the exact all-bank handled canards; the attitude hold takes over at its next due cycle.
+		if (control == research_stabilized_manual::Status::NotDue && !_hold_frame_staged) {
+			report = {};
+			report.allocation.command = _handled_output.canards;
+			report.rate_setpoint_rad_s = _handled_rate_setpoint;
+			control = research_stabilized_manual::Status::Ok;
+		}
+
+		if (control == research_stabilized_manual::Status::NotDue) { return ManualWorkerStatus::NotDue; }
+
+		if (control != research_stabilized_manual::Status::Ok) { return reject(ManualWorkerStatus::ControlRejected, now); }
+
+		const uint64_t limit = _hold_start_us + kRecoveryLimitUs;
+		// Banks bound a Manual EDF request by the selected-input age as well as the output lease; the owned
+		// hold sequence uses the same bound so its frames are admitted exactly like pilot frames.
+		const uint64_t lease = static_cast<uint64_t>(_mode == ControlMode::Acceleration ? _configuration.output_lease_ms :
+				       math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+
+		if (observed_edf.sequence == UINT64_MAX || _sequence == UINT64_MAX) { return reject(ManualWorkerStatus::ControlRejected, now); }
+
+		EdfRequest request{};
+		request.session = permission.session;
+		request.source = permission.source;
+		request.configuration = permission.configuration;
+		request.sequence = observed_edf.sequence + 1;
+		request.timestamp_us = now;
+		request.deadline_us = math::min(expiry(now, lease), math::min(permission.deadline_us, limit));
+		request.mode = permission.mode;
+		const float target = EdfOwner::holdTarget(_configuration.recovery, _hold_edf, now - _hold_start_us);
+
+		if (request.mode == ControlMode::Manual) {
+			request.units = EdfUnits::Normalized;
+			request.value = target;
+
+		} else {
+			request.units = EdfUnits::Newtons;
+
+			if (!commandToThrust(_configuration, target, request.value)) { return reject(ManualWorkerStatus::PropulsionRejected, now); }
+		}
+
+		// At the hold's start instant the request installed by acceptHold() is already the current one.
+		if (now > _hold_start_us && _edf.accept(now, permission, request) != EdfFault::None) {
+			return reject(ManualWorkerStatus::PropulsionRejected, now);
+		}
+
+		const auto edf = _edf.sample(now, permission);
+
+		if (edf.disposition != EdfDisposition::Command) { return reject(ManualWorkerStatus::PropulsionRejected, now); }
+
+		uint64_t deadline = math::min(math::min(edf.deadline_us, expiry(state.attitude_sample_us, _state_age_us)),
+					      math::min(expiry(state.rate_sample_us, _state_age_us), expiry(now, _cycle_age_us)));
+		deadline = math::min(deadline, limit);
+
+		if (_schedule_enabled) { deadline = math::min(deadline, _schedule.deadline()); }
+
+		if (deadline <= now) { return reject(ManualWorkerStatus::ControlRejected, now); }
+
+		ManualWorkerOutput candidate{};
+		candidate.timestamp_us = now;
+		candidate.deadline_us = deadline;
+		candidate.sequence = ++_sequence;
+		candidate.canards = report.allocation.command;
+		candidate.edf = edf;
+		candidate.binding = _binding;
+		candidate.mode = _mode;
+		candidate.transition_us = permission.transition_us;
+		_pending_rate_setpoint = report.rate_setpoint_rad_s;
+
+		if (_schedule_enabled) { _schedule.commit(scheduled); }
+
+		_hold_frame_staged = true;
+		_deadline = deadline;
+		_last_calculation = now;
+		stage(candidate);
+		output = candidate;
+		return ManualWorkerStatus::Command;
 	}
 	// One recovery cycle after a fault. Produces a recovery frame (frozen canards, EDF from the owner's
 	// recover()) only when every earlier recovery frame is acknowledged; ends recovery when the owner
@@ -491,6 +741,18 @@ public:
 		if (ack && ack->sequence <= _recovery_base_sequence) { ack = nullptr; }
 
 		if (!acceptAcknowledgment(now, permission, ack)) { return endRecovery(ManualWorkerStatus::OutputRejected); }
+
+		// Clarification 4: a bank that stops confirming while another still does is dropped from recovery
+		// after one maximum cycle. The remaining bank keeps its frozen-canard frames. EDF on a dropped bank
+		// is assumed off: its ramp is neither attempted there nor relied on.
+		const uint8_t live = _binding.banks & ~_failed_banks;
+
+		if (_pending_banks && _pending_banks != live && now - _last_calculation > static_cast<uint64_t>(_configuration.cycle_max_us)) {
+			_failed_banks |= _pending_banks;
+			_pending_banks = 0;
+		}
+
+		if (!(_binding.banks & ~_failed_banks)) { return endRecovery(ManualWorkerStatus::OutputRejected); }
 
 		if (_pending_banks) { return ManualWorkerStatus::Waiting; }
 
@@ -614,6 +876,8 @@ public:
 		control.fixed_simulated_thrust_n = 0.F;
 		const auto current = _edf.sample(now, previous);
 		_schedule_enabled = configuration.schedule.enabled == 1;
+		// A D2 handoff leaves an Acceleration D1 hold; its hold-only controller is replaced here.
+		_control.disable();
 
 		if (_schedule_enabled) {
 			ControlSchedule::Step initial{};
@@ -643,6 +907,7 @@ public:
 		_acceleration.disable();
 		_acceleration_diagnostic.state = AccelerationDiagnosticState::Inactive;
 		_configuration = configuration;
+		_holding = false;
 		_mode = ControlMode::Manual;
 		_clock = now;
 		_observed_state = state;
@@ -726,7 +991,7 @@ private:
 			_handled_rate_setpoint = _pending_rate_setpoint;
 			_have_handled = true;
 
-			if (_pending_output.mode == ControlMode::Acceleration && !_recovering) {
+			if (_pending_output.mode == ControlMode::Acceleration && !_recovering && !_holding) {
 				_acceleration_diagnostic.handled_sequence = _sequence;
 				_acceleration_diagnostic.handled_us = _acknowledged_us;
 				_acceleration_diagnostic.handled_deadline_us = _pending_output.deadline_us;
@@ -742,7 +1007,7 @@ private:
 	{
 		_pending_output = output;
 		_acknowledged_us = 0;
-		_pending_banks = _binding.banks;
+		_pending_banks = _binding.banks & ~_failed_banks;
 	}
 	bool sameStateSource(const research_stabilized_manual::StateSample &state) const
 	{
@@ -753,6 +1018,7 @@ private:
 			   const EdfPermission &previous, const EdfPermission &next, const ManualOutputBinding &binding, ControlMode target) const
 	{
 		return _active && _have_handled && !_pending_banks && _sequence != UINT64_MAX && now >= _clock && now < _deadline
+		       && !(_holding && target == ControlMode::Acceleration) && !_gate_closed
 		       && _handled_us <= now
 		       && transition_us > previous.transition_us && transition_us > previous.session
 		       && transition_us < now && previous.timestamp_us <= transition_us && next.timestamp_us >= transition_us
@@ -806,6 +1072,21 @@ private:
 		const auto result = _acceleration.cycle(input, calculated);
 
 		if (result == AccelerationPortStatus::NotDue) { return ManualWorkerStatus::NotDue; }
+
+		// An infeasible companion demand with healthy state and banks is an unusable command: D1 holds in
+		// this session (and D2 may hand off to Manual). Without complete D1 data hold() itself falls to D3.
+		if (result != AccelerationPortStatus::Calculated && !transition_us
+		    && _acceleration.fault() == AccelerationControlFault::AllocationRejected) {
+			_acceleration_diagnostic.state = AccelerationDiagnosticState::Rejected;
+			_acceleration_diagnostic.worker_status = ManualWorkerStatus::AccelerationRejected;
+			_acceleration_diagnostic.fault_us = now;
+			_acceleration_diagnostic.fault = AccelerationControlFault::AllocationRejected;
+			_acceleration_diagnostic.allocation_stage = _acceleration.allocationStage();
+			_acceleration_diagnostic.allocation_result = _acceleration.allocationResult();
+			const auto held = hold(now, permission, input.selected_state, &input.operating_condition);
+
+			return held == ManualWorkerStatus::Ready ? ManualWorkerStatus::Waiting : ManualWorkerStatus::AccelerationRejected;
+		}
 
 		if (result != AccelerationPortStatus::Calculated || _sequence == UINT64_MAX || current.sequence == UINT64_MAX) { return reject(ManualWorkerStatus::AccelerationRejected, now); }
 
@@ -902,10 +1183,11 @@ private:
 		const auto mode = _mode;
 		const uint64_t transition = _handled_output.transition_us;
 		const uint64_t at = observed_us ? observed_us : _clock;
+		const uint64_t hold_start = _holding ? _hold_start_us : 0;
 		stop(reason, observed_us);
 
 		if (recover) {
-			_edf.abandon(at);
+			_edf.abandon(at, hold_start);
 			_recovering = true;
 			_recovery_canards = canards;
 			_recovery_mode = mode;
@@ -929,6 +1211,14 @@ private:
 		return status;
 	}
 	bool _recovering{};
+	bool _holding{};
+	bool _hold_frame_staged{};
+	bool _gate_closed{};
+	bool _hold_configured{}; // Complete D1 data in this session's profile; only then does pilot loss start early.
+	uint8_t _failed_banks{}; // Recovery only; cleared by stop().
+	research_stabilized_manual::CanardVector _trim{};
+	uint64_t _hold_start_us{};
+	float _hold_edf{};
 	research_stabilized_manual::CanardVector _recovery_canards{};
 	ControlMode _recovery_mode{ControlMode::None};
 	uint64_t _recovery_transition_us{}, _recovery_base_sequence{};

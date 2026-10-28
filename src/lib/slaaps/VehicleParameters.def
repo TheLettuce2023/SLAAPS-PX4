@@ -209,7 +209,7 @@ SLAAPS_INT(manual_age_ms, SLA_IN_AGE, "SLAAPS Input Timing", "Maximum manual sam
 SLAAPS_INT(state_age_ms, SLA_STATE_AGE, "SLAAPS Input Timing", "Maximum selected-state sample age", "ms", 0, 500, 0)
 SLAAPS_INT(state_skew_ms, SLA_STATE_SKEW, "SLAAPS Input Timing", "Maximum attitude-rate sample skew", "ms", 0, 500, 0)
 SLAAPS_INT(manual_ready_wait_s, SLA_MAN_WAIT, "SLAAPS Input Timing", "Maximum disarmed Manual operator readiness wait; zero unconfigured", "s", 0, 60, 0)
-SLAAPS_INT(selected_status_age_us, SLA_STATUS_AGE, "SLAAPS Input Timing", "Maximum selected estimator status and flags age; zero unconfigured", "us", 0, 1000000, 0)
+SLAAPS_INT(selected_status_age_us, SLA_STATUS_AGE, "SLAAPS Input Timing", "Maximum selected estimator status and flags age; above the 1 s EKF2 flags period", "us", 0, 2000000, 0)
 SLAAPS_INT(actuator_permission_age_us, SLA_ARM_AGE, "SLAAPS Input Timing", "Maximum Commander and actuator arming metadata age; zero unconfigured", "us", 0, 1000000, 0)
 SLAAPS_INT(activation_ack_timeout_us, SLA_ACT_ACK_US, "SLAAPS Input Timing", "Activation reply timeout; below cycle maximum minus first-command budget", "us", 0, 500000, 0)
 SLAAPS_INT(first_command_budget_us, SLA_FIRST_CMD_US, "SLAAPS Input Timing", "First-command budget; strictly between cycle minimum and maximum", "us", 0, 500000, 0)
@@ -235,6 +235,13 @@ SLAAPS_FLOAT(edf_rise, SLA_EDF_RISE, "SLAAPS EDF", "Maximum normalized EDF comma
 SLAAPS_FLOAT(edf_fall, SLA_EDF_FALL, "SLAAPS EDF", "Maximum normalized EDF command fall per second", "", 0.0F, 100.0F, 0.0F)
 SLAAPS_FLOAT(edf_entry_max, SLA_EDF_ENTRY, "SLAAPS EDF", "Maximum normalized throttle admitted on entry", "", 0.0F, 0.1F, 0.0F)
 SLAAPS_FLOAT(edf_commission_max, SLA_EDF_BMAX, "SLAAPS EDF", "Explicit armed EDF commissioning ceiling; zero denies commissioning", "", 0.0F, 1.0F, 0.0F)
+SLAAPS_FLOAT(recovery.hold_s, SLA_REC_HOLD, "SLAAPS Recovery", "D1 attitude and EDF hold after command loss; zero refuses flight", "s", 0.0F, 60.0F, 0.0F)
+SLAAPS_FLOAT(recovery.ramp, SLA_REC_RAMP, "SLAAPS Recovery", "D1 normalized EDF ramp after the hold; zero refuses flight", "1/s", 0.0F, 100.0F, 0.0F)
+SLAAPS_FLOAT(recovery.thrust, SLA_REC_THR, "SLAAPS Recovery", "D1 normalized recovery EDF command; zero ends in EDF off", "", 0.0F, 1.0F, 0.0F)
+SLAAPS_INT(launch.stage, SLA_FLT_STAGE, "SLAAPS Flight", "Flight admission stage; 0 off 1 captive 2 launcher", "", 0, 2, 0)
+SLAAPS_INT(launch.airspeed_instance, SLA_LAUNCH_AS_I, "SLAAPS Flight", "Launcher raw airspeed instance; -1 unconfigured", "", -1, 3, -1)
+SLAAPS_FLOAT(launch.minimum_airspeed_m_s, SLA_LAUNCH_AS, "SLAAPS Flight", "Measured minimum indicated airspeed for launcher attitude authority", "m/s", 0.0F, 100.0F, 0.0F)
+SLAAPS_INT(launch.airspeed_age_ms, SLA_LAUNCH_AGE, "SLAAPS Flight", "Maximum launcher airspeed sample age; zero unconfigured", "ms", 0, 500, 0)
 
 // Optional empirical table. Disabled by default; configured data is not envelope qualification.
 SLAAPS_INT(schedule.enabled, SLA_SCH_EN, "SLAAPS Schedule", "Enable empirical 2x2 control schedule; never flight qualification", "", 0, 1, 0)

@@ -46,6 +46,7 @@ using namespace px4::logger;
 void LoggedTopics::add_default_topics()
 {
 #if defined(CONFIG_MODULES_SLAAPS)
+	add_optional_topic("slaaps_flight_status", 100); // Admission staging and D1/D3/D6 observation.
 	add_optional_topic("slaaps_acceleration_status", 20); // Sample diagnostics at50 Hz; original command/ACK times remain in the payload.
 #endif
 	add_topic("action_request");
