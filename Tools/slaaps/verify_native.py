@@ -1020,9 +1020,9 @@ def main():
             stdout=supervisor_log, stderr=subprocess.STDOUT)
         try:
             # Outer runner budget for the sequential Manual, flight-handoff,
-            # servo and EDF lifecycles. Their individual live deadlines remain
-            # enforced by the fixture and production code.
-            deadline = time.monotonic() + 60
+            # recovery-loss, servo and EDF lifecycles (about 40 s typical). Their
+            # individual live deadlines remain enforced by the fixture and production code.
+            deadline = time.monotonic() + 90
             supervisor_output = ""
             while True:
                 newest = supervisor_reader.read(65536 if signed_flight else -1)

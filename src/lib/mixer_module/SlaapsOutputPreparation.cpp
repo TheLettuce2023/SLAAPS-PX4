@@ -106,9 +106,21 @@ public:
 		const bool awaiting_grant = !_bank.active() && !_bank.recovering();
 		const bool granted = context(now, driver, ready, armed, awaiting_grant);
 
+		// A recovering bank never re-enters the granted flow, even while a still-fresh grant is read: its last frame
+		// can expire (estimator-capped lease) before the supervisor notices the loss and stops granting.
+		if (_bank.recovering()) {
+			if (!recoveryLocal(now, driver, ready, armed)) { return fail(now, true); }
+
+			_candidate = _bank.dispatchLive(now, _permission, _routing.inventory, _request.binding);
+
+			if (!_bank.recovering()) { return fail(now, true); }
+
+			return _candidate.command_valid && _bank.awaitingHandling() ? SlaapsOutputStatus::Command : SlaapsOutputStatus::Waiting;
+		}
+
 		if (!granted && !_waiting_for_grant) {
-			// D3/D4: an active or recovering flight bank whose grant is lost continues only through its own
-			// recovery (frozen canards, recovery frames). The bank decides; anything else fails as before.
+			// D3/D4: an active flight bank whose grant is lost continues only through its own recovery
+			// (frozen canards, recovery frames). The bank decides; anything else fails as before.
 			if (awaiting_grant || !recoveryLocal(now, driver, ready, armed)) { return fail(now, true); }
 
 			_candidate = _bank.dispatchLive(now, _permission, _routing.inventory, _request.binding);
@@ -168,12 +180,16 @@ public:
 	{
 		// The physical callback may have taken time. Re-read independent authority,
 		// configuration and inventory before acknowledging this exact saved ticket.
-		const bool recovering = _bank.recovering();
 		const bool granted = context(now, driver, ready, armed);
 
-		const bool confirmed = (granted || (recovering && recoveryLocal(now, driver, ready, armed)))
+		// Without a grant the bank may still be entering recovery inside this confirmation; it then never
+		// acknowledges a pre-loss ticket. Without local recovery prerequisites the ticket fails as before.
+		const bool confirmed = (granted || recoveryLocal(now, driver, ready, armed))
 				       && _bank.confirmHandledLive(now, _permission, _routing.inventory, _request.binding, _candidate, success);
 
+		// A normal ticket written just before the bank entered recovery is not acknowledged; recovery continues.
+		if (!confirmed && _bank.recovering() && _candidate.disposition != slaaps::EdfDisposition::Recovery
+		    && recoveryLocal(now, driver, ready, armed)) { return false; }
 
 		if (!confirmed) {
 			fail(now, true);

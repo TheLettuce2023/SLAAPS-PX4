@@ -295,6 +295,11 @@ private:
 		} else if (wire.sequence == _last.sequence) {
 			if (memcmp(&wire, &_last, sizeof(wire)) != 0) { revoke(); }
 
+		} else if (wire.edf_disposition != slaaps_manual_command_s::EDF_RECOVERY) {
+			// A normal frame published just before the loss and read only now is history. It is never applied,
+			// and only a recovery frame may follow. Remember it so it is not decoded again.
+			memcpy(&_last, &wire, sizeof(wire));
+
 		} else if (!decodeManualCommand(now, wire, frame)) {
 			revoke();
 
@@ -333,6 +338,9 @@ private:
 
 		ManualOutputAck ack{};
 		slaaps_manual_ack_s wire{};
+
+		// A pre-loss normal ticket handled after recovery started gets no acknowledgment and ends nothing.
+		if (_consumer.recovering() && handled.disposition != EdfDisposition::Recovery) { return false; }
 
 		if (_consumer.confirmHandled(now, permission, inventory, binding, handled, success, ack) != ManualBankFault::None
 		    || !encodeManualAck(now, Bank, ack, wire) || !_ack.publish(wire)) {

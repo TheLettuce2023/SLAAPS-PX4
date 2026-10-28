@@ -145,7 +145,7 @@ The controller and exclusive active handoff pass native capture tests; cold acce
    revision from its final failed `copyQueuedBound` call, which clears revision by contract; payload and
    production MAVLink drain were correct. Full native verifier PASS on build `slaaps-native-xc32ipac`
    (binary bf9ae495, 6101 control checks); host suite PASS (4383/config). Physical health remains unqualified.
-3. Recovery policy: D3/D4 library layer and transports done (see decision record status); supervisor wired and runtime-verified natively (recovery frames, frozen canards, disarm ends it); mode-left and power loss also enter recovery through the real driver path (estimator loss unresolved); next estimator loss, then D1/D2/D5/D6. Original list: D4 60 s EDF-off ceiling, D1/D3 owned recovery sequences,
+3. Recovery policy: D3/D4 library layer and transports done (see decision record status); supervisor wired and runtime-verified natively (recovery frames, frozen canards, disarm ends it); mode-left, power and estimator loss also enter recovery through the real driver path (stale-frame and early-expiry races fixed); next D1/D2/D5/D6. Original list: D4 60 s EDF-off ceiling, D1/D3 owned recovery sequences,
    D2 Manual handoff + QGC alarm, D5 armed Manual re-entry, D6 net-position parameters, closed
    Commander failsafe path. Resolve the record's open clarifications first where they change design.
 4. Close stock QGC operator workflow, working-base boot integration, runtime timing/stack

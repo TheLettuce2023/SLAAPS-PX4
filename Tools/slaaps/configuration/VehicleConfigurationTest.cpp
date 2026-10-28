@@ -9703,12 +9703,22 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		throttle = -1.F;
 		SlaapsNativeTest::admitted.store(true);
 		const auto stopped_writes = main.nonzeroWrites() + aux.nonzeroWrites();
+		slaaps_manual_command_s stopped_command{};
+		const bool have_stopped_command = command_sub.copy(&stopped_command);
 		const auto settle = hrt_absolute_time() + 120000;
 
 		while (hrt_absolute_time() < settle) { pump(); px4_usleep(1000); }
 
+		// Pilot input loss while armed after handled output enters D3 recovery (a stand-in until D1): its frames may keep
+		// writing frozen canards and a falling EDF. Nothing may write a new calculated flight command.
+		slaaps_manual_command_s settled_command{};
+		const bool unchanged = main.nonzeroWrites() + aux.nonzeroWrites() == stopped_writes;
+		const bool recovery_only = scenario == 0 && have_stopped_command && command_sub.copy(&settled_command)
+					   && settled_command.session == stopped_command.session
+					   && (settled_command.sequence == stopped_command.sequence
+					       || settled_command.edf_disposition == slaaps_manual_command_s::EDF_RECOVERY);
 		check(status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_REJECTED && !status.manual_worker_active
-		      && main.nonzeroWrites() + aux.nonzeroWrites() == stopped_writes,
+		      && (unchanged || recovery_only),
 		      "restored authority and fresh inputs cannot revive rejected supervisor session");
 		vehicle_armed = armed.armed = false;
 		disarm_injection.requested.store(0, std::memory_order_release);
@@ -10582,12 +10592,13 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	}
 	flight_keepalive = flight_stream_requests = false;
 
-	// D3 losses detected outside the core: the SLAAPS mode is left or the power source stops while still armed after
-	// a handled frame. Each enters recovery: canards frozen, EDF ramps off, disarm ends it. Estimator loss (case 2) is
-	// routed in source but still ends in a transport cancel in this fixture; it is excluded until that is resolved.
-	for (unsigned loss = 0; loss < 2; ++loss) {
+	// D3 losses detected outside the core: the SLAAPS mode is left, the power source stops, or the estimator stops,
+	// while still armed after a handled frame. Each enters recovery: canards frozen, EDF ramps off, disarm ends it.
+	// Estimator loss can expire the last frame before the supervisor notices, so the banks may recover first.
+	for (unsigned loss = 0; loss < 3; ++loss) {
 		static const char *const kLossLog[] {"SLAAPS: mode left, canards hold, EDF ramping off",
-						     "SLAAPS: power lost, canards hold, EDF ramping off", nullptr};
+						     "SLAAPS: power lost, canards hold, EDF ramping off",
+						     "SLAAPS: control lost, canards hold, EDF ramping off"};
 		static const char *const kLossRecovery[] {"leaving the SLAAPS mode while armed enters recovery",
 							  "losing the power source while armed enters recovery",
 							  "losing the estimator while armed enters recovery"};

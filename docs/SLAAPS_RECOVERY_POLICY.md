@@ -13,9 +13,11 @@ An allocator rejection now enters D3 recovery as a stand-in until D1/D2 exist. L
 failsafe) and power-source loss while armed now also enter recovery, verified natively through the real driver path
 (recovery frames acknowledged by both banks, canards frozen, EDF ramped off, critical QGC message, disarm ends it).
 The driver-side `SlaapsOutputPreparation` now hands a lost grant to the bank's recovery instead of revoking the bank.
-Estimator loss is routed in source but still ends in a worker-transport cancel in the native fixture; unresolved and
-excluded from the test. Not done: D1, D2, D5, D6, Commander failsafe path, estimator loss, a failed bank that carries
-the EDF channel. Until all land and are verified, `flight_admitted` stays false.
+Estimator loss also enters recovery (verified natively, three consecutive supervisor runs). Its last frame can expire
+first (estimator-capped lease), so a bank may recover before the supervisor notices; a recovering bank therefore never
+re-enters the driver's granted flow, and a pre-loss normal frame or ticket arriving after recovery starts is ignored,
+never applied or acknowledged. Pilot input loss also enters D3 recovery (stand-in until D1). Not done: D1, D2, D5, D6,
+Commander failsafe path, a failed bank that carries the EDF channel. Until all land and are verified, `flight_admitted` stays false.
 
 ## Decisions
 

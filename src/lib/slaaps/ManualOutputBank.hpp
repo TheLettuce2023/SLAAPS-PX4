@@ -425,6 +425,9 @@ private:
 	{
 		if (recoveryPoll(now, permission, inventory, binding) != ManualBankFault::None) { return _fault; }
 
+		// A normal ticket written just before recovery started is history: never acknowledged, never fatal here.
+		if (handled.disposition != EdfDisposition::Recovery) { return ManualBankFault::HandlingRejected; }
+
 		if (!success || !_awaiting_handling || !_recovery_frame || now < _accepted_us || !handled.command_valid
 		    || handled.mode != _grant.mode || handled.disposition != EdfDisposition::Recovery
 		    || handled.channel_mask != _candidate.channel_mask || handled.sequence != _candidate.sequence
