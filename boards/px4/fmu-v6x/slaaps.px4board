@@ -32,4 +32,15 @@ CONFIG_MODULES_MC_ATT_CONTROL=n
 CONFIG_MODULES_MC_POS_CONTROL=n
 CONFIG_MODULES_MC_HOVER_THRUST_ESTIMATOR=n
 CONFIG_MODULES_MC_RATE_CONTROL=n
+# Flash headroom: the companion link is signed MAVLink and mode selection must not require ROS 2,
+# so the uXRCE-DDS bridge is not used.
+CONFIG_MODULES_UXRCE_DDS_CLIENT=n
+# No camera on this airframe; the starts are TRIG_MODE/CAM_CAP_FBACK-gated in rcS.
+CONFIG_DRIVERS_CAMERA_CAPTURE=n
+CONFIG_DRIVERS_CAMERA_TRIGGER=n
+CONFIG_MODULES_CAMERA_FEEDBACK=n
+# Precision landing depends on the navigator, which this target does not build.
+CONFIG_MODULES_LANDING_TARGET_ESTIMATOR=n
+# No rangefinder on this vehicle (confirmed by the project lead).
+CONFIG_COMMON_DISTANCE_SENSOR=n
 CONFIG_MAVLINK_DIALECT="slaaps"

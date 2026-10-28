@@ -7,7 +7,7 @@ Implementation status (2026-10-27): D3/D4 library layer done and host-tested (no
 last handled pulses, only `Recovery` frames admitted, bank enforces the ceiling itself), wire value `EDF_RECOVERY = 3`,
 `ManualWorker::recoverCycle`, bank/worker transport recovery states. Supervisor wired (`Slaaps::updateRecovery`): a worker fault after a handled frame holds recovery while armed with no
 kill/lockdown/termination, publishes a non-granting armed permission, logs a critical QGC message; disarm or any integrity
-loss still cancels. Compiles/links native and 6X (image 1,948,260 B, 17.4 KB free); native supervisor run verifies recovery
+loss still cancels. Compiles/links native and 6X (image 1,851,788 B after the board trim, 114.3 KB free); native supervisor run verifies recovery
 frames after an Acceleration allocator rejection, held canards, non-rising EDF and disarm ending recovery.
 An allocator rejection now enters D3 recovery as a stand-in until D1/D2 exist. Leaving the SLAAPS mode (pilot or
 failsafe) and power-source loss while armed now also enter recovery, verified natively through the real driver path

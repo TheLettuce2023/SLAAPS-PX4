@@ -315,10 +315,13 @@ to motor slot 0, reports inventory with protocol 1 and rate in kbit/s, and sends
 SLAAPS owns the channel. Still open: bench test of the DShot600 EDF output (needs separate hardware authorization) and the board
 layout (Pixhawk 6X: EDF on a DShot600 timer group of PWM_AUX, servos on MAIN).
 
-## Flash use: optimize later (2026-10-27)
+## Flash use (2026-10-27)
 
-The px4_fmu-v6x_slaaps image uses 1,937,892 of 1,920 KB (98.57%) of flash after the DShot600 change, so there is almost
-no headroom. Task for later: reduce flash use (drop unused modules and drivers from boards/px4/fmu-v6x/slaaps.px4board,
-review size by module) before adding features. Not urgent for the current work.
+Trimmed `boards/px4/fmu-v6x/slaaps.px4board`: removed the uXRCE-DDS bridge (companion is signed MAVLink; ROS 2 not
+required), camera trigger/capture/feedback (no camera), the landing-target estimator (needs the navigator, already off)
+and the rangefinder drivers (no rangefinder, confirmed by the project lead). Kept DroneCAN (planned pitot), Septentrio,
+GPS, magnetometers, RC protocols, airspeed sensors and power monitors. Image 1,948,884 -> 1,851,788 B (94.19%,
+114.3 KB free). Not flashed. `Tools/slaaps/build_board_snapshot.py` still asserts its Micro-CDR donor mirror exists; it
+is now unused but harmless.
 Build result 2026-10-27: DShot600 commit ebdb57d070 compiles and links for the 6X in a WSL copy
 (/var/tmp/slaaps-6x, CRLF cleaned there only). Not flashed, not bench tested.
