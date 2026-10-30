@@ -49,7 +49,13 @@ DShot::DShot() :
 	_mixing_output.setAllMaxValues(DSHOT_MAX_THROTTLE);
 
 	// Avoid using the PWM failsafe params
+#if defined(CONFIG_MODULES_SLAAPS)
+	// The SLAAPS EDF has no function provider to resolve a default failsafe, and SLAAPS admits only the disarm frame
+	// as its off value. Report and use that frame explicitly instead of the unresolved default marker.
+	_mixing_output.setAllFailsafeValues(DSHOT_DISARM_VALUE);
+#else
 	_mixing_output.setAllFailsafeValues(UINT16_MAX);
+#endif
 
 	// Advertise early to ensure we beat uavcan
 	_esc_status_pub.advertise();

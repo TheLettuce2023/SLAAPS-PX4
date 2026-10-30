@@ -202,7 +202,9 @@ void PWMOut::Run()
 	// check at end of cycle (updateSubscriptions() can potentially change to a different WorkQueue thread)
 #if defined(CONFIG_MODULES_SLAAPS)
 
-	if (_mixing_output.slaapsInventoryDue()) {
+	// A pwm_out that drives no channel (every timer group it would own runs DShot or is unused) is not an output bank.
+	// Its report would duplicate the DShot driver's report for the same rail, and it can bypass nothing.
+	if (_mixing_output.slaapsInventoryDue() && !(_pwm_initialized && _pwm_mask == 0)) {
 		uint16_t rates[16] {};
 
 		for (unsigned channel = 0; channel < _num_outputs && channel < 16; ++channel) {

@@ -127,8 +127,9 @@ private:
 #if defined(CONFIG_MODULES_SLAAPS)
 	bool slaapsEdfOutput(int output_channel) const
 	{
-		return _mixing_output.isFunctionSet(output_channel)
-		       && _mixing_output.outputFunction(output_channel) == OutputFunction::SLAAPS_EDF;
+		// SLAAPS functions have no function provider (SLAAPS writes them itself), so isFunctionSet() is false for
+		// them outside a SLAAPS write; the parameter assignment alone identifies the EDF channel.
+		return _mixing_output.outputFunction(output_channel) == OutputFunction::SLAAPS_EDF;
 	}
 
 	bool slaapsOwnsOutputs(unsigned num_outputs) const
