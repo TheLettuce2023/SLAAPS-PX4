@@ -101,6 +101,16 @@ def render():
                 "observe low throttle and readiness, deliberately enable, then deliberately arm through Commander. "
                 "Profile, limit and duration remain bound; stop, disarm, kill or input/permission loss ends the session. "
                 "This is ground commissioning, never flight admission.")
+        if item["field"].endswith(".zero_offset_deg"):
+            parameter["description"]["long"] = (
+                "Deflection, in degrees, from the canard's position at SLA_Cn_PWM_CTR to its true zero; positive moves "
+                "toward SLA_Cn_PWM_POS. The correction shifts SLA_Cn_PWM_NEG/CTR/POS by the same whole number of "
+                "microseconds (the calibrated pulses per degree), so command zero, the Bench physical zero and the full "
+                "travel are centred on the true zero. On a successful apply, disarmed, SLAAPS writes the shifted pulses "
+                "to the MIN/CENT/MAX parameters of the output that carries this canard, and the routing check requires "
+                "the output to report them. The shifted pulses must stay within 500 to 2500 us. This is a mechanical "
+                "correction, not SLA_Cn_TRIM (the modeled zero-moment flight trim). Edit outside the SLAAPS modes and "
+                "apply the complete profile.")
         if item["name"].startswith("SLA_DATA_"):
             parameter["description"]["long"] = (
                 "Operator-declared provenance for an external calibration or qualification record. "
@@ -263,9 +273,10 @@ def render():
             description=dict(short="Maximum commissioning session duration",
                              long="Set a finite duration before deliberately enabling commissioning. "
                                   "Zero denies enable. Expiry stops the session and requires deliberate re-entry. "
-                                  "The 60 second software ceiling is not measured hardware qualification. "
+                                  "The software ceiling is 3600 seconds for servo targets and 60 seconds for the EDF "
+                                  "target; a longer EDF duration denies enable. Neither is measured hardware qualification. "
                                   "Input freshness, command leases and stop/kill checks remain independently enforced."),
-            type="int32", min=0, max=60, default=0, unit="s"),
+            type="int32", min=0, max=3600, default=0, unit="s"),
     }
     groups["SLAAPS Companion Actions"] = {
         "SLA_CMP_ACT": dict(

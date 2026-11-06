@@ -71,9 +71,12 @@ RoutingResult makeRoutingPlan(const VehicleConfiguration &c, const OutputInvento
 
 			if (assigned[logical]) { return {RoutingFault::DuplicateFunction, diagnostic}; }
 
-			if (!pulseMatches(servo.pwm_negative, channel.reversed ? channel.maximum_us : channel.minimum_us)
-			    || !pulseMatches(servo.pwm_positive, channel.reversed ? channel.minimum_us : channel.maximum_us)
-			    || !pulseMatches(servo.pwm_neutral, channel.center_us)
+			// The output reports the calibration after the mechanical centre correction (SLA_Cn_ZERO).
+			const auto pulses = correctedCanardPulses(servo);
+
+			if (!pulseMatches(pulses.negative, channel.reversed ? channel.maximum_us : channel.minimum_us)
+			    || !pulseMatches(pulses.positive, channel.reversed ? channel.minimum_us : channel.maximum_us)
+			    || !pulseMatches(pulses.neutral, channel.center_us)
 			    || channel.center_us <= channel.minimum_us || channel.center_us >= channel.maximum_us) {
 				return {RoutingFault::InvalidCalibration, diagnostic};
 			}

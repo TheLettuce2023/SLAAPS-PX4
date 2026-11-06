@@ -59,7 +59,10 @@ constexpr hrt_abstime kRoutingDiagnosticIntervalUs = 1000000; // Telemetry rate 
 constexpr hrt_abstime kAccelerationDiagnosticIntervalUs = 1000000; // Change-edge telemetry bound only.
 constexpr px4::wq_config_t kSupervisorQueue{"wq:slaaps", 6500, -5};
 constexpr const char *kModeNames[kModeCount] = {"SLAAPS Manual", "SLAAPS Acceleration", "SLAAPS Bench"};
-constexpr int32_t kMaximumBenchSeconds = 60; // Software command bound, not hardware qualification.
+// Software command bounds, not hardware qualification. Servo commissioning keeps its other stops (enable, mode, input,
+// lease, arming); the EDF target spins the fan and keeps the short bound.
+constexpr int32_t kMaximumBenchSeconds = 3600;
+constexpr int32_t kMaximumEdfBenchSeconds = 60;
 constexpr unsigned kEdfBenchTarget = slaaps::kCanards + 1;
 constexpr unsigned kDisarmRequestAttempts = 3; // Bounded command delivery; output expiry is independent.
 static_assert(static_cast<uint8_t>(slaaps::AccelerationControlFault::AllocationRejected) == slaaps_acceleration_status_s::FAULT_ALLOCATION
@@ -126,6 +129,7 @@ private:
 #endif
 	void updateBenchDisarm(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool fresh);
 	bool resetBenchEnable();
+	void writeCanardOutputLimits(const slaaps::VehicleConfiguration &configuration);
 	bool restoreStoppedProfile(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool actuator_fresh);
 	void updateManualActivation(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh);
 	void updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicle, const actuator_armed_s &armed, bool armed_fresh);
@@ -557,6 +561,8 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 
 		PX4_INFO("configuration %s; mode readiness checked separately", restoring ? "restored" : "applied");
 
+		if (!restoring) { writeCanardOutputLimits(snapshot.configuration); }
+
 		if (snapshot.configuration.data_assessment > 0) {
 			const char *assessment = snapshot.configuration.data_assessment == static_cast<int32_t>(slaaps::DataAssessment::Calibrated) ?
 						 "calibrated" : "qualified";
@@ -766,6 +772,70 @@ bool Slaaps::restoreStoppedProfile(hrt_abstime now, const vehicle_status_s &vehi
 	}
 
 	return false;
+}
+
+// SLA_Cn_ZERO moves each canard's routed output window. After a deliberate disarmed apply, write the corrected
+// MIN/CENT/MAX to the one output whose function is that canard; the routing check then requires the driver to report
+// exactly these values, so a write that does not take effect leaves the canard unroutable rather than miscalibrated.
+void Slaaps::writeCanardOutputLimits(const slaaps::VehicleConfiguration &configuration)
+{
+	static constexpr const char *kPrefixes[] {"PWM_MAIN", "PWM_AUX"};
+	static constexpr unsigned kMaximumOutputs = 16;
+	unsigned written = 0;
+
+	for (unsigned canard = 0; canard < slaaps::kCanards; ++canard) {
+		const int32_t function = slaaps::kCanardFunctionFirst + canard;
+		const char *prefix = nullptr;
+		unsigned output = 0, matches = 0;
+		char name[17];
+
+		for (const char *candidate : kPrefixes) {
+			for (unsigned n = 1; n <= kMaximumOutputs; ++n) {
+				int32_t value{};
+				snprintf(name, sizeof(name), "%s_FUNC%u", candidate, n);
+				const param_t handle = param_find_no_notification(name);
+
+				if (handle != PARAM_INVALID && param_get(handle, &value) == 0 && value == function) { prefix = candidate; output = n; ++matches; }
+			}
+		}
+
+		if (matches != 1) {
+			PX4_WARN("canard %u output limits not written: %u outputs assigned", canard + 1, matches);
+			continue;
+		}
+
+		int32_t reverse{};
+		snprintf(name, sizeof(name), "%s_REV", prefix);
+		const param_t reverse_handle = param_find_no_notification(name);
+		const bool reversed = reverse_handle != PARAM_INVALID && param_get(reverse_handle, &reverse) == 0
+				      && (reverse & (1 << (output - 1)));
+		const auto pulses = slaaps::correctedCanardPulses(configuration.canard[canard]);
+		const struct {
+			const char *suffix;
+			float pulse;
+		} limits[] {{"MIN", reversed ? pulses.positive : pulses.negative}, {"CENT", pulses.neutral},
+			{"MAX", reversed ? pulses.negative : pulses.positive}
+		};
+
+		for (const auto &limit : limits) {
+			int32_t current{};
+			const int32_t target = static_cast<int32_t>(limit.pulse);
+			snprintf(name, sizeof(name), "%s_%s%u", prefix, limit.suffix, output);
+			const param_t handle = param_find_no_notification(name);
+
+			if (handle == PARAM_INVALID || param_get(handle, &current) != 0) {
+				PX4_WARN("canard %u output limit %s not found", canard + 1, name);
+
+			} else if (current != target && param_set_no_notification(handle, &target) == 0) {
+				++written;
+			}
+		}
+	}
+
+	if (written) {
+		param_notify_changes();
+		PX4_INFO("canard centre correction: %u output limits written; routing re-checks them", written);
+	}
 }
 
 bool Slaaps::resetBenchEnable()
@@ -1989,6 +2059,7 @@ void Slaaps::updateRecovery(hrt_abstime now, const vehicle_status_s &vehicle, co
 	}
 
 	reportNet();
+
 	if (reentryReady(now, vehicle)) { beginReentry(hrt_absolute_time()); return; }
 
 	_manual_status = _manual.recoverObserved(_manual_permission, _prepared_request.binding);
@@ -2123,7 +2194,7 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 			return;
 		}
 
-		const uint64_t raw_age = static_cast<uint64_t>(math::min(configuration.manual_age_ms, configuration.output_lease_ms)) * 1000;
+		const uint64_t raw_age = slaaps::edfRequestLeaseUs(configuration, slaaps::ControlMode::Manual);
 		const uint64_t raw_timestamp = _input_observation.manual.timestamp_sample_us;
 		uint64_t reserve{};
 		now = hrt_absolute_time();
@@ -2293,6 +2364,8 @@ void Slaaps::updateBench(hrt_abstime now)
 		       && sec >= 0 && sec <= kMaximumBenchSeconds;
 	};
 	const bool controls = read_controls(enable, target, seconds);
+	// An over-long EDF duration is an incomplete selection, like zero: it waits instead of latching a rejection.
+	const bool duration_valid = seconds > 0 && (target != static_cast<int32_t>(kEdfBenchTarget) || seconds <= kMaximumEdfBenchSeconds);
 
 	if (!controls || !healthy || (!edf && !disarmed) || (edf && !disarmed && !_bench_arming_authorized)
 	    || vehicle_revision != _bench_vehicle_revision || armed_revision != _bench_armed_revision) {
@@ -2315,13 +2388,13 @@ void Slaaps::updateBench(hrt_abstime now)
 		return;
 	}
 
-	if (!configured || !coherent_target || !seconds || !_routing_valid || !registered || (!edf && !armed.prearmed)
+	if (!configured || !coherent_target || !duration_valid || !_routing_valid || !registered || (!edf && !armed.prearmed)
 	    || vehicle.nav_state != mode.id) {
 		_bench_enable_ready = false;
 
 		if (session || enable || (!configured && _bench_input_bound)) { cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return; }
 
-		_bench_entry_status = !configured || !coherent_target || !seconds ? slaaps_status_s::BENCH_ENTRY_WAIT_CONFIGURATION :
+		_bench_entry_status = !configured || !coherent_target || !duration_valid ? slaaps_status_s::BENCH_ENTRY_WAIT_CONFIGURATION :
 				      !_routing_valid || !registered ? slaaps_status_s::BENCH_ENTRY_WAIT_ROUTING :
 				      !edf && !armed.prearmed ? slaaps_status_s::BENCH_ENTRY_WAIT_PREARM : slaaps_status_s::BENCH_ENTRY_WAIT_SELECTION;
 		return;
@@ -2502,7 +2575,7 @@ void Slaaps::updateBench(hrt_abstime now)
 			_bench_arming_authorized = true;
 			_bench_can_arm = disarmed && _bench_can_run && !permission_waiting;
 			// Match ManualEdfInput's original, exclusive raw-command lease.
-			const uint64_t raw_age = static_cast<uint64_t>(math::min(configuration.manual_age_ms, configuration.output_lease_ms)) * 1000;
+			const uint64_t raw_age = slaaps::edfRequestLeaseUs(configuration, slaaps::ControlMode::EdfBench);
 			uint64_t reserve{};
 
 			if (_bench_sample.timestamp_sample_us > UINT64_MAX - raw_age
@@ -2687,7 +2760,7 @@ void Slaaps::updatePreparation(hrt_abstime now)
 	if (!_manual_entry_deadline) {
 		// A re-entry is bounded like an initial bank response, never by the disarmed operator window.
 		const uint64_t wait = _reentry ? math::min(static_cast<uint64_t>(_configuration.configuration().manual_ready_wait_s) * 1000000,
-					slaaps::ManualBankPreparation::kMaximumPreparationUs) :
+				      slaaps::ManualBankPreparation::kMaximumPreparationUs) :
 				      static_cast<uint64_t>(_configuration.configuration().manual_ready_wait_s) * 1000000;
 
 		if (!_manual_entry_started || now < _manual_entry_started || _manual_entry_started > UINT64_MAX - wait

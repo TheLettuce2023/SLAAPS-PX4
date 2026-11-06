@@ -91,6 +91,30 @@ bool validServo(const CanardConfiguration &c)
 	       && positive(c.slew_positive) && positive(c.slew_negative);
 }
 
+constexpr float kMaximumZeroOffsetDeg = 10.F;
+
+// The corrected calibration must stay inside the servo pulse range; the supervisor writes it to the output driver,
+// and the routing check then requires the driver to report exactly these pulses.
+ConfigurationResult validateCentreCorrection(const VehicleConfiguration &configuration)
+{
+	static constexpr const char *kParameters[kCanards] {"SLA_C1_ZERO", "SLA_C2_ZERO", "SLA_C3_ZERO", "SLA_C4_ZERO"};
+
+	for (unsigned i = 0; i < kCanards; ++i) {
+		const auto &c = configuration.canard[i];
+		const auto pulses = correctedCanardPulses(c);
+		const float values[] {pulses.negative, pulses.neutral, pulses.positive};
+		bool inside = std::isfinite(c.zero_offset_deg) && std::fabs(c.zero_offset_deg) <= kMaximumZeroOffsetDeg;
+
+		for (float pulse : values) {
+			inside = inside && std::isfinite(pulse) && pulse >= kMinimumServoPulse && pulse <= kMaximumServoPulse;
+		}
+
+		if (!inside) { return {ConfigurationFault::InvalidServo, kParameters[i]}; }
+	}
+
+	return {};
+}
+
 bool validThrustCurve(const VehicleConfiguration &c)
 {
 	if (!(c.edf_thrust[0] >= 0.F && c.edf_thrust[0] <= 0.F)
@@ -210,7 +234,8 @@ void buildBenchProfile(const VehicleConfiguration &c, research_actuator_command:
 
 	for (unsigned i = 0; i < kCanards; ++i) {
 		const auto &canard = c.canard[i];
-		control.servos[i] = {canard.pwm_negative, canard.pwm_neutral, canard.pwm_positive,
+		const auto pulses = correctedCanardPulses(canard);
+		control.servos[i] = {pulses.negative, pulses.neutral, pulses.positive,
 				     canard.maximum_deflection_deg, canard.slew_positive * canard.maximum_deflection_deg,
 				     canard.slew_negative * canard.maximum_deflection_deg, canard.minimum, canard.maximum
 				    };
@@ -446,6 +471,8 @@ ConfigurationResult validateWrenchConfiguration(const VehicleConfiguration &c)
 	for (const auto &canard : c.canard) {
 		if (!validServo(canard)) { return {ConfigurationFault::InvalidServo, nullptr}; }
 	}
+
+	if (const auto centre = validateCentreCorrection(c); !centre.valid()) { return centre; }
 
 	if (!validThrustCurve(c)) { return {ConfigurationFault::InvalidThrustCurve, "SLA_EDF_T4"}; }
 
@@ -1000,6 +1027,8 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 	for (const auto &canard : c.canard) {
 		if (!validServo(canard)) { return {ConfigurationFault::InvalidServo, nullptr}; }
 	}
+
+	if (const auto centre = validateCentreCorrection(c); !centre.valid()) { return centre; }
 
 	if (use == ConfigurationUse::Bench) { return validateBenchConfiguration(c); }
 

@@ -106,7 +106,7 @@ def main():
     assert actual["SLA_DATA_VER"].findtext("max") == "1"
     assert actual["SLA_DATA_REC"].findtext("min") == "0"
     assert actual["SLA_DATA_REC"].findtext("max") == "2147483647"
-    assert actual["SLA_BENCH_SEC"].findtext("max") == "60"
+    assert actual["SLA_BENCH_SEC"].findtext("max") == "3600"
     assert actual["SLA_SCH_AGE"].findtext("min") == "0"
     assert actual["SLA_SCH_AGE"].findtext("max") == "1000000"
     for name in ("SLA_SCH_EDF_LO", "SLA_SCH_EDF_HI"):

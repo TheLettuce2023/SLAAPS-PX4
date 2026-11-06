@@ -95,8 +95,7 @@ public:
 		const ControlMode mode = transfer ? permission.mode : _grant.mode;
 		const bool bench = mode == ControlMode::ServoBench;
 		const bool edf_bench = mode == ControlMode::EdfBench;
-		const uint64_t lease = static_cast<uint64_t>(mode == ControlMode::Acceleration ? _configuration.output_lease_ms :
-				       math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+		const uint64_t lease = edfRequestLeaseUs(_configuration, mode);
 
 		if (_awaiting_handling || _sequence == UINT64_MAX || frame.sequence != _sequence + 1 || frame.timestamp_us < _last_timestamp
 		    || (_received && frame.timestamp_us == _last_timestamp) || frame.timestamp_us > now
@@ -140,10 +139,7 @@ public:
 			if (!std::isfinite(value) || value < servo.minimum || value > servo.maximum
 			    || (edf_bench && !(value >= 0.F && value <= 0.F))) { return reject(ManualBankFault::InvalidFrame); }
 
-			const float endpoint = value < 0.F ? servo.pwm_negative : servo.pwm_positive;
-			const float pwm = servo.pwm_neutral + std::fabs(value) * (endpoint - servo.pwm_neutral);
-
-			if (!map(_routing.canard[i], pwm, candidate)) { return reject(ManualBankFault::InvalidFrame); }
+			if (!map(_routing.canard[i], canardPulse(servo, value), candidate)) { return reject(ManualBankFault::InvalidFrame); }
 		}
 
 		if (bench) {

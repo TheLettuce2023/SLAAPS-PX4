@@ -1082,6 +1082,18 @@
           "default": 0.0,
           "unit": "N",
           "decimal": 6
+        },
+        "SLA_C1_ZERO": {
+          "description": {
+            "short": "Mechanical centre correction; positive toward PWM_POS",
+            "long": "Deflection, in degrees, from the canard's position at SLA_Cn_PWM_CTR to its true zero; positive moves toward SLA_Cn_PWM_POS. The correction shifts SLA_Cn_PWM_NEG/CTR/POS by the same whole number of microseconds (the calibrated pulses per degree), so command zero, the Bench physical zero and the full travel are centred on the true zero. On a successful apply, disarmed, SLAAPS writes the shifted pulses to the MIN/CENT/MAX parameters of the output that carries this canard, and the routing check requires the output to report them. The shifted pulses must stay within 500 to 2500 us. This is a mechanical correction, not SLA_Cn_TRIM (the modeled zero-moment flight trim). Edit outside the SLAAPS modes and apply the complete profile."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "deg",
+          "decimal": 6
         }
       }
     },
@@ -1390,6 +1402,18 @@
           "max": 1000.0,
           "default": 0.0,
           "unit": "N",
+          "decimal": 6
+        },
+        "SLA_C2_ZERO": {
+          "description": {
+            "short": "Mechanical centre correction; positive toward PWM_POS",
+            "long": "Deflection, in degrees, from the canard's position at SLA_Cn_PWM_CTR to its true zero; positive moves toward SLA_Cn_PWM_POS. The correction shifts SLA_Cn_PWM_NEG/CTR/POS by the same whole number of microseconds (the calibrated pulses per degree), so command zero, the Bench physical zero and the full travel are centred on the true zero. On a successful apply, disarmed, SLAAPS writes the shifted pulses to the MIN/CENT/MAX parameters of the output that carries this canard, and the routing check requires the output to report them. The shifted pulses must stay within 500 to 2500 us. This is a mechanical correction, not SLA_Cn_TRIM (the modeled zero-moment flight trim). Edit outside the SLAAPS modes and apply the complete profile."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "deg",
           "decimal": 6
         }
       }
@@ -1700,6 +1724,18 @@
           "default": 0.0,
           "unit": "N",
           "decimal": 6
+        },
+        "SLA_C3_ZERO": {
+          "description": {
+            "short": "Mechanical centre correction; positive toward PWM_POS",
+            "long": "Deflection, in degrees, from the canard's position at SLA_Cn_PWM_CTR to its true zero; positive moves toward SLA_Cn_PWM_POS. The correction shifts SLA_Cn_PWM_NEG/CTR/POS by the same whole number of microseconds (the calibrated pulses per degree), so command zero, the Bench physical zero and the full travel are centred on the true zero. On a successful apply, disarmed, SLAAPS writes the shifted pulses to the MIN/CENT/MAX parameters of the output that carries this canard, and the routing check requires the output to report them. The shifted pulses must stay within 500 to 2500 us. This is a mechanical correction, not SLA_Cn_TRIM (the modeled zero-moment flight trim). Edit outside the SLAAPS modes and apply the complete profile."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "deg",
+          "decimal": 6
         }
       }
     },
@@ -2008,6 +2044,18 @@
           "max": 1000.0,
           "default": 0.0,
           "unit": "N",
+          "decimal": 6
+        },
+        "SLA_C4_ZERO": {
+          "description": {
+            "short": "Mechanical centre correction; positive toward PWM_POS",
+            "long": "Deflection, in degrees, from the canard's position at SLA_Cn_PWM_CTR to its true zero; positive moves toward SLA_Cn_PWM_POS. The correction shifts SLA_Cn_PWM_NEG/CTR/POS by the same whole number of microseconds (the calibrated pulses per degree), so command zero, the Bench physical zero and the full travel are centred on the true zero. On a successful apply, disarmed, SLAAPS writes the shifted pulses to the MIN/CENT/MAX parameters of the output that carries this canard, and the routing check requires the output to report them. The shifted pulses must stay within 500 to 2500 us. This is a mechanical correction, not SLA_Cn_TRIM (the modeled zero-moment flight trim). Edit outside the SLAAPS modes and apply the complete profile."
+          },
+          "type": "float",
+          "min": -10.0,
+          "max": 10.0,
+          "default": 0.0,
+          "unit": "deg",
           "decimal": 6
         }
       }
@@ -2591,7 +2639,7 @@
         },
         "SLA_IN_AGE": {
           "description": {
-            "short": "Maximum manual sample age",
+            "short": "Maximum manual sample age and pilot request lifetime",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "int32",
@@ -2712,7 +2760,7 @@
         },
         "SLA_OUT_LEASE": {
           "description": {
-            "short": "Independent consumer output lease",
+            "short": "Supervisor permission and owned-request output lease",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "int32",
@@ -5747,11 +5795,11 @@
         "SLA_BENCH_SEC": {
           "description": {
             "short": "Maximum commissioning session duration",
-            "long": "Set a finite duration before deliberately enabling commissioning. Zero denies enable. Expiry stops the session and requires deliberate re-entry. The 60 second software ceiling is not measured hardware qualification. Input freshness, command leases and stop/kill checks remain independently enforced."
+            "long": "Set a finite duration before deliberately enabling commissioning. Zero denies enable. Expiry stops the session and requires deliberate re-entry. The software ceiling is 3600 seconds for servo targets and 60 seconds for the EDF target; a longer EDF duration denies enable. Neither is measured hardware qualification. Input freshness, command leases and stop/kill checks remain independently enforced."
           },
           "type": "int32",
           "min": 0,
-          "max": 60,
+          "max": 3600,
           "default": 0,
           "unit": "s"
         }

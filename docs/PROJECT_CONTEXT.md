@@ -253,6 +253,12 @@ sits 28.28 mm over and 28.28 mm up or down: servo 1 (y,z) = (+28.28, -28.28) mm,
 Viewing direction: from the outboard end looking toward the centerline. SLA_Cn_SLOPE = +0.261799 rad (15 deg) for all
 four, so a positive command is positive deflection in the stated sense; the per-servo sense (1 CCW, 2 CW, 3 CCW, 4 CW)
 must be carried by the moment and force derivatives when they are computed. Slope uncertainty (SLA_Cn_SL_UNC) unset.
+Corrected by the servo bench (2026-11-05, same viewing direction): a positive command turns all four servos
+counter-clockwise; the servo 3 and 4 plugs were swapped on the rail and have been swapped back. The moment and force
+derivatives keep the 10-27 positive-deflection sense, so SLA_C2_SLOPE and SLA_C4_SLOPE are -0.261799 and the canard 2
+and 4 bench mix signs are inverted (roll -1/-1/-1/-1, pitch +1/+1/-1/-1, yaw -1/+1/+1/-1 for canards 1 to 4). With both
+fixes the combined bench matches the geometry (viewed from outboard): roll right all CW; pitch stick forward CW/CW/CCW/CCW;
+yaw right CW/CCW/CCW/CW.
 
 ## Modeled canard derivatives (computed 2026-10-27, labelled modeled, not measured)
 
@@ -406,3 +412,29 @@ timing-sensitive.
 - Native scenario: block "D1 then D5" before the flight-transfer supervisor stop in VehicleConfigurationTest.cpp.
 - After native PASS: rebuild the 6X image (scratchpad build_6x.sh / collect_6x.sh flow, clean build dir), replace the
   image in build/slaaps_firmware/flight-readiness-20261028, and update its README.
+
+## Servo bench on the board and pilot lease (2026-11-05 to 2026-11-06)
+
+- The servo bench runs on the Pixhawk 6X; see docs/SLAAPS_6X_FLASH_AND_BOOT.md (Servo bench) for its requirements, the
+  PX4IO stack crash, the AUX endpoint and PX4IO register fixes, and the canard direction findings.
+- SLA_BENCH_SEC: up to 3600 s for servo targets (SLA_BENCH_CH 0-4); the EDF target keeps 60 s, and a longer value waits
+  at bench entry=1 instead of latching a rejection.
+- Pilot request lease decoupled (lead decision 2026-11-06): a Manual, servo-bench or EDF-bench pilot request lives for
+  SLA_IN_AGE after its stick sample (`slaaps::edfRequestLeaseUs`), checked identically by ManualEdfInput, EdfOwner and the
+  banks. SLA_OUT_LEASE still bounds the supervisor permission (and so every output frame), owned hold and recovery
+  requests, and Acceleration requests; frames still expire SLA_CYCLE_MAX after they are sent. Reason: QGC joystick input
+  over USB arrives with gaps up to about 100 ms, which ended sessions under min(SLA_IN_AGE, SLA_OUT_LEASE).
+  Consequence: the D1 pilot-loss hold now starts at SLA_IN_AGE - 2 x SLA_CYCLE_MIN (292 ms with the QGC parameter file,
+  previously 92 ms).
+- Lead decision 2026-11-06: Manual keeps the EDF at DShot idle (109) at zero throttle while armed.
+- Still open before armed Manual on the board: SLA_FIRST_CMD_US / SLA_ACT_ACK_US are shared by all modes. The bench needs
+  40000 / 35000 us on the board (banks poll every 20 ms in bench), but Manual requires the first-command budget below
+  SLA_CYCLE_MAX (12000 us), so the bench values must be restored to the file values (8000 / 3000) before Manual, and
+  3000 us may be too short for a real bank reply. Per-mode budgets in code would remove the swap.
+- Mechanical canard centring (2026-11-06, lead chose SLAAPS-written output limits): SLA_Cn_ZERO (deg, +-10, positive
+  toward SLA_Cn_PWM_POS). `correctedCanardPulses()` in VehicleConfiguration.hpp shifts NEG/CTR/POS by a whole-microsecond
+  offset; `canardPulse()` (the only command-to-pulse conversion), the bench profile and the routing check all use the
+  shifted pulses. On a deliberate disarmed apply `Slaaps::writeCanardOutputLimits` writes them to the PWM_MAIN/PWM_AUX
+  MIN/CENT/MAX of the one output whose function is the canard (respecting the REV bit); routing then requires the driver
+  to report them. Validation keeps the shifted pulses within 500-2500 us. The new parameters change the configuration
+  identity, so the accepted profile must be re-applied after flashing. SLA_Cn_TRIM stays the modeled zero-moment flight trim.

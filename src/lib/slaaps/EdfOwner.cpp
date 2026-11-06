@@ -127,7 +127,7 @@ EdfFault EdfOwner::accept(uint64_t now, const EdfPermission &permission, const E
 	if (request.sequence == 0 || request.sequence <= _request.sequence
 	    || request.timestamp_us < _grant.session || request.timestamp_us > now
 	    || (_received && request.timestamp_us <= _request.timestamp_us)
-	    || request.deadline_us <= now || request.deadline_us - request.timestamp_us > _lease_us
+	    || request.deadline_us <= now || request.deadline_us - request.timestamp_us > edfRequestLeaseUs(_configuration, request.mode)
 	    || !std::isfinite(request.value)) { return reject(EdfFault::InvalidRequest); }
 
 	float target{};
@@ -185,7 +185,8 @@ EdfFault EdfOwner::transfer(uint64_t now, uint64_t transition_us, const EdfPermi
 
 	if (!request.sequence || request.sequence <= _request.sequence || request.timestamp_us <= transition_us
 	    || request.timestamp_us <= _request.timestamp_us || request.timestamp_us > now || request.deadline_us <= now
-	    || request.deadline_us - request.timestamp_us > _lease_us || request.deadline_us > _request.deadline_us
+	    || request.deadline_us - request.timestamp_us > edfRequestLeaseUs(_configuration, next.mode)
+	    || request.deadline_us > _request.deadline_us
 	    || request.deadline_us > previous.deadline_us || request.deadline_us > next.deadline_us
 	    || !std::isfinite(request.value)) { return reject(EdfFault::InvalidRequest); }
 

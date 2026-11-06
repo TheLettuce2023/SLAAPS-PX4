@@ -226,7 +226,7 @@ bool slaapsEdfOwnerTransferTests(unsigned &checks, const slaaps::VehicleConfigur
 	raw.timestamp_us = back_grant.timestamp_us;
 	raw.timestamp_sample_us = back_grant.transition_us + 1;
 	raw.axes[static_cast<unsigned>(research_actuator_command::ManualAxis::Throttle)] = c.manual_throttle_low;
-	const uint64_t raw_lease = static_cast<uint64_t>(c.manual_age_ms < c.output_lease_ms ? c.manual_age_ms : c.output_lease_ms) * 1000;
+	const uint64_t raw_lease = static_cast<uint64_t>(c.manual_age_ms) * 1000;
 	ManualEdfInput adapter;
 	EdfRequest mapped{};
 	expect(adapter.configureForTransfer(c, back_grant, back_grant.transition_us, incoming.sequence)
@@ -307,6 +307,62 @@ bool slaapsEdfOwnerTransferTests(unsigned &checks, const slaaps::VehicleConfigur
 	       && timestamp_end.evaluate(raw.timestamp_us, raw, mapped) == ManualEdfStatus::Rejected
 	       && std::memcmp(mapped_bytes, &mapped, sizeof(mapped)) == 0,
 	       "overflowing the original raw deadline rejects before arithmetic or request publication");
+
+	// The pilot request lease is SLA_IN_AGE alone, so input delivery gaps longer than SLA_OUT_LEASE do not end it,
+	// while the permission and every Acceleration request stay bounded by SLA_OUT_LEASE.
+	auto decoupled = c;
+	decoupled.manual_age_ms = 300;
+	decoupled.output_lease_ms = 100;
+	expect(edfRequestLeaseUs(decoupled, ControlMode::Manual) == 300000 && edfRequestLeaseUs(decoupled, ControlMode::EdfBench) == 300000
+	       && edfRequestLeaseUs(decoupled, ControlMode::ServoBench) == 300000
+	       && edfRequestLeaseUs(decoupled, ControlMode::Acceleration) == 100000,
+	       "pilot modes use the input age and Acceleration uses the output lease");
+	const uint64_t decoupled_identity = fingerprint(decoupled);
+
+	for (unsigned lease_mode = 0; lease_mode < 2; ++lease_mode) {
+		const bool lease_acceleration_mode = lease_mode == 1;
+		EdfPermission lease_grant{};
+		lease_grant.timestamp_us = lease_grant.session = start;
+		lease_grant.deadline_us = start + 100000;
+		lease_grant.source = 17;
+		lease_grant.configuration = decoupled_identity;
+		lease_grant.mode = lease_acceleration_mode ? ControlMode::Acceleration : ControlMode::Manual;
+		lease_grant.armed = lease_grant.flight_admitted = lease_grant.healthy = lease_grant.measured_condition_valid = true;
+		auto lease_too_long_permission = lease_grant;
+		lease_too_long_permission.deadline_us = start + 100001;
+		EdfOwner lease_owner_long_permission;
+		expect(lease_owner_long_permission.begin(start, decoupled, lease_too_long_permission) == EdfFault::PermissionLost,
+		       "a permission longer than the output lease is still refused when the input age is longer");
+		const EdfUnits lease_units = lease_acceleration_mode ? EdfUnits::Newtons : EdfUnits::Normalized;
+
+		for (unsigned lease_length = 0; lease_length < 3; ++lease_length) {
+			// 250 ms: beyond the output lease, within the input age. 300 ms: the input age. 300.001 ms: beyond it.
+			const uint64_t lease_lifetime = lease_length == 0 ? 250000 : lease_length == 1 ? 300000 : 300001;
+			EdfOwner lease_owner;
+			EdfRequest lease_request{start, 17, decoupled_identity, 1, start, start + lease_lifetime, lease_grant.mode, lease_units, 0.F};
+			const bool lease_accepted = lease_owner.begin(start, decoupled, lease_grant) == EdfFault::None
+						    && lease_owner.accept(start, lease_grant, lease_request) == EdfFault::None;
+			expect(lease_accepted == (!lease_acceleration_mode && lease_length < 2),
+			       lease_acceleration_mode ? "an Acceleration request longer than the output lease is refused"
+			       : lease_length < 2 ? "a Manual request may live for the input age beyond the output lease"
+			       : "a Manual request longer than the input age is refused");
+		}
+	}
+
+	ManualEdfInput decoupled_adapter;
+	auto decoupled_grant = first;
+	decoupled_grant.configuration = decoupled_identity;
+	auto decoupled_raw = raw;
+	decoupled_raw.timestamp_us = decoupled_raw.timestamp_sample_us = start + 1;
+	decoupled_raw.axes[static_cast<unsigned>(research_actuator_command::ManualAxis::Throttle)] = decoupled.manual_throttle_low;
+	EdfRequest decoupled_request{};
+	expect(decoupled_adapter.configure(decoupled, decoupled_grant)
+	       && decoupled_adapter.evaluate(decoupled_raw.timestamp_us, decoupled_raw, decoupled_request) == ManualEdfStatus::Request
+	       && decoupled_request.deadline_us == decoupled_raw.timestamp_sample_us + 300000
+	       && decoupled_adapter.evaluate(decoupled_raw.timestamp_sample_us + 250000, decoupled_raw, decoupled_request) == ManualEdfStatus::Held
+	       && decoupled_adapter.evaluate(decoupled_raw.timestamp_sample_us + 300000, decoupled_raw, decoupled_request)
+	       == ManualEdfStatus::Rejected,
+	       "the raw throttle adapter holds a sample for the input age, not the shorter output lease");
 	return passed;
 }
 

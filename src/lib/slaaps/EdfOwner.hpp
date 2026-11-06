@@ -12,6 +12,14 @@ enum class EdfFault : uint8_t {
 	WrongOwner, InvalidRequest, NotLowThrottle, Expired, Revoked
 };
 // Recovery is only produced by EdfOwner::recover(); wire and worker paths accept Command alone.
+
+// A pilot request (Manual and both bench modes) lives for SLA_IN_AGE after its stick sample, so ordinary input delivery
+// gaps do not end it. SLA_OUT_LEASE separately bounds the supervisor permission, and so every output frame, and each
+// owned hold or recovery request. A companion Acceleration request lives for SLA_OUT_LEASE.
+inline uint64_t edfRequestLeaseUs(const VehicleConfiguration &configuration, ControlMode mode)
+{
+	return static_cast<uint64_t>(mode == ControlMode::Acceleration ? configuration.output_lease_ms : configuration.manual_age_ms) * 1000;
+}
 enum class EdfDisposition : uint8_t { Inhibited, Command, RecoveryRequired, Recovery };
 
 // Supplied by the selected-input/controller adapter; never an actuator topic.

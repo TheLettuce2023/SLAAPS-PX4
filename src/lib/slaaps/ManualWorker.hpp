@@ -130,7 +130,7 @@ public:
 		    || !ManualBankPreparation::activationTimingConfigured(configuration, ControlMode::ServoBench)
 		    || !makeBenchProfile(configuration, profile)) { return reject(ManualWorkerStatus::ConfigurationRejected); }
 
-		_bench_input_lease_us = math::min(profile.control.maximum_manual_age_us, profile.lease_us);
+		_bench_input_lease_us = profile.control.maximum_manual_age_us; // Pilot request lease: see edfRequestLeaseUs().
 		_permission_lease_us = profile.lease_us;
 		_cycle_age_us = profile.control.maximum_cycle_gap_us;
 		_latest_request = {};
@@ -220,7 +220,7 @@ public:
 		// expires: the stabilized controller cycles once per period, and its first hold frame must precede the expiry of
 		// the last pilot frame (and the banks' output). The sample offered in this cycle counts: its request is only
 		// created further down.
-		const uint64_t pilot_lease = static_cast<uint64_t>(math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+		const uint64_t pilot_lease = edfRequestLeaseUs(_configuration, ControlMode::Manual);
 		const uint64_t margin = 2 * static_cast<uint64_t>(_configuration.cycle_min_us);
 		const uint64_t pilot_deadline = math::max(_latest_request.deadline_us,
 						manual.valid && manual.timestamp_sample_us <= now ? expiry(manual.timestamp_sample_us, pilot_lease) : 0);
@@ -534,9 +534,9 @@ public:
 		// On the launcher before the airspeed gate there is no flight to hold: abort with D3.
 		if (!_have_handled || _gate_closed || !validateRecoveryConfiguration(_configuration).valid()) { return reject(ManualWorkerStatus::ControlRejected, now); }
 
-		// Banks bound a Manual EDF request by the selected-input age as well as the output lease.
-		const uint64_t lease = static_cast<uint64_t>(_mode == ControlMode::Acceleration ? _configuration.output_lease_ms :
-				       math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+		// An owned hold request is timestamped now: bound it by the output lease and by the pilot request lease the banks apply.
+		const uint64_t lease = math::min(static_cast<uint64_t>(_configuration.output_lease_ms) * 1000,
+						 edfRequestLeaseUs(_configuration, _mode));
 		float held{};
 
 		if (_edf.acceptHold(now, permission, math::min(expiry(now, lease), permission.deadline_us), held) != EdfFault::None) {
@@ -662,10 +662,10 @@ public:
 		if (control != research_stabilized_manual::Status::Ok) { return reject(ManualWorkerStatus::ControlRejected, now); }
 
 		const uint64_t limit = _hold_start_us + kRecoveryLimitUs;
-		// Banks bound a Manual EDF request by the selected-input age as well as the output lease; the owned
-		// hold sequence uses the same bound so its frames are admitted exactly like pilot frames.
-		const uint64_t lease = static_cast<uint64_t>(_mode == ControlMode::Acceleration ? _configuration.output_lease_ms :
-				       math::min(_configuration.output_lease_ms, _configuration.manual_age_ms)) * 1000;
+		// An owned hold request is timestamped now: bound it by the output lease and by the pilot request lease the banks
+		// apply, so its frames are admitted exactly like pilot frames.
+		const uint64_t lease = math::min(static_cast<uint64_t>(_configuration.output_lease_ms) * 1000,
+						 edfRequestLeaseUs(_configuration, _mode));
 
 		if (observed_edf.sequence == UINT64_MAX || _sequence == UINT64_MAX) { return reject(ManualWorkerStatus::ControlRejected, now); }
 

@@ -999,6 +999,74 @@ static void profileTests()
 	bad.canard[0].pwm_negative = 1900.F;
 	bad.canard[0].pwm_positive = 1100.F;
 	check(validate(bad, ConfigurationUse::Bench).valid(), "reversed servo calibration accepted without extra reversal");
+	{
+		// Mechanical centre correction (SLA_Cn_ZERO): 3.25 deg of the 13 deg, 400 us calibration is exactly 100 us here.
+		const auto &servo = c.canard[0];
+		const auto unchanged = correctedCanardPulses(servo);
+		check(near(unchanged.negative, 1100.F) && near(unchanged.neutral, 1500.F) && near(unchanged.positive, 1900.F)
+		      && near(canardPulse(servo, 0.F), 1500.F) && near(canardPulse(servo, 1.F), 1900.F)
+		      && near(canardPulse(servo, -1.F), 1100.F) && near(canardPulse(servo, .5F), 1700.F),
+		      "zero centre correction keeps the calibrated pulse mapping");
+		auto corrected = c;
+		corrected.canard[0].zero_offset_deg = 3.25F;
+		corrected.canard[1].zero_offset_deg = -3.25F;
+		corrected.canard[2].zero_offset_deg = 1.F; // 30.77 us rounds to 31.
+		corrected.canard[3].zero_offset_deg = -1.F;
+		const auto up = correctedCanardPulses(corrected.canard[0]), down = correctedCanardPulses(corrected.canard[1]);
+		check(near(up.negative, 1200.F) && near(up.neutral, 1600.F) && near(up.positive, 2000.F)
+		      && near(down.negative, 1000.F) && near(down.neutral, 1400.F) && near(down.positive, 1800.F)
+		      && near(correctedCanardPulses(corrected.canard[2]).neutral, 1531.F)
+		      && near(correctedCanardPulses(corrected.canard[3]).neutral, 1469.F),
+		      "centre correction shifts the whole calibration by whole microseconds at the calibrated pulses per degree");
+		check(near(canardPulse(corrected.canard[0], 0.F), 1600.F) && near(canardPulse(corrected.canard[0], 1.F), 2000.F)
+		      && near(canardPulse(corrected.canard[0], -1.F), 1200.F) && near(canardPulse(corrected.canard[1], .5F), 1600.F),
+		      "corrected commands keep the full calibrated travel about the true zero");
+		check(validate(corrected, ConfigurationUse::Bench).valid() && validate(corrected, ConfigurationUse::StabilizedManual).valid(),
+		      "corrected calibrations are accepted for Bench and flight with the full command range");
+		auto reversed = corrected;
+		reversed.canard[0].pwm_negative = 1900.F;
+		reversed.canard[0].pwm_positive = 1100.F;
+		const auto reversed_pulses = correctedCanardPulses(reversed.canard[0]);
+		check(near(reversed_pulses.negative, 1800.F) && near(reversed_pulses.neutral, 1400.F) && near(reversed_pulses.positive, 1000.F)
+		      && validate(reversed, ConfigurationUse::Bench).valid(),
+		      "positive correction moves toward PWM_POS on a reversed calibration");
+		auto large = c;
+		large.canard[0].zero_offset_deg = 10.F; // 307.7 us rounds to 308.
+		check(near(correctedCanardPulses(large.canard[0]).positive, 2208.F) && validate(large, ConfigurationUse::Bench).valid(),
+		      "a 10 deg correction inside the servo pulse range is accepted");
+
+		for (unsigned scenario = 0; scenario < 4; ++scenario) {
+			auto rejected = c;
+			auto &canard = rejected.canard[scenario == 3 ? 3 : 0];
+			// 1600/2000/2400 us leaves exactly 100 us (3.25 deg) below the 2500 us servo limit.
+			canard.pwm_negative = 1600.F;
+			canard.pwm_neutral = 2000.F;
+			canard.pwm_positive = 2400.F;
+
+			switch (scenario) {
+			case 0: canard.zero_offset_deg = 3.25F; break; // Reaches 2500 us exactly.
+
+			case 1: canard.zero_offset_deg = 3.3F; break; // 102 us: passes 2500 us.
+
+			case 2: canard.zero_offset_deg = std::numeric_limits<float>::quiet_NaN(); break;
+
+			default: canard.zero_offset_deg = 10.1F; break;
+			}
+
+			const auto result = validate(rejected, ConfigurationUse::Bench);
+
+			if (scenario == 0) {
+				check(result.valid(), "a corrected calibration reaching the 2500 us servo limit exactly is accepted");
+				continue;
+			}
+
+			// Non-finite and above-10-deg values fail the shared parameter metadata range first.
+			check(result.fault == (scenario == 1 ? ConfigurationFault::InvalidServo : ConfigurationFault::ParameterRange)
+			      && result.parameter && std::strcmp(result.parameter, scenario == 3 ? "SLA_C4_ZERO" : "SLA_C1_ZERO") == 0
+			      && !validate(rejected, ConfigurationUse::StabilizedManual).valid(),
+			      "a centre correction outside the servo pulse range, non-finite or above 10 deg is rejected by name");
+		}
+	}
 	bad = c;
 	bad.canard[0].slope_uncertainty = .3F;
 	check(!validate(bad, ConfigurationUse::StabilizedManual).valid(), "uncertain slope sign rejected");
@@ -1782,6 +1850,20 @@ static void routingTests()
 	bad.channels[4].function = 0;
 	check(makeRoutingPlan(c, bad, true, plan).fault == RoutingFault::MissingEdf, "flight requires EDF mapping");
 	check(makeRoutingPlan(c, bad, false, plan).valid() && !plan.edf_assigned, "bench permits disconnected EDF");
+	{
+		// A centre correction requires the output to report the shifted calibration, exactly.
+		auto corrected = c;
+		corrected.canard[0].zero_offset_deg = 3.25F;
+		check(makeRoutingPlan(corrected, inventory, true, plan).fault == RoutingFault::InvalidCalibration,
+		      "an output still reporting the uncorrected calibration is not routed");
+		auto shifted = inventory;
+		shifted.channels[0].minimum_us = 1200;
+		shifted.channels[0].center_us = 1600;
+		shifted.channels[0].maximum_us = 2000;
+		check(makeRoutingPlan(corrected, shifted, true, plan).valid(), "an output reporting the corrected calibration is routed");
+		check(makeRoutingPlan(c, shifted, true, plan).fault == RoutingFault::InvalidCalibration,
+		      "a shifted output without the matching correction is not routed");
+	}
 	bad = inventory;
 	bad.channels[0].protocol = OutputProtocol::Unsupported;
 	check(makeRoutingPlan(c, bad, true, plan).fault == RoutingFault::UnsupportedProtocol, "unsupported transport rejected");
@@ -10717,7 +10799,7 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		      && scheduled_permission_sub.copy(&original_permission) && original_permission.session == capture_session,
 		      "target ACK wait captures the real outgoing command and original permission bound");
 		const uint64_t handoff_deadline = math::min(held_before_ack.deadline, math::min(original_permission.deadline,
-						   math::min(flight_protocol.map_deadline, flight_protocol.connection_deadline)));
+						  math::min(flight_protocol.map_deadline, flight_protocol.connection_deadline)));
 		const auto target_epoch = flight_protocol.transition_epoch, target_map = flight_protocol.map_epoch;
 		auto handoff_remaining = [&]() {
 			const auto current = hrt_absolute_time();
@@ -10828,8 +10910,10 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	      "the real caller observes successful guarded capture before numerical rejection");
 	const auto &captured_rejection = native_acceleration_captures[captures - 1];
 	check(captured_rejection.source == rejected_detail.request_source && captured_rejection.session == rejected_detail.request_session
-	      && captured_rejection.sequence == rejected_detail.request_sequence && captured_rejection.configuration == rejected_detail.configuration_identity
-	      && captured_rejection.observed_us == rejected_detail.request_observed_us && captured_rejection.captured_us <= rejected_detail.fault_observed_us
+	      && captured_rejection.sequence == rejected_detail.request_sequence
+	      && captured_rejection.configuration == rejected_detail.configuration_identity
+	      && captured_rejection.observed_us == rejected_detail.request_observed_us
+	      && captured_rejection.captured_us <= rejected_detail.fault_observed_us
 	      && captured_rejection.producer_created < captured_rejection.producer_expiry
 	      && captured_rejection.mapped_created < captured_rejection.mapped_expiry
 	      && captured_rejection.captured_us < captured_rejection.evidence_deadline,
@@ -10881,7 +10965,8 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 			  static_cast<unsigned long long>(captured_rejection.source), static_cast<unsigned long long>(captured_rejection.session),
 			  static_cast<unsigned long long>(captured_rejection.sequence), static_cast<unsigned long long>(captured_rejection.configuration),
 			  static_cast<unsigned long long>(captured_rejection.captured_us), static_cast<unsigned long long>(captured_rejection.observed_us),
-			  static_cast<unsigned long long>(captured_rejection.producer_created), static_cast<unsigned long long>(captured_rejection.producer_expiry)) > 0
+			  static_cast<unsigned long long>(captured_rejection.producer_created),
+			  static_cast<unsigned long long>(captured_rejection.producer_expiry)) > 0
 	      && std::fflush(stdout) == 0, "emit original capture metadata without relying on post-revocation wire status");
 	vehicle_armed = armed.armed = false; // Explicit operator disarm after the capture-only rejection.
 	SlaapsNativeTest::admitted.store(false);
@@ -10908,10 +10993,12 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	for (unsigned loss = 0; loss < 3; ++loss) {
 		static const char *const kLossLog[] {"SLAAPS: mode left, canards hold, EDF ramping off",
 						     "SLAAPS: power lost, canards hold, EDF ramping off",
-						     "SLAAPS: control lost, canards hold, EDF ramping off"};
+						     "SLAAPS: control lost, canards hold, EDF ramping off"
+						    };
 		static const char *const kLossRecovery[] {"leaving the SLAAPS mode while armed enters recovery",
-							  "losing the power source while armed enters recovery",
-							  "losing the estimator while armed enters recovery"};
+				"losing the power source while armed enters recovery",
+				"losing the estimator while armed enters recovery"
+							 };
 		flight_keepalive = flight_renew_clock = flight_auto_ack = flight_stream_requests = false;
 		vehicle_armed = armed.armed = false;
 		vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
@@ -10931,7 +11018,7 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		const auto loss_session = status.manual_preparation_session;
 		vehicle_armed = armed.armed = true;
 		wait([&]() { return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING; },
-		     500000, "loss case Manual worker runs on both real callback adapters");
+		500000, "loss case Manual worker runs on both real callback adapters");
 		flight_renew_clock = false;
 		wait([&]() {
 			return !flight_clock_pending && status.companion_event_sequence >= flight_last_clock_event
@@ -11017,7 +11104,7 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		roll = 0.F;
 		publish_power = publish_estimates = publish_manual = true;
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE; }, 1000000,
-		     "D5 case starts disarmed and inactive");
+		"D5 case starts disarmed and inactive");
 		auto reentry_profile = flight_profile;
 		reentry_profile.data_record_id = 1;
 		reentry_profile.data_assessment = static_cast<int32_t>(DataAssessment::Calibrated);
@@ -11041,11 +11128,11 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		SlaapsNativeTest::admitted.store(true);
 		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kManualMode];
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED; }, 500000,
-		     "D5 case prepares a deliberate disarmed Manual session");
+		"D5 case prepares a deliberate disarmed Manual session");
 		const auto held_session = status.manual_preparation_session;
 		vehicle_armed = armed.armed = true;
 		wait([&]() { return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING; },
-		     500000, "D5 case Manual worker runs on both real callback adapters");
+		500000, "D5 case Manual worker runs on both real callback adapters");
 		throttle = -.5F;
 		slaaps_manual_command_s before_loss{};
 		wait([&]() {
@@ -11322,10 +11409,11 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 
 		else if (scenario == 2) { publish_inputs = false; }
 
+		// Raw-input loss ends the session SLA_IN_AGE after the last sample (the pilot request lease), not SLA_OUT_LEASE.
 		wait([&]() {
 			return !status.bench_worker_active && status.bench_entry_status == (scenario == 2 ?
 					slaaps_status_s::BENCH_ENTRY_REJECTED : slaaps_status_s::BENCH_ENTRY_COMPLETE);
-		}, scenario == 1 ? 1200000 : 500000,
+		}, scenario == 1 ? 1200000 : scenario == 2 ? static_cast<uint64_t>(bench.manual_age_ms) * 1000 + 300000 : 500000,
 		"real Bench supervisor stops on GUI disable, immutable total duration or raw-input loss");
 		check(param_get(enable_parameter, &enable_value) == 0 && enable_value == 0,
 		      "every completed or faulted Bench session resets the native enable parameter");
@@ -11493,9 +11581,10 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 			uint64_t reserve{};
 			check(activationReserveUs(bench, reserve), "synthetic EDF profile supplies its explicit full activation reserve");
 			const uint64_t input_age_us = static_cast<uint64_t>(bench.manual_age_ms) * 1000;
-			const uint64_t raw_lease_us = std::min(input_age_us, static_cast<uint64_t>(bench.output_lease_ms) * 1000);
-			check(raw_lease_us > reserve && input_age_us > raw_lease_us,
-			      "held-raw regression distinguishes the shorter EDF lease from configured pilot age");
+			const uint64_t raw_lease_us = edfRequestLeaseUs(bench, ControlMode::EdfBench);
+			check(raw_lease_us > reserve && raw_lease_us == input_age_us
+			      && raw_lease_us > static_cast<uint64_t>(bench.output_lease_ms) * 1000,
+			      "held-raw regression uses the configured pilot age, longer than the output lease, as the EDF request lease");
 			const uint64_t raw_expiry = held_raw.timestamp_sample + raw_lease_us;
 			const uint64_t readiness_expiry = raw_expiry - reserve;
 			publish_manual = false;
@@ -11593,8 +11682,10 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 
 		else if (scenario == 3) { power_scenario = 1; }
 
+		// Input loss ends the session SLA_IN_AGE after the last sample (the pilot request lease), not SLA_OUT_LEASE.
 		wait([&]() { return status.bench_disarm_pending && !status.bench_worker_active && disarm_requests > disarms_before_stop; },
-		scenario == 2 ? 1200000 : 500000, "stop, original duration, input loss or power fault revokes EDF and requests ordinary Commander disarm");
+		scenario == 2 ? 1200000 : scenario == 1 ? static_cast<uint64_t>(bench.manual_age_ms) * 1000 + 300000 : 500000,
+		"stop, original duration, input loss or power fault revokes EDF and requests ordinary Commander disarm");
 
 		if (scenario == 3) {
 			check(status.power_status == slaaps_status_s::POWER_FAULT && !status.power_ready && !status.power_deadline,
@@ -12106,7 +12197,7 @@ static int nativeMixingOutputTests()
 
 				const auto &servo = c.canard[logical];
 				const float value = frame.canards[logical];
-				const float pulse = servo.pwm_neutral + std::fabs(value) * ((value < 0.F ? servo.pwm_negative : servo.pwm_positive) - servo.pwm_neutral);
+				const float pulse = canardPulse(servo, value);
 				const auto &captured = logical % 2 ? main : aux;
 				check(near(captured.lastOutput(7 - logical), pulse), "actual callback receives calibrated mapped canard PWM");
 			}

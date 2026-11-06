@@ -2,6 +2,7 @@
 
 #include <lib/research_actuator_command/BenchOutputLease.hpp>
 #include <lib/research_stabilized_manual/StabilizedManualControl.hpp>
+#include <cmath>
 #include <cstdint>
 
 namespace research_acceleration { struct ContractConfig; }
@@ -45,6 +46,7 @@ struct CanardConfiguration {
 	float local_airflow{}; // measured m/s, not inferred from EDF thrust
 	float bench_mix[kAxes] {};
 	float force_derivative[kAxes] {}; // Signed N/rad, same condition and deflection convention.
+	float zero_offset_deg{}; // Mechanical centre correction; positive toward pwm_positive.
 };
 
 struct AxisConfiguration {
@@ -283,6 +285,29 @@ bool makeManualConfiguration(const VehicleConfiguration &configuration,
 // The full declared activation-reply window plus first-command budget must fit
 // every supporting lease. Failure preserves reserve_us; no deadline is renewed.
 bool activationReserveUs(const VehicleConfiguration &configuration, uint64_t &reserve_us);
+
+// Mechanical centre correction as a whole-microsecond pulse shift, at the calibrated pulses per degree of the side it
+// moves toward. SLA_Cn_PWM_NEG/CTR/POS describe the servo about its own centre; the correction moves all three, so the
+// full calibrated travel stays centred on the true zero deflection.
+struct CanardPulses {
+	float negative{}, neutral{}, positive{};
+};
+
+inline CanardPulses correctedCanardPulses(const CanardConfiguration &c)
+{
+	const float side = c.zero_offset_deg < 0.F ? c.pwm_negative : c.pwm_positive;
+	const float shift = std::fabs(c.zero_offset_deg) / c.maximum_deflection_deg * (side - c.pwm_neutral);
+	const float whole = shift < 0.F ? -std::floor(-shift + .5F) : std::floor(shift + .5F);
+	return {c.pwm_negative + whole, c.pwm_neutral + whole, c.pwm_positive + whole};
+}
+
+// Output pulse for a normalized canard command; the routed output MIN/CENT/MAX must equal the corrected pulses.
+inline float canardPulse(const CanardConfiguration &c, float value)
+{
+	const auto pulses = correctedCanardPulses(c);
+	const float endpoint = value < 0.F ? pulses.negative : pulses.positive;
+	return pulses.neutral + std::fabs(value) * (endpoint - pulses.neutral);
+}
 bool manualActivationTimingConfigured(const VehicleConfiguration &configuration);
 bool benchActivationTimingConfigured(const VehicleConfiguration &configuration);
 

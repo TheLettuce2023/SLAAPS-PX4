@@ -181,3 +181,40 @@ the bank then reported PX4IO defaults and `routing_fault=8` (invalid calibration
 
 Then declare the data record (SLA_DATA_REC, SLA_DATA_REV, SLA_DATA_STATE = Calibrated), set SLA_CFG_KIND = 1 and increase
 SLA_CFG_APPLY while disarmed. `slaaps status` should show `configuration valid=1 use=1`.
+
+## Servo bench (2026-11-05 and 2026-11-06)
+
+The servo bench runs on the board (image `flight-readiness-20261105-benchdiag5`). It needs, disarmed:
+`COM_PREARM_MODE` set so `actuator_armed.prearmed` is true; SLA_CFG_KIND 0 with an increased SLA_CFG_APPLY; and
+SLA_IN_INST set to the joystick's MAVLink instance (2 for USB). After any rejection, leave and re-enter the mode and
+re-apply. Bench-only timing used with the QGC joystick over USB, whose packets arrive with gaps up to about 100 ms:
+SLA_OUT_LEASE 250, SLA_BENCH_GAP 100, SLA_FIRST_CMD_US 40000, SLA_ACT_ACK_US 35000. Restore and re-derive these
+before Manual. The first enable crashed the board: PX4IO runs on `wq:ttyS5`, whose 2 KiB stack overflowed; the board
+file now reserves 4 KiB.
+
+The combined test found the servo 3 and 4 plugs swapped and canards 2 and 4 turning opposite to the recorded positive
+sense (see `docs/PROJECT_CONTEXT.md`, Canards and servos). Both are fixed; the parameter file carries the new slopes and
+bench mix.
+
+From image `flight-readiness-20261106-benchsec`, SLA_BENCH_SEC accepts up to 3600 s for servo targets
+(SLA_BENCH_CH 0-4) so one session can run for a whole check. The EDF target keeps 60 s; a longer duration waits at
+bench entry=1. `SLA_BENCH_EN 0` and leaving the mode stop a session at once; input loss stops it SLA_IN_AGE after the
+last sample.
+
+Current image: `flight-readiness-20261106` (`444f2e5f...`), without the diagnostic status lines. In it a pilot request
+lives for SLA_IN_AGE after its stick sample, independent of SLA_OUT_LEASE, so the QGC joystick no longer needs the
+250 ms output lease: SLA_IN_AGE 300 with SLA_OUT_LEASE 100 covers its gaps. The bench still needs SLA_BENCH_GAP 100,
+SLA_FIRST_CMD_US 40000 and SLA_ACT_ACK_US 35000; restore 50 / 8000 / 3000 before Manual, whose first-command budget
+must stay below SLA_CYCLE_MAX.
+
+Mechanical centring (from image `flight-readiness-20261106-trim2`): SLA_Cn_ZERO, in degrees, per canard, up to +-10.
+It shifts SLA_Cn_PWM_NEG/CTR/POS by the same whole number of microseconds (about 11.1 us/deg here), so command zero, the
+Bench physical zero and the full +-15 deg travel are centred on the true zero. Positive moves toward SLA_Cn_PWM_POS,
+which turns every canard counter-clockwise viewed from outboard: a canard resting 1 deg clockwise of true zero needs
+SLA_Cn_ZERO = +1. On each successful apply SLAAPS writes the shifted pulses to PWM_MAIN_MIN/CENT/MAXn (or PWM_AUX_...)
+of the output that carries the canard, and the routing check requires the output to report them; it also rewrites them
+if they were edited by hand. The shifted pulses must stay within 500-2500 us. Leave SLA_Cn_PWM_NEG/CTR/POS at the servo's
+own calibration (1333/1500/1667). Procedure: leave the SLAAPS mode, set SLA_Cn_ZERO, increase SLA_CFG_APPLY (the console
+prints "canard centre correction: N output limits written"; a rejection names the parameter), check `slaaps status` for
+`routing_fault=0`, re-enter Bench with SLA_BENCH_CH n and the stick centred, and repeat until centred.
+SLA_Cn_TRIM is the modeled zero-moment flight trim, not a mechanical offset.

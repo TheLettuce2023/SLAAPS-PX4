@@ -52,7 +52,7 @@ public:
 		_throttle_high = configuration.manual_throttle_high;
 		_maximum = commissioning ? configuration.edf_commission_max : 1.F;
 		_entry_max = configuration.edf_entry_max;
-		_lease_us = math::min(mapping.maximum_sample_age_us, static_cast<uint64_t>(configuration.output_lease_ms) * 1000);
+		_lease_us = edfRequestLeaseUs(configuration, grant.mode);
 		_sequence = 0;
 		_transfer_us = 0;
 		_clock = grant.timestamp_us;
