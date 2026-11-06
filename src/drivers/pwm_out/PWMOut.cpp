@@ -178,6 +178,16 @@ void PWMOut::Run()
 	perf_begin(_cycle_perf);
 	perf_count(_interval_perf);
 
+#if defined(CONFIG_MODULES_SLAAPS)
+
+	// Resolve the owned channels before the first mixer update creates this rail's SLAAPS bank endpoint. With
+	// DShot or nothing on every FMU timer, DShot is the AUX bank; a second endpoint here would end its lifetime.
+	if (!_pwm_on && update_pwm_out_state(true)) { _pwm_on = true; }
+
+	if (_pwm_initialized && _pwm_mask == 0) { _mixing_output.excludeSlaapsBank(); }
+
+#endif
+
 	_mixing_output.update();
 
 	/* update PWM status if armed or if disarmed PWM values are set */

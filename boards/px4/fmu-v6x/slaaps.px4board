@@ -3,9 +3,13 @@ CONFIG_MODULES_SLAAPS=y
 CONFIG_MODULES_RESEARCH_STABILIZED_MANUAL=n
 CONFIG_RESEARCH_STABILIZED_OUTPUT_HOOK=n
 CONFIG_MODULES_RESEARCH_BENCH_CONTROL=n
-# MAIN/AUX activation validates the shared profile on hp_default. The measured
-# ARM call chain exceeds 2.6 KiB; reserve stack here without changing stock PX4.
+# Bank activation validates the shared profile in the output driver's queue. The
+# measured ARM call chain exceeds 2.6 KiB; reserve stack here without changing
+# stock PX4. AUX (dshot/pwm_out) runs on hp_default. MAIN is PX4IO, which runs on
+# its serial port queue (wq:ttyS5); its 2 KiB default overflowed on the first
+# servo Bench enable.
 CONFIG_WQ_HP_DEFAULT_STACKSIZE=4096
+CONFIG_WQ_TTY_STACKSIZE=4096
 CONFIG_MODULES_FW_AUTOTUNE_ATTITUDE_CONTROL=n
 CONFIG_MODULES_MC_AUTOTUNE_ATTITUDE_CONTROL=n
 # QGC-based SLAAPS target does not use MSP video overlay; retain flash for its control/output owners.

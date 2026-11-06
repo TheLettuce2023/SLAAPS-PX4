@@ -557,7 +557,7 @@ private:
 
 void MixingOutput::initializeSlaapsPreparation()
 {
-	if (_slaaps_preparation) { return; }
+	if (_slaaps_preparation || _slaaps_bank_excluded) { return; }
 
 	int32_t airframe{};
 

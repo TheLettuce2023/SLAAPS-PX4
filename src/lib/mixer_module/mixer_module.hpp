@@ -250,6 +250,10 @@ public:
 	SlaapsOutputStatus slaapsOutputStatus() const { return _slaaps_output_status; }
 	void reportSlaapsInventory(unsigned channel_count, uint32_t hardware_mask, const uint16_t rates[16], bool ready,
 				   uint8_t protocol = 0);
+	// A driver that owns no channel of its rail (pwm_out when DShot or nothing uses every FMU timer) is not an
+	// output bank. Call before the first update(): each bank endpoint admits one publisher, and a second advertiser
+	// ends the real driver's lifetime. Stock mixing stays inhibited on the dedicated airframe.
+	void excludeSlaapsBank() { _slaaps_bank_excluded = true; }
 #endif
 
 	void setLowrateSchedulingInterval(hrt_abstime interval) { _lowrate_schedule_interval = interval; }
@@ -352,6 +356,7 @@ private:
 	bool updateSlaapsPreparation();
 	bool slaapsLocallyReady() const;
 	bool _slaaps_inventory_invalidated{};
+	bool _slaaps_bank_excluded{};
 	uint16_t _slaaps_writing_mask{};
 	SlaapsOutputStatus _slaaps_output_status{SlaapsOutputStatus::Inactive};
 	void destroySlaapsPreparation();

@@ -1249,7 +1249,14 @@ int PX4IO::io_reg_set(uint8_t page, uint8_t offset, const uint16_t *values, unsi
 			      && end > PX4IO_P_SETUP_FEATURES;
 
 	if (num_values && (rates || features || page == PX4IO_PAGE_DISARMED_PWM || page == PX4IO_PAGE_FAILSAFE_PWM)) {
-		_mixing_output.invalidateSlaapsInventory();
+		// Every parameter update rewrites these registers, normally with identical values; that is not a mutation
+		// and must not end an active SLAAPS session. A changed, oversized or unreadable range still invalidates.
+		uint16_t current[PX4IO_MAX_ACTUATORS] {};
+
+		if (num_values > PX4IO_MAX_ACTUATORS || io_reg_get(page, offset, current, num_values) != OK
+		    || memcmp(current, values, num_values * sizeof(*values)) != 0) {
+			_mixing_output.invalidateSlaapsInventory();
+		}
 	}
 
 #endif
