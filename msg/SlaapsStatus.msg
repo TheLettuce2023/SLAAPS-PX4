@@ -80,6 +80,7 @@ uint8 UNAVAILABLE_REGISTRATION = 3
 uint8 AVAILABLE_SERVO_BENCH = 4 # Servo selection only; no arming, EDF or flight permission
 uint8 AVAILABLE_EDF_COMMISSIONING = 5 # Deliberate bounded ground commissioning; never flight admission
 uint8 UNAVAILABLE_FLIGHT_ADMISSION = 6 # Manual output path exists; measured-envelope/recovery admission remains absent
+uint8 AVAILABLE_MANUAL_CAPTIVE = 7 # Captive-stage Manual may run; arming is offered only while its disarmed preparation is complete
 uint8 unavailable_reason
 bool schedule_enabled # Explicit empirical IAS/EDF table selected; not flight qualification
 bool schedule_inputs_valid # Fresh selected IAS/density/voltage observations; not local flow-angle/wash qualification

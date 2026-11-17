@@ -7,6 +7,7 @@
 #include <lib/slaaps/ManualOutputBank.hpp>
 #include <lib/slaaps/ManualBankPreparation.hpp>
 #include <lib/slaaps/ManualActivationBarrier.hpp>
+#include <lib/slaaps/ManualAvailability.hpp>
 #include <lib/slaaps/ManualActivationTransport.hpp>
 #include <lib/slaaps/ObservedRoutingBinding.hpp>
 #include <lib/slaaps/ManualPreparationTransport.hpp>
@@ -79,6 +80,8 @@ static VehicleConfiguration fixture()
 	c.actuator_permission_age_us = 100000;
 	c.activation_ack_timeout_us = 2000;
 	c.first_command_budget_us = 6000;
+	c.bench_activation_ack_timeout_us = 10000;
+	c.bench_first_command_budget_us = 40000;
 	c.bench_gap_ms = 100;
 	c.output_lease_ms = 100;
 	c.centered_enter = .04F;
@@ -625,8 +628,8 @@ static void dataProvenanceTests()
 
 		if (use == ConfigurationUse::EdfCommissioning) {
 			c.edf_commission_max = .25F;
-			c.activation_ack_timeout_us = 10000;
-			c.first_command_budget_us = 40000;
+			c.bench_activation_ack_timeout_us = 10000;
+			c.bench_first_command_budget_us = 40000;
 		}
 
 		for (const auto state : {DataAssessment::Calibrated, DataAssessment::Qualified}) {
@@ -811,8 +814,8 @@ static void manualTimingConfigurationTests()
 
 	auto bench_only = c;
 	bench_only.manual_ready_wait_s = 0;
-	bench_only.activation_ack_timeout_us = 10000;
-	bench_only.first_command_budget_us = 40000;
+	bench_only.bench_activation_ack_timeout_us = 10000;
+	bench_only.bench_first_command_budget_us = 40000;
 	bench_only.edf_commission_max = .25F;
 	check(validate(bench_only, ConfigurationUse::Bench).valid() && benchActivationTimingConfigured(bench_only)
 	      && validate(bench_only, ConfigurationUse::EdfCommissioning).valid(),
@@ -822,12 +825,153 @@ static void manualTimingConfigurationTests()
 	      "an operator wait alone cannot make otherwise absent manual timing configured");
 }
 
+// Commander's run/arm answer for SLAAPS Manual. A mode that cannot run triggers the fallback failsafe at the moment
+// of arming, so the answer stays true for an owned session and is offered for arming only when a captive-stage
+// session is completely prepared.
+static void manualAvailabilityTests()
+{
+	auto c = fixture();
+	c.data_record_id = 1;
+	c.data_assessment = static_cast<int32_t>(DataAssessment::Calibrated);
+	c.recovery.hold_s = 5.F;
+	c.recovery.ramp = 1.F;
+	c.recovery.thrust = 0.F;
+	c.launch.stage = static_cast<int32_t>(FlightStage::Captive);
+	check(validateFlightConfiguration(c).valid(), "Manual availability fixture is a complete captive flight profile");
+
+	ManualAvailabilityState ready{};
+	ready.manual_use_selected = ready.configuration_eligible = ready.modes_registered = ready.routing_valid = true;
+	ready.power_valid = ready.input_valid = ready.prepared = true;
+	check(manualAvailability(c, ready) == ManualAvailability::Prepared,
+	      "a completely prepared captive Manual session may be armed");
+
+	for (unsigned field = 0; field < 7; ++field) {
+		auto state = ready;
+		bool *flag[] = {&state.manual_use_selected, &state.configuration_eligible, &state.modes_registered,
+				&state.routing_valid, &state.power_valid, &state.input_valid, &state.prepared
+			       };
+		*flag[field] = false;
+		check(manualAvailability(c, state) == ManualAvailability::Denied,
+		      "every missing preparation condition denies run and arm");
+	}
+
+	auto launcher = c;
+	launcher.launch.stage = static_cast<int32_t>(FlightStage::Launcher);
+	launcher.launch.airspeed_instance = 0;
+	check(manualAvailability(launcher, ready) == ManualAvailability::Denied, "the launcher stage is never offered for arming");
+	launcher.launch.stage = static_cast<int32_t>(FlightStage::Off);
+	check(manualAvailability(launcher, ready) == ManualAvailability::Denied, "stage Off is never offered for arming");
+
+	auto incomplete = c;
+	incomplete.data_assessment = static_cast<int32_t>(DataAssessment::Incomplete);
+	check(manualAvailability(incomplete, ready) == ManualAvailability::Denied,
+	      "an undeclared data record denies arming");
+	incomplete = c;
+	incomplete.recovery.hold_s = 0.F;
+	check(manualAvailability(incomplete, ready) == ManualAvailability::Denied,
+	      "missing recovery data denies arming");
+
+	// An owned session keeps its run permission through every loss the supervisor handles itself.
+	auto owned = ready;
+	owned.active = true;
+	owned.power_valid = owned.input_valid = owned.routing_valid = owned.prepared = false;
+	check(manualAvailability(c, owned) == ManualAvailability::Run,
+	      "an active session keeps running while the supervisor applies its recovery responses");
+	owned.configuration_eligible = false;
+	check(manualAvailability(c, owned) == ManualAvailability::Denied, "a withdrawn configuration ends the run permission");
+	owned.configuration_eligible = true;
+	owned.manual_use_selected = false;
+	check(manualAvailability(c, owned) == ManualAvailability::Denied, "another configuration scope ends the run permission");
+}
+
+// Flight banks poll every SLA_CYCLE_MIN and bench banks every 20 ms, so each group
+// declares its own activation reply timeout and first-command budget.
+static void perModeActivationTimingTests()
+{
+	auto c = fixture();
+	c.edf_commission_max = .25F; // EDF commissioning validation names the exact bench timing parameter.
+	check(manualActivationTimingConfigured(c) && benchActivationTimingConfigured(c)
+	      && validate(c, ConfigurationUse::StabilizedManual).valid() && validate(c, ConfigurationUse::Bench).valid(),
+	      "flight and bench activation budgets are valid together in one profile");
+
+	auto shared = c;
+	shared.bench_activation_ack_timeout_us = shared.activation_ack_timeout_us;
+	shared.bench_first_command_budget_us = shared.first_command_budget_us;
+	const auto shared_result = validate(shared, ConfigurationUse::EdfCommissioning);
+	check(manualActivationTimingConfigured(shared) && !benchActivationTimingConfigured(shared)
+	      && shared_result.parameter && std::strcmp(shared_result.parameter, "SLA_BN_FIRST_US") == 0,
+	      "flight budgets cannot satisfy the 20 ms bench interval and the bench group names its own parameter");
+
+	auto flight_off = c;
+	flight_off.activation_ack_timeout_us = flight_off.first_command_budget_us = 0;
+	check(!manualActivationTimingConfigured(flight_off) && benchActivationTimingConfigured(flight_off)
+	      && validate(flight_off, ConfigurationUse::Bench).valid()
+	      && validate(flight_off, ConfigurationUse::EdfCommissioning).valid(),
+	      "servo and EDF commissioning use only the bench budgets");
+
+	auto bench_off = c;
+	bench_off.bench_activation_ack_timeout_us = bench_off.bench_first_command_budget_us = 0;
+	check(manualActivationTimingConfigured(bench_off) && !benchActivationTimingConfigured(bench_off)
+	      && validate(bench_off, ConfigurationUse::StabilizedManual).valid(),
+	      "Manual uses only the flight budgets");
+
+	auto bench_ack = c;
+	bench_ack.bench_activation_ack_timeout_us = bench_ack.bench_gap_ms * 1000 - bench_ack.bench_first_command_budget_us;
+	const auto ack_result = validate(bench_ack, ConfigurationUse::EdfCommissioning);
+	check(!ack_result.valid() && ack_result.parameter && std::strcmp(ack_result.parameter, "SLA_BN_ACK_US") == 0,
+	      "bench reply timeout must be strictly below the bench gap minus the bench first-command budget");
+	--bench_ack.bench_activation_ack_timeout_us;
+	check(benchActivationTimingConfigured(bench_ack), "one microsecond below the bench reply boundary is configurable");
+
+	auto bench_first = c;
+	bench_first.bench_first_command_budget_us = static_cast<int32_t>(research_actuator_command::kBenchIntervalUs);
+	check(!benchActivationTimingConfigured(bench_first), "bench first-command budget must exceed the 20 ms bench interval");
+
+	// The QGC parameter file values for the Pixhawk 6X (modeled starting values, not measured qualification).
+	auto board = c;
+	board.cycle_min_us = 4000;
+	board.cycle_max_us = 12000;
+	board.first_command_budget_us = 5000;
+	board.activation_ack_timeout_us = 6500;
+	board.bench_gap_ms = board.output_lease_ms = 100;
+	board.manual_age_ms = 300;
+	board.bench_first_command_budget_us = 40000;
+	board.bench_activation_ack_timeout_us = 35000;
+	check(manualActivationTimingConfigured(board) && benchActivationTimingConfigured(board)
+	      && validate(board, ConfigurationUse::StabilizedManual).valid() && validate(board, ConfigurationUse::Bench).valid()
+	      && validate(board, ConfigurationUse::EdfCommissioning).valid(),
+	      "board timing holds both groups without swapping parameters between Bench and Manual");
+	board.activation_ack_timeout_us = 7000;
+	check(!manualActivationTimingConfigured(board) && benchActivationTimingConfigured(board),
+	      "a flight reply timeout that leaves no first-command time rejects only the flight group");
+
+	// The barrier checks a commissioning session against the bench budgets it was configured with.
+	const ManualOutputBinding binding{42, {51, 52}, 3};
+	const ManualPreparationRequest request{1000, 200000, 1000, 17, fingerprint(c), 77, {88, 99}, binding, 66,
+					       ControlMode::ServoBench};
+	ManualActivationBarrier barrier;
+	check(barrier.begin(2000, c, request, 2000 + static_cast<uint64_t>(c.bench_activation_ack_timeout_us),
+			    static_cast<uint64_t>(c.bench_first_command_budget_us)),
+	      "bench activation accepts the declared bench reply timeout and first-command budget");
+	ManualActivationBarrier flight_budget;
+	check(!flight_budget.begin(2000, c, request, 2000 + static_cast<uint64_t>(c.bench_activation_ack_timeout_us),
+				   static_cast<uint64_t>(c.first_command_budget_us)),
+	      "bench activation refuses the flight first-command budget");
+	ManualActivationBarrier long_reply;
+	check(!long_reply.begin(2000, c, request, 2001 + static_cast<uint64_t>(c.bench_activation_ack_timeout_us),
+				static_cast<uint64_t>(c.bench_first_command_budget_us)),
+	      "bench activation refuses a reply window longer than SLA_BN_ACK_US");
+}
+
 static void activationReserveConfigurationTests()
 {
 	auto c = fixture();
 	uint64_t reserve = 17;
-	check(activationReserveUs(c, reserve) && reserve == 8000,
+	check(activationReserveUs(c, ActivationTiming::Flight, reserve) && reserve == 8000,
 	      "activation reserve is the complete declared reply window plus first-command budget");
+	check(activationReserveUs(c, ActivationTiming::Bench, reserve) && reserve == 50000,
+	      "bench activation reserve uses only the bench reply window and first-command budget");
+	reserve = 8000;
 
 	for (unsigned invalid = 0; invalid < 4; ++invalid) {
 		auto bad = c;
@@ -836,20 +980,23 @@ static void activationReserveConfigurationTests()
 
 		else { bad.first_command_budget_us = invalid == 2 ? 0 : -1; }
 
-		check(!activationReserveUs(bad, reserve) && reserve == 8000,
+		check(!activationReserveUs(bad, ActivationTiming::Flight, reserve) && reserve == 8000,
 		      "missing or negative reserve bounds preserve the caller's destination");
+		check(activationReserveUs(bad, ActivationTiming::Bench, reserve) && reserve == 50000,
+		      "a missing flight reserve does not remove the independently declared bench reserve");
+		reserve = 8000;
 	}
 
 	auto wide = c;
 	wide.activation_ack_timeout_us = wide.first_command_budget_us = std::numeric_limits<int32_t>::max();
-	check(activationReserveUs(wide, reserve)
+	check(activationReserveUs(wide, ActivationTiming::Flight, reserve)
 	      && reserve == 2 * static_cast<uint64_t>(std::numeric_limits<int32_t>::max()),
 	      "reserve arithmetic widens before addition without claiming metadata validity");
 
 	// Explicit synthetic values cover a full 60ms activation window and 80ms
 	// first-command reserve. They do not establish measured timing qualification.
-	c.activation_ack_timeout_us = 60000;
-	c.first_command_budget_us = 80000;
+	c.activation_ack_timeout_us = c.bench_activation_ack_timeout_us = 60000;
+	c.first_command_budget_us = c.bench_first_command_budget_us = 80000;
 	c.cycle_max_us = 200000;
 	c.bench_gap_ms = c.output_lease_ms = c.manual_age_ms = 200;
 	c.actuator_permission_age_us = c.power.maximum_age_us = 200000;
@@ -907,8 +1054,8 @@ static void powerConfigurationTests()
 	      && !validate(c, ConfigurationUse::StabilizedManual).valid(),
 	      "servo-only commissioning stays independent while manual propulsion requires explicit battery selection");
 	c.edf_commission_max = .25F;
-	c.activation_ack_timeout_us = 10000;
-	c.first_command_budget_us = 40000;
+	c.bench_activation_ack_timeout_us = 10000;
+	c.bench_first_command_budget_us = 40000;
 	check(!validate(c, ConfigurationUse::EdfCommissioning).valid(), "armed EDF commissioning cannot use an unconfigured power gate");
 	c.power = fixture().power;
 	check(validate(c, ConfigurationUse::EdfCommissioning).valid(), "EDF commissioning accepts the same explicit power policy as manual");
@@ -2160,8 +2307,8 @@ static void benchWorkerExpiryTests()
 	using namespace research_actuator_command;
 	auto c = fixture();
 	c.mass = c.airflow = 0.F;
-	c.activation_ack_timeout_us = 10000;
-	c.first_command_budget_us = 40000;
+	c.bench_activation_ack_timeout_us = 10000;
+	c.bench_first_command_budget_us = 40000;
 	const ManualOutputBinding binding{42, {51, 52}, 3};
 	auto p = permission(1000, ControlMode::ServoBench);
 	p.configuration = fingerprint(c);
@@ -2219,8 +2366,8 @@ static void edfCommissioningTests()
 
 	c.edf_voltage = 0.F;
 	c.edf_commission_max = .05F;
-	c.activation_ack_timeout_us = 10000;
-	c.first_command_budget_us = 40000;
+	c.bench_activation_ack_timeout_us = 10000;
+	c.bench_first_command_budget_us = 40000;
 	check(validate(c, ConfigurationUse::EdfCommissioning).valid()
 	      && !validate(c, ConfigurationUse::StabilizedManual).valid(),
 	      "explicit EDF ground profile needs servo calibration, input, ceiling and slew but no flight plant or thrust curve");
@@ -2237,7 +2384,7 @@ static void edfCommissioningTests()
 
 		case 3: bad.manual_throttle_high = bad.manual_throttle_low; break;
 
-		case 4: bad.first_command_budget_us = 20000; break;
+		case 4: bad.bench_first_command_budget_us = 20000; break;
 
 		case 5: bad.edf_fall = 0.F; break;
 		}
@@ -4654,6 +4801,8 @@ static int runConfigurationTests()
 	vehicleWrenchAllocationTests();
 	dataProvenanceTests();
 	activationReserveConfigurationTests();
+	perModeActivationTimingTests();
+	manualAvailabilityTests();
 	powerConfigurationTests();
 	profileTests();
 	benchTravelBoundsTests();
@@ -6150,8 +6299,8 @@ static void nativeInitialPreparationUnreadyTests()
 	NativePermissionPublisher permission_publisher;
 	auto c = fixture();
 	c.edf_commission_max = .25F;
-	c.activation_ack_timeout_us = 10000;
-	c.first_command_budget_us = 30000;
+	c.bench_activation_ack_timeout_us = 10000;
+	c.bench_first_command_budget_us = 30000;
 	const auto snapshot = routingSnapshotFixture();
 	const ManualOutputBinding binding{42, {51, 52}, 3};
 	const ReportedRoutingPolicy policy{5000, 5000};
@@ -8017,9 +8166,12 @@ struct SlaapsNativeTest {
 	static void injectOrdinaryDisarm(bool at_capture);
 	static void supplyPermission(hrt_abstime, slaaps::EdfPermission &permission)
 	{
+		// Only flight admission and the measured condition are synthetic here. `healthy` stays the supervisor's own
+		// computation: forcing it hid a production defect (armed activation required an activation that follows it).
 		const bool allow = admitted.load() && permission.armed && !permission.kill
 				   && !permission.lockdown && !permission.termination;
-		permission.flight_admitted = permission.healthy = permission.measured_condition_valid = allow;
+		permission.flight_admitted = permission.measured_condition_valid = allow;
+		permission.healthy = permission.healthy && allow;
 	}
 };
 std::atomic<bool> SlaapsNativeTest::admitted{false};
@@ -11127,12 +11279,23 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		flight_establish_session();
 		SlaapsNativeTest::admitted.store(true);
 		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[kManualMode];
+		const uint32_t manual_bit = 1U << status.mode_id[kManualMode];
+		const uint32_t acceleration_bit = 1U << status.mode_id[kAccelerationMode];
+		check(!(status.can_run_mask & manual_bit) && !(status.can_arm_mask & manual_bit),
+		      "Manual is neither runnable nor armable before any session is prepared");
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED; }, 500000,
 		"D5 case prepares a deliberate disarmed Manual session");
+		wait([&]() { return (status.can_run_mask & manual_bit) && (status.can_arm_mask & manual_bit); }, 300000,
+		"a completely prepared captive Manual session is published as runnable and armable");
+		check(status.unavailable_reason == slaaps_status_s::AVAILABLE_MANUAL_CAPTIVE
+		      && !(status.can_run_mask & acceleration_bit) && !(status.can_arm_mask & acceleration_bit),
+		      "only Manual is offered; Acceleration stays denied");
 		const auto held_session = status.manual_preparation_session;
 		vehicle_armed = armed.armed = true;
 		wait([&]() { return status.manual_worker_active && status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING; },
 		500000, "D5 case Manual worker runs on both real callback adapters");
+		check((status.can_run_mask & manual_bit) && !(status.can_run_mask & acceleration_bit),
+		      "an armed running Manual session keeps its run permission, so Commander raises no fallback failsafe");
 		throttle = -.5F;
 		slaaps_manual_command_s before_loss{};
 		wait([&]() {
@@ -11230,8 +11393,8 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	bench.manual_component = c.manual_component;
 	bench.manual_age_ms = 500;
 	bench.selected_status_age_us = bench.actuator_permission_age_us = 1000000;
-	bench.activation_ack_timeout_us = 60000;
-	bench.first_command_budget_us = 80000;
+	bench.bench_activation_ack_timeout_us = 60000;
+	bench.bench_first_command_budget_us = 80000;
 	bench.bench_gap_ms = bench.output_lease_ms = 200;
 	bench.centered_enter = c.centered_enter;
 	bench.centered_exit = c.centered_exit;
@@ -11579,7 +11742,7 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 			manual_control_setpoint_s held_raw{}, observed_raw{};
 			check(diagnostic_raw.copy(&held_raw), "capture the exact raw pilot sample before pausing only its publisher");
 			uint64_t reserve{};
-			check(activationReserveUs(bench, reserve), "synthetic EDF profile supplies its explicit full activation reserve");
+			check(activationReserveUs(bench, ActivationTiming::Bench, reserve), "synthetic EDF profile supplies its explicit full activation reserve");
 			const uint64_t input_age_us = static_cast<uint64_t>(bench.manual_age_ms) * 1000;
 			const uint64_t raw_lease_us = edfRequestLeaseUs(bench, ControlMode::EdfBench);
 			check(raw_lease_us > reserve && raw_lease_us == input_age_us
@@ -12324,8 +12487,8 @@ static int nativeMixingOutputTests()
 
 	for (float &inertia : c.inertia) { inertia = 0.F; }
 
-	c.activation_ack_timeout_us = 10000;
-	c.first_command_budget_us = 40000;
+	c.bench_activation_ack_timeout_us = 10000;
+	c.bench_first_command_budget_us = 40000;
 	c.canard[0].minimum = -.2F;
 	c.canard[0].maximum = .35F;
 	installNativeMixerConfiguration(c);

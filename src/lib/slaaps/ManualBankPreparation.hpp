@@ -69,6 +69,10 @@ public:
 		       (configuration.bench_gap_ms > 0 ? static_cast<uint64_t>(configuration.bench_gap_ms) * 1000 : 0) :
 		       (configuration.cycle_max_us > 0 ? static_cast<uint64_t>(configuration.cycle_max_us) : 0);
 	}
+	static ActivationTiming activationTiming(ControlMode mode)
+	{
+		return commissioningMode(mode) ? ActivationTiming::Bench : ActivationTiming::Flight;
+	}
 	static bool activationTimingConfigured(const VehicleConfiguration &configuration, ControlMode mode)
 	{
 		return flightMode(mode) ? manualActivationTimingConfigured(configuration) :

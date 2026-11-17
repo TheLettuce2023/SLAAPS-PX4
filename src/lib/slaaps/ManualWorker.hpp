@@ -507,6 +507,8 @@ public:
 	}
 	uint64_t handledSequence() const { return _active ? _handled_sequence : 0; }
 	bool recovering() const { return _recovering; }
+	// Mode of the session being recovered; None when no recovery is in progress.
+	ControlMode recoveryMode() const { return _recovering ? _recovery_mode : ControlMode::None; }
 	uint8_t failedBanks() const { return _recovering ? _failed_banks : 0; }
 	uint64_t recoveryBaseSequence() const { return _recovering ? _recovery_base_sequence : 0; }
 	// Supervisor- or transport-detected loss (mode left, power, estimator) while the core itself is still

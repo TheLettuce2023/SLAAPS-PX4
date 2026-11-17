@@ -34,12 +34,13 @@ public:
 		    || activation_deadline_us <= now || activation_deadline_us > request.deadline_us
 		    || activation_deadline_us - now >= ManualBankPreparation::cycleMaximumUs(configuration, request.mode) - first_command_budget_us
 		    || (ManualBankPreparation::commissioningMode(request.mode)
-			&& (first_command_budget_us != static_cast<uint64_t>(configuration.first_command_budget_us)
-			    || activation_deadline_us - now > static_cast<uint64_t>(configuration.activation_ack_timeout_us)))) { return rejectBegin(); }
+			&& (first_command_budget_us != static_cast<uint64_t>(configuration.bench_first_command_budget_us)
+			    || activation_deadline_us - now > static_cast<uint64_t>(configuration.bench_activation_ack_timeout_us)))) { return rejectBegin(); }
 
 		_request = request;
 		_banks = request.binding.banks;
 		_received = 0;
+		_reply_us[0] = _reply_us[1] = 0;
 		_started = now;
 		_deadline = activation_deadline_us;
 		_budget = first_command_budget_us;
@@ -62,6 +63,8 @@ public:
 		    || ack.first_command_deadline_us - ack.activated_us > _cycle_max
 		    || ack.first_command_deadline_us - now <= _budget
 		    || ((_received & (1U << bank)) && !sameManualActivation(ack, _acks[bank]))) { return reject(); }
+
+		if (!(_received & (1U << bank))) { _reply_us[bank] = now - _started; }
 
 		_acks[bank] = ack;
 		_received |= 1U << bank;
@@ -101,12 +104,16 @@ public:
 	}
 	void cancel() { reject(); }
 	uint8_t requiredBanks() const { return _banks; }
+	// Diagnostics only: banks whose reply arrived, and each reply's delay from begin() to its acceptance.
+	uint8_t receivedBanks() const { return _received; }
+	uint64_t replyUs(unsigned bank) const { return bank < 2 ? _reply_us[bank] : 0; }
 private:
 	ActivationStatus reject() { _status = ActivationStatus::Rejected; return _status; }
 	bool rejectBegin() { reject(); return false; }
 	ManualPreparationRequest _request{};
 	ManualActivationAck _acks[2] {};
 	uint64_t _clock{}, _last_session{}, _started{}, _deadline{}, _budget{}, _cycle_max{};
+	uint64_t _reply_us[2] {};
 	uint8_t _banks{}, _received{};
 	ActivationStatus _status{ActivationStatus::Inactive};
 };

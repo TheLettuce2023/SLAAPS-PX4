@@ -1,13 +1,15 @@
 # SLAAPS inertia tensor (kg m^2) and 10S propulsion voltage range (SLA_PWR_VMIN 30 V = 3.0 V/cell, VMAX 42 V) at CG, body FRD (x forward, y right, z down), kg m^2.
-# Ixx, Iyy, Izz: project-lead values (2026-10-26). Ixy, Ixz, Iyz: 0 by declared symmetry of the project lead, NOT measured.
+# Data sheet 2026-11-12 (CAD): mass 2.05 kg, CG 0.233 m from the tail end, IMU 0.268 m, canard COP 0.166 m forward of CG.
+# CAD MMOI (kg mm^2, at CG) rotated into body FRD. CAD frame (project lead, 2026-11-12): +Z forward; viewed from behind,
+# +Y between right and up (45 deg from right), +X between left and up (225 deg from down).
 # Load in QGC (Parameters > Tools > Load from file) while the SLAAPS configuration is disabled; edit any entry there.
 # Vehicle-Id	Component-Id	Name	Value	Type
-1	1	SLA_I_XX	0.0072	9
-1	1	SLA_I_YY	0.0595	9
-1	1	SLA_I_ZZ	0.0595	9
-1	1	SLA_I_XY	0	9
-1	1	SLA_I_XZ	0	9
-1	1	SLA_I_YZ	0	9
+1	1	SLA_I_XX	0.0027886	9
+1	1	SLA_I_YY	0.0337643	9
+1	1	SLA_I_ZZ	0.0337507	9
+1	1	SLA_I_XY	0.0000084	9
+1	1	SLA_I_XZ	0.0000847	9
+1	1	SLA_I_YZ	-0.0000077	9
 1	1	SLA_PWR_VMIN	30	9
 1	1	SLA_PWR_VMAX	42	9
 1	1	SLA_EDF_RISE	2.5	9
@@ -53,63 +55,63 @@
 1	1	SLA_C3_SLOPE	0.261799	9
 1	1	SLA_C4_SLOPE	-0.261799	9
 1	1	SLA_C1_DFX	0.00000	9
-1	1	SLA_C1_DFY	-0.39233	9
-1	1	SLA_C1_DFZ	-0.39233	9
-1	1	SLA_C1_DMR	-0.02219	9
-1	1	SLA_C1_DMP	0.09157	9
-1	1	SLA_C1_DMY	-0.09157	9
+1	1	SLA_C1_DFY	-3.71437	9
+1	1	SLA_C1_DFZ	-3.71437	9
+1	1	SLA_C1_DMR	-0.21012	9
+1	1	SLA_C1_DMP	0.61658	9
+1	1	SLA_C1_DMY	-0.61658	9
 1	1	SLA_C2_DFX	0.00000	9
-1	1	SLA_C2_DFY	-0.39233	9
-1	1	SLA_C2_DFZ	0.39233	9
-1	1	SLA_C2_DMR	0.02219	9
-1	1	SLA_C2_DMP	-0.09157	9
-1	1	SLA_C2_DMY	-0.09157	9
+1	1	SLA_C2_DFY	-3.71437	9
+1	1	SLA_C2_DFZ	3.71437	9
+1	1	SLA_C2_DMR	0.21012	9
+1	1	SLA_C2_DMP	-0.61658	9
+1	1	SLA_C2_DMY	-0.61658	9
 1	1	SLA_C3_DFX	0.00000	9
-1	1	SLA_C3_DFY	0.39233	9
-1	1	SLA_C3_DFZ	0.39233	9
-1	1	SLA_C3_DMR	-0.02219	9
-1	1	SLA_C3_DMP	-0.09157	9
-1	1	SLA_C3_DMY	0.09157	9
+1	1	SLA_C3_DFY	3.71437	9
+1	1	SLA_C3_DFZ	3.71437	9
+1	1	SLA_C3_DMR	-0.21012	9
+1	1	SLA_C3_DMP	-0.61658	9
+1	1	SLA_C3_DMY	0.61658	9
 1	1	SLA_C4_DFX	0.00000	9
-1	1	SLA_C4_DFY	0.39233	9
-1	1	SLA_C4_DFZ	-0.39233	9
-1	1	SLA_C4_DMR	0.02219	9
-1	1	SLA_C4_DMP	0.09157	9
-1	1	SLA_C4_DMY	0.09157	9
+1	1	SLA_C4_DFY	3.71437	9
+1	1	SLA_C4_DFZ	-3.71437	9
+1	1	SLA_C4_DMR	0.21012	9
+1	1	SLA_C4_DMP	0.61658	9
+1	1	SLA_C4_DMY	0.61658	9
 1	1	SLA_C1_SL_UNC	0.05	9
-1	1	SLA_C1_DUR	0.01110	9
-1	1	SLA_C1_DUP	0.04579	9
-1	1	SLA_C1_DUY	0.04579	9
+1	1	SLA_C1_DUR	0.10506	9
+1	1	SLA_C1_DUP	0.30829	9
+1	1	SLA_C1_DUY	0.30829	9
 1	1	SLA_C2_SL_UNC	0.05	9
-1	1	SLA_C2_DUR	0.01110	9
-1	1	SLA_C2_DUP	0.04579	9
-1	1	SLA_C2_DUY	0.04579	9
+1	1	SLA_C2_DUR	0.10506	9
+1	1	SLA_C2_DUP	0.30829	9
+1	1	SLA_C2_DUY	0.30829	9
 1	1	SLA_C3_SL_UNC	0.05	9
-1	1	SLA_C3_DUR	0.01110	9
-1	1	SLA_C3_DUP	0.04579	9
-1	1	SLA_C3_DUY	0.04579	9
+1	1	SLA_C3_DUR	0.10506	9
+1	1	SLA_C3_DUP	0.30829	9
+1	1	SLA_C3_DUY	0.30829	9
 1	1	SLA_C4_SL_UNC	0.05	9
-1	1	SLA_C4_DUR	0.01110	9
-1	1	SLA_C4_DUP	0.04579	9
-1	1	SLA_C4_DUY	0.04579	9
-1	1	SLA_AIRSPD	13	9
+1	1	SLA_C4_DUR	0.10506	9
+1	1	SLA_C4_DUP	0.30829	9
+1	1	SLA_C4_DUY	0.30829	9
+1	1	SLA_AIRSPD	40	9
 1	1	SLA_C1_TRIM	0	9
-1	1	SLA_C1_WASH	13	9
+1	1	SLA_C1_WASH	40	9
 1	1	SLA_C1_BMR	-1	9
 1	1	SLA_C1_BMP	1	9
 1	1	SLA_C1_BMY	-1	9
 1	1	SLA_C2_TRIM	0	9
-1	1	SLA_C2_WASH	13	9
+1	1	SLA_C2_WASH	40	9
 1	1	SLA_C2_BMR	-1	9
 1	1	SLA_C2_BMP	1	9
 1	1	SLA_C2_BMY	1	9
 1	1	SLA_C3_TRIM	0	9
-1	1	SLA_C3_WASH	13	9
+1	1	SLA_C3_WASH	40	9
 1	1	SLA_C3_BMR	-1	9
 1	1	SLA_C3_BMP	-1	9
 1	1	SLA_C3_BMY	1	9
 1	1	SLA_C4_TRIM	0	9
-1	1	SLA_C4_WASH	13	9
+1	1	SLA_C4_WASH	40	9
 1	1	SLA_C4_BMR	-1	9
 1	1	SLA_C4_BMP	-1	9
 1	1	SLA_C4_BMY	-1	9
@@ -121,7 +123,7 @@
 1	1	SLA_C3_DELAY	0.008	9
 1	1	SLA_C4_LAG	0.05	9
 1	1	SLA_C4_DELAY	0.008	9
-1	1	SLA_MASS	2.1	9
+1	1	SLA_MASS	2.05	9
 1	1	SLA_CG_Y	0	9
 1	1	SLA_CG_Z	0	9
 1	1	SLA_EDF_T0	0	9
@@ -130,10 +132,11 @@
 1	1	SLA_EDF_T3	29.42	9
 1	1	SLA_EDF_T4	39.2266	9
 1	1	SLA_EDF_VOLT	42	9
-1	1	SLA_R_M_SCALE	0.019	9
-1	1	SLA_P_M_SCALE	0.077	9
-1	1	SLA_Y_M_SCALE	0.077	9
-1	1	SLA_CG_X	0.2716	9
+1	1	SLA_EDF_BMAX	1	9
+1	1	SLA_R_M_SCALE	0.176	9
+1	1	SLA_P_M_SCALE	0.5165	9
+1	1	SLA_Y_M_SCALE	0.5165	9
+1	1	SLA_CG_X	0.233	9
 1	1	SLA_R_INPUT	0	6
 1	1	SLA_P_INPUT	1	6
 1	1	SLA_Y_INPUT	2	6
@@ -142,42 +145,48 @@
 1	1	SLA_Y_SIGN	1	9
 1	1	SLA_THR_LOW	-1	9
 1	1	SLA_THR_HIGH	1	9
-1	1	EKF2_IMU_POS_X	0.05215	9
+# SLAAPS observes exactly one estimator (SelectedStateObservation singleEstimator): without these four values the
+# selected state is never valid and Manual entry never leaves 'waiting for input'. Reboot after loading.
+1	1	EKF2_MULTI_IMU	0	6
+1	1	EKF2_MULTI_MAG	0	6
+1	1	SENS_IMU_MODE	1	6
+1	1	SENS_MAG_MODE	1	6
+1	1	EKF2_IMU_POS_X	0.035	9
 1	1	EKF2_IMU_POS_Y	0	9
 1	1	EKF2_IMU_POS_Z	-0.01	9
 # Modeled starting values derived 2026-10-27 (rate loop from inertia and modeled canard authority, timing
 # from PX4 publication rates); see docs/PROJECT_CONTEXT.md. Pending project-lead review; not measured.
-1	1	SLA_R_RATE_P	1.89	9
-1	1	SLA_R_RATE_I	1.89	9
+1	1	SLA_R_RATE_P	0.0792	9
+1	1	SLA_R_RATE_I	0.0792	9
 1	1	SLA_R_RATE_D	0.0	9
 1	1	SLA_R_I_LIM	0.3	9
 1	1	SLA_R_M_LIM	1.0	9
 1	1	SLA_R_WEIGHT	1.0	9
 1	1	SLA_R_ATT_P	1.43	9
 1	1	SLA_R_RATE	2.0	9
-1	1	SLA_R_SP_ACC	1.85	9
+1	1	SLA_R_SP_ACC	44.2	9
 1	1	SLA_R_MEAS_R	15.0	9
 1	1	SLA_R_MEAS_A	1000.0	9
-1	1	SLA_P_RATE_P	3.09	9
-1	1	SLA_P_RATE_I	2.47	9
+1	1	SLA_P_RATE_P	0.261	9
+1	1	SLA_P_RATE_I	0.209	9
 1	1	SLA_P_RATE_D	0.0	9
 1	1	SLA_P_I_LIM	0.3	9
 1	1	SLA_P_M_LIM	1.0	9
 1	1	SLA_P_WEIGHT	1.0	9
 1	1	SLA_P_ATT_P	1.14	9
 1	1	SLA_P_RATE	1.0	9
-1	1	SLA_P_SP_ACC	0.91	9
+1	1	SLA_P_SP_ACC	10.7	9
 1	1	SLA_P_MEAS_R	15.0	9
 1	1	SLA_P_MEAS_A	1000.0	9
-1	1	SLA_Y_RATE_P	3.09	9
-1	1	SLA_Y_RATE_I	2.47	9
+1	1	SLA_Y_RATE_P	0.261	9
+1	1	SLA_Y_RATE_I	0.209	9
 1	1	SLA_Y_RATE_D	0.0	9
 1	1	SLA_Y_I_LIM	0.3	9
 1	1	SLA_Y_M_LIM	1.0	9
 1	1	SLA_Y_WEIGHT	1.0	9
 1	1	SLA_Y_ATT_P	1.14	9
 1	1	SLA_Y_RATE	1.0	9
-1	1	SLA_Y_SP_ACC	0.91	9
+1	1	SLA_Y_SP_ACC	10.7	9
 1	1	SLA_Y_MEAS_R	15.0	9
 1	1	SLA_Y_MEAS_A	1000.0	9
 1	1	SLA_IN_SOURCE	2	6
@@ -187,11 +196,16 @@
 1	1	SLA_MAN_WAIT	30	6
 1	1	SLA_STATUS_AGE	1500000	6
 1	1	SLA_ARM_AGE	800000	6
-1	1	SLA_ACT_ACK_US	3000	6
-1	1	SLA_FIRST_CMD_US	8000	6
+# Activation timing per mode (2026-11-10, modeled): flight banks poll every SLA_CYCLE_MIN, bench banks every 20 ms.
+# Flight: SLA_ACT_ACK_US covers one 4 ms bank poll plus driver time; SLA_ACT_ACK_US + SLA_FIRST_CMD_US < SLA_CYCLE_MAX.
+# Bench: SLA_BN_* and SLA_BENCH_GAP 100 are the values that ran the servo bench on the Pixhawk 6X.
+1	1	SLA_ACT_ACK_US	6500	6
+1	1	SLA_FIRST_CMD_US	5000	6
+1	1	SLA_BN_ACK_US	35000	6
+1	1	SLA_BN_FIRST_US	40000	6
 1	1	SLA_CYCLE_MIN	4000	6
 1	1	SLA_CYCLE_MAX	12000	6
-1	1	SLA_BENCH_GAP	50	6
+1	1	SLA_BENCH_GAP	100	6
 1	1	SLA_OUT_LEASE	100	6
 1	1	SLA_STK_ENTER	0.05	9
 1	1	SLA_STK_EXIT	0.08	9
@@ -214,7 +228,16 @@
 1	1	SLA_IN_COMP	190	6
 1	1	SLA_PWR_INST	0	6
 1	1	SLA_PWR_ID	1	6
-1	1	SLA_PWR_SRC	0	6
+1	1	SLA_PWR_SRC	1	6
 1	1	SLA_REC_HOLD	2.0	9
 1	1	SLA_REC_RAMP	0.5	9
 1	1	SLA_REC_THR	0.0	9
+# Data record 20261110 revision 3 (wind tunnel 18-40 m/s): modeled derivatives, moment scales and rate gains at 40 m/s.
+# Incomplete until the project lead declares it Calibrated (SLA_DATA_STATE 1). Revision 2 (measured data) was declared
+# Calibrated by the project lead, Kael Spry, 2026-11-12; revision 3 changes only modeled values.
+# SLA_Cn_ZERO stay 0 here by the lead's choice; canards are trimmed manually on the board after loading this file.
+# Revision 1 was declared Calibrated by the project lead, Kael Spry, 2026-11-10.
+# See docs/SLAAPS_DATA_RECORD.md for what it covers; modeled values stay modeled.
+1	1	SLA_DATA_REC	20261110	6
+1	1	SLA_DATA_REV	3	6
+1	1	SLA_DATA_STATE	0	6

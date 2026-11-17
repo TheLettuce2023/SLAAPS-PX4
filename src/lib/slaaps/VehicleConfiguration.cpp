@@ -129,9 +129,15 @@ bool validThrustCurve(const VehicleConfiguration &c)
 	return true;
 }
 
-ConfigurationResult activationTiming(const VehicleConfiguration &c, uint64_t minimum, uint64_t maximum,
-				     const char *cycle_parameter)
+ConfigurationResult activationTiming(const VehicleConfiguration &c, ActivationTiming group, uint64_t minimum,
+				     uint64_t maximum, const char *cycle_parameter)
 {
+	const bool bench = group == ActivationTiming::Bench;
+	const char *first_parameter = bench ? "SLA_BN_FIRST_US" : "SLA_FIRST_CMD_US";
+	const char *ack_parameter = bench ? "SLA_BN_ACK_US" : "SLA_ACT_ACK_US";
+	const int32_t first_command = firstCommandBudgetUs(c, group);
+	const int32_t activation_ack = activationAckTimeoutUs(c, group);
+
 	if (c.selected_status_age_us <= 0 || c.selected_status_age_us > kMaximumStatusAgeUs) {
 		return {ConfigurationFault::InvalidTiming, "SLA_STATUS_AGE"};
 	}
@@ -144,21 +150,21 @@ ConfigurationResult activationTiming(const VehicleConfiguration &c, uint64_t min
 		return {ConfigurationFault::InvalidTiming, cycle_parameter};
 	}
 
-	if (c.first_command_budget_us <= 0 || static_cast<uint64_t>(c.first_command_budget_us) <= minimum
-	    || static_cast<uint64_t>(c.first_command_budget_us) >= maximum) {
-		return {ConfigurationFault::InvalidTiming, "SLA_FIRST_CMD_US"};
+	if (first_command <= 0 || static_cast<uint64_t>(first_command) <= minimum
+	    || static_cast<uint64_t>(first_command) >= maximum) {
+		return {ConfigurationFault::InvalidTiming, first_parameter};
 	}
 
 	// Ordered positive bounds make the subtraction safe. Match the activation
 	// barrier's strict remaining-cycle inequality without adding signed times.
-	if (c.activation_ack_timeout_us <= 0
-	    || static_cast<uint64_t>(c.activation_ack_timeout_us) >= maximum - static_cast<uint64_t>(c.first_command_budget_us)) {
-		return {ConfigurationFault::InvalidTiming, "SLA_ACT_ACK_US"};
+	if (activation_ack <= 0
+	    || static_cast<uint64_t>(activation_ack) >= maximum - static_cast<uint64_t>(first_command)) {
+		return {ConfigurationFault::InvalidTiming, ack_parameter};
 	}
 
 	uint64_t reserve{};
 
-	if (!activationReserveUs(c, reserve)) { return {ConfigurationFault::InvalidTiming, "SLA_ACT_ACK_US"}; }
+	if (!activationReserveUs(c, group, reserve)) { return {ConfigurationFault::InvalidTiming, ack_parameter}; }
 
 	// Admission reserves the complete declared reply window, not only a lucky
 	// early reply. Original live sample expiry still needs an independent check.
@@ -178,11 +184,13 @@ ConfigurationResult activationTiming(const VehicleConfiguration &c, uint64_t min
 	return {};
 }
 
-ConfigurationResult propulsionActivationTiming(const VehicleConfiguration &c)
+ConfigurationResult propulsionActivationTiming(const VehicleConfiguration &c, ActivationTiming group)
 {
 	uint64_t reserve{};
 
-	if (!activationReserveUs(c, reserve)) { return {ConfigurationFault::InvalidTiming, "SLA_ACT_ACK_US"}; }
+	if (!activationReserveUs(c, group, reserve)) {
+		return {ConfigurationFault::InvalidTiming, group == ActivationTiming::Bench ? "SLA_BN_ACK_US" : "SLA_ACT_ACK_US"};
+	}
 
 	// The original selected battery report bounds every propulsion permission.
 	if (c.power.maximum_age_us <= 0 || static_cast<uint64_t>(c.power.maximum_age_us) + 1 <= reserve) {
@@ -194,7 +202,7 @@ ConfigurationResult propulsionActivationTiming(const VehicleConfiguration &c)
 
 ConfigurationResult manualActivationTiming(const VehicleConfiguration &c)
 {
-	const auto timing = activationTiming(c, c.cycle_min_us > 0 ? static_cast<uint64_t>(c.cycle_min_us) : 0,
+	const auto timing = activationTiming(c, ActivationTiming::Flight, c.cycle_min_us > 0 ? static_cast<uint64_t>(c.cycle_min_us) : 0,
 					     c.cycle_max_us > 0 ? static_cast<uint64_t>(c.cycle_max_us) : 0, "SLA_CYCLE_MAX");
 
 	if (!timing.valid()) { return timing; }
@@ -208,7 +216,7 @@ ConfigurationResult manualActivationTiming(const VehicleConfiguration &c)
 
 ConfigurationResult benchActivationTiming(const VehicleConfiguration &c)
 {
-	return activationTiming(c, research_actuator_command::kBenchIntervalUs,
+	return activationTiming(c, ActivationTiming::Bench, research_actuator_command::kBenchIntervalUs,
 				c.bench_gap_ms > 0 ? static_cast<uint64_t>(c.bench_gap_ms) * kUsPerMs : 0, "SLA_BENCH_GAP");
 }
 
@@ -741,12 +749,15 @@ ConfigurationResult validateAccelerationControlConfiguration(const VehicleConfig
 	return {};
 }
 
-bool activationReserveUs(const VehicleConfiguration &c, uint64_t &reserve_us)
+bool activationReserveUs(const VehicleConfiguration &c, ActivationTiming timing, uint64_t &reserve_us)
 {
-	if (c.activation_ack_timeout_us <= 0 || c.first_command_budget_us <= 0) { return false; }
+	const int32_t activation_ack = activationAckTimeoutUs(c, timing);
+	const int32_t first_budget = firstCommandBudgetUs(c, timing);
 
-	const auto activation = static_cast<uint64_t>(c.activation_ack_timeout_us);
-	const auto first_command = static_cast<uint64_t>(c.first_command_budget_us);
+	if (activation_ack <= 0 || first_budget <= 0) { return false; }
+
+	const auto activation = static_cast<uint64_t>(activation_ack);
+	const auto first_command = static_cast<uint64_t>(first_budget);
 
 	if (activation > UINT64_MAX - first_command) { return false; }
 
@@ -1048,7 +1059,7 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 		if (!positive(c.edf_fall)) { return {ConfigurationFault::InvalidController, "SLA_EDF_FALL"}; }
 
 		const auto timing = benchActivationTiming(c);
-		return timing.valid() ? propulsionActivationTiming(c) : timing;
+		return timing.valid() ? propulsionActivationTiming(c, ActivationTiming::Bench) : timing;
 	}
 
 	if (!positive(c.mass)) { return {ConfigurationFault::InvalidInertia, "SLA_MASS"}; }
@@ -1107,7 +1118,7 @@ ConfigurationResult validate(const VehicleConfiguration &c, ConfigurationUse use
 
 		if (!timing.valid()) { return timing; }
 
-		const auto propulsion_timing = propulsionActivationTiming(c);
+		const auto propulsion_timing = propulsionActivationTiming(c, ActivationTiming::Flight);
 
 		if (!propulsion_timing.valid()) { return propulsion_timing; }
 	}

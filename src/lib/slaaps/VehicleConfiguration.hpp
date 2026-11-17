@@ -226,8 +226,10 @@ struct VehicleConfiguration {
 	int32_t manual_ready_wait_s{}; // One bounded disarmed operator window, not an output lease.
 	int32_t selected_status_age_us{};
 	int32_t actuator_permission_age_us{};
-	int32_t activation_ack_timeout_us{};
-	int32_t first_command_budget_us{};
+	int32_t activation_ack_timeout_us{}; // Manual and Acceleration.
+	int32_t first_command_budget_us{}; // Manual and Acceleration.
+	int32_t bench_activation_ack_timeout_us{};
+	int32_t bench_first_command_budget_us{};
 	int32_t cycle_min_us{};
 	int32_t cycle_max_us{};
 	int32_t bench_gap_ms{};
@@ -284,7 +286,18 @@ bool makeManualConfiguration(const VehicleConfiguration &configuration,
 // but cannot activate. Configured bounds are not runtime timing qualification.
 // The full declared activation-reply window plus first-command budget must fit
 // every supporting lease. Failure preserves reserve_us; no deadline is renewed.
-bool activationReserveUs(const VehicleConfiguration &configuration, uint64_t &reserve_us);
+// Flight banks poll every SLA_CYCLE_MIN and bench banks every 20 ms, so the two
+// groups keep separate reply timeouts and first-command budgets.
+enum class ActivationTiming : uint8_t { Flight, Bench };
+inline int32_t activationAckTimeoutUs(const VehicleConfiguration &c, ActivationTiming timing)
+{
+	return timing == ActivationTiming::Bench ? c.bench_activation_ack_timeout_us : c.activation_ack_timeout_us;
+}
+inline int32_t firstCommandBudgetUs(const VehicleConfiguration &c, ActivationTiming timing)
+{
+	return timing == ActivationTiming::Bench ? c.bench_first_command_budget_us : c.first_command_budget_us;
+}
+bool activationReserveUs(const VehicleConfiguration &configuration, ActivationTiming timing, uint64_t &reserve_us);
 
 // Mechanical centre correction as a whole-microsecond pulse shift, at the calibrated pulses per degree of the side it
 // moves toward. SLA_Cn_PWM_NEG/CTR/POS describe the servo about its own centre; the correction moves all three, so the

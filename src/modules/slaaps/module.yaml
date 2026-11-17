@@ -2705,7 +2705,7 @@
         },
         "SLA_ACT_ACK_US": {
           "description": {
-            "short": "Activation reply timeout; below cycle maximum minus first-command budget",
+            "short": "Manual/Acceleration activation reply timeout; below SLA_CYCLE_MAX minus SLA_FIRST_CMD_US",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "int32",
@@ -2716,7 +2716,29 @@
         },
         "SLA_FIRST_CMD_US": {
           "description": {
-            "short": "First-command budget; strictly between cycle minimum and maximum",
+            "short": "Manual/Acceleration first-command budget; strictly between SLA_CYCLE_MIN and SLA_CYCLE_MAX",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_BN_ACK_US": {
+          "description": {
+            "short": "Bench activation reply timeout; below SLA_BENCH_GAP minus SLA_BN_FIRST_US",
+            "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
+          },
+          "type": "int32",
+          "min": 0,
+          "max": 500000,
+          "default": 0,
+          "unit": "us"
+        },
+        "SLA_BN_FIRST_US": {
+          "description": {
+            "short": "Bench first-command budget; strictly between the 20 ms bench interval and SLA_BENCH_GAP",
             "long": "SLAAPS vehicle configuration. Edit while disabled and apply a complete validated configuration before mode entry. Zero physical defaults are unconfigured, not vehicle measurements. Saving parameters does not establish flight readiness."
           },
           "type": "int32",

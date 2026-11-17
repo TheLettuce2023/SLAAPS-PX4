@@ -1476,6 +1476,7 @@ def main():
                         "SLA_BENCH_SEC": 5, "SLA_IN_AGE": 500, "SLA_STATUS_AGE": 1000000,
                         "SLA_ARM_AGE": 1000000, "SLA_BENCH_GAP": 200, "SLA_OUT_LEASE": 200,
                         "SLA_ACT_ACK_US": 60000, "SLA_FIRST_CMD_US": 80000,
+                        "SLA_BN_ACK_US": 60000, "SLA_BN_FIRST_US": 80000,
                         "COM_PREARM_MODE": 2}  # Commander enum: Always prearmed; still disarmed.
         for name, value in bench_values.items():
             client("param", "set", name, str(value))

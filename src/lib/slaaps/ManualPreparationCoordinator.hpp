@@ -239,6 +239,7 @@ public:
 		const auto prepared = pollObservedLive(now, configuration, snapshot, result);
 		return startActivation(now, configuration, revisions, deadline, budget, prepared, &snapshot, result);
 	}
+	const ManualActivationBarrier &activationBarrier() const { return _activation; }
 	ActivationStatus pollActivation(uint64_t now, const VehicleConfiguration &configuration, const OutputInventory &inventory)
 	{
 		if (_observed_mode) { return rejectActivation(now); }

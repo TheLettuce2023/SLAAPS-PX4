@@ -40,6 +40,8 @@ public:
 	// D3/D4 recovery keeps command publication and acknowledgment subscriptions after a controller fault.
 	// The supervisor must call recoverObserved every cycle; stop() ends recovery for good.
 	bool recovering() const { return _recovering; }
+	// Mode of the session being recovered; None when no recovery is in progress.
+	ControlMode recoveryMode() const { return _recovering ? _worker.recoveryMode() : ControlMode::None; }
 	// Loss detected outside the core. Recovery starts only if the core has a handled flight frame.
 	ManualWorkerStatus abandon(ManualWorkerStatus reason)
 	{

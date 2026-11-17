@@ -3,6 +3,7 @@
 #include <lib/slaaps/ManualExecution.hpp>
 #include <lib/slaaps/ManualPreparationCoordinator.hpp>
 #include <lib/slaaps/ManualPermissionTransport.hpp>
+#include <lib/slaaps/ManualAvailability.hpp>
 #include <lib/research_stabilized_manual/SelectedStateObservation.hpp>
 #include <lib/slaaps/OperatingConditionObservation.hpp>
 #include <lib/slaaps/PowerObservation.hpp>
@@ -157,6 +158,8 @@ private:
 				     bool *normal_disarm = nullptr);
 	unsigned permissionRevision() { return _permission_revision && _permission_lifetime.revision() == _permission_revision ? _permission_revision : 0; }
 	void publishStatus(hrt_abstime now);
+	// Commander's run/arm answer for SLAAPS Manual; captive stage only (see ManualAvailability.hpp).
+	slaaps::ManualAvailability manualAvailability(hrt_abstime now) const;
 	void publishAccelerationStatus(hrt_abstime now);
 	void updateSchedule();
 	void updateCompanion(hrt_abstime now);
@@ -199,6 +202,21 @@ private:
 	slaaps::ManualPreparationRequest _prepared_request{};
 	unsigned _manual_activation_revisions[2] {};
 	uint64_t _manual_first_command_deadline{};
+	// Last activation attempt's measured bank replies (diagnostic only, never an admission input).
+	uint64_t _activation_reply_us[2] {};
+	uint64_t _activation_reply_limit_us{};
+	uint8_t _activation_reply_banks{}, _activation_reply_received{};
+	bool _activation_reply_bench{};
+	void noteActivationReplies(uint64_t limit_us, bool bench)
+	{
+		const auto &barrier = _preparation.activationBarrier();
+		_activation_reply_us[0] = barrier.replyUs(0);
+		_activation_reply_us[1] = barrier.replyUs(1);
+		_activation_reply_banks = barrier.requiredBanks();
+		_activation_reply_received = barrier.receivedBanks();
+		_activation_reply_limit_us = limit_us;
+		_activation_reply_bench = bench;
+	}
 	slaaps::ControlMode _flight_transfer_target{slaaps::ControlMode::None};
 	uint64_t _flight_transfer_us{}, _flight_transfer_deadline{};
 	slaaps::EdfPermission _flight_previous_permission{};
@@ -572,6 +590,34 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 	}
 }
 
+slaaps::ManualAvailability Slaaps::manualAvailability(hrt_abstime now) const
+{
+	if (!_configuration.hasCandidate()) { return slaaps::ManualAvailability::Denied; }
+
+	slaaps::ManualAvailabilityState state{};
+	state.manual_use_selected = _selected_use == 1;
+	// Accepted and never invalidated by an observed edit. eligible() would be wrong here: it also requires the
+	// activation that only follows arming.
+	state.configuration_eligible = _configuration.hasCandidate();
+	state.modes_registered = !_registration_fault && _modes[kManualMode].configured;
+	state.routing_valid = _routing_valid;
+	state.power_valid = _power_valid && now < _power_sample.deadline_us;
+	state.input_valid = _input_metadata_valid;
+	state.prepared = _manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED
+			 && _preparation_status == slaaps::PreparationStatus::Ready && now < _preparation_deadline;
+	// Only a session this supervisor prepared as Manual owns the Manual run permission. An Acceleration or Bench
+	// session, including its recovery, never advertises Manual.
+	// A session handed over to Acceleration keeps its prepared Manual request, so the worker's own mode decides.
+	const bool manual_session = _prepared_request.mode == slaaps::ControlMode::Manual
+				    && _manual.mode() != slaaps::ControlMode::Acceleration
+				    && _manual.recoveryMode() != slaaps::ControlMode::Acceleration;
+	state.active = manual_session && (_manual.active() || _manual.recovering() || _reentry || _manual_activation_owned
+					  || _manual_entry_status == slaaps_status_s::MANUAL_ENTRY_ACTIVATING
+					  || _manual_entry_status == slaaps_status_s::MANUAL_ENTRY_FIRST_COMMAND
+					  || _manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING);
+	return slaaps::manualAvailability(_configuration.configuration(), state);
+}
+
 void Slaaps::answerChecks(hrt_abstime now)
 {
 	arming_check_request_s request{};
@@ -592,8 +638,9 @@ void Slaaps::answerChecks(hrt_abstime now)
 		reply.mode_req_prevent_arming = i == kBenchMode && !(_bench_can_arm && now < _bench_can_arm_deadline);
 		// Bench is selectable independently of its explicit output enable. Its
 		// prevent-arming requirement and zero can_arm mask remain independent.
-		reply.can_arm_and_run = i == kBenchMode && _bench_can_run && _configuration.hasCandidate()
-					&& (_selected_use == 0 || (_selected_use == 2 && _power_valid && now < _power_sample.deadline_us));
+		reply.can_arm_and_run = (i == kBenchMode && _bench_can_run && _configuration.hasCandidate()
+					 && (_selected_use == 0 || (_selected_use == 2 && _power_valid && now < _power_sample.deadline_us)))
+					|| (i == kManualMode && manualAvailability(now) != slaaps::ManualAvailability::Denied);
 		_arming_reply.publish(reply);
 	}
 }
@@ -1425,8 +1472,10 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting, slaaps::Con
 	// never sets either flight flag.
 	if (!bench) {
 		const bool launcher = static_cast<slaaps::FlightStage>(configuration.launch.stage) == slaaps::FlightStage::Launcher;
+		// The accepted, never-invalidated candidate, not eligible(): eligibility needs the activation this very
+		// permission authorizes, so requiring it here made every armed activation reject itself.
 		permission.healthy = permission.armed && !permission.kill && !permission.lockdown && !permission.termination
-				     && !armed.in_esc_calibration_mode && _input_metadata_valid && _routing_valid && _configuration.eligible()
+				     && !armed.in_esc_calibration_mode && _input_metadata_valid && _routing_valid && _configuration.hasCandidate()
 				     && !_registration_fault;
 		// A disarmed permission is always a complete denial, whatever the profile or power state.
 		permission.measured_condition_valid = permission.armed && _power_valid && now < _power_sample.deadline_us;
@@ -1694,7 +1743,22 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 	if (waiting) { _manual_entry_status = slaaps_status_s::MANUAL_ENTRY_ACTIVATING; return; }
 
 	if (!slaaps::ManualBankPreparation::permitted(_manual_permission, current_mode)) {
-		cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected);
+		// Disarm, kill, lockdown, termination and a lost lease were rejected above. If flight admission and the measured
+		// condition still hold and only `healthy` dropped, the supervisor's own health (estimator state, routing) was
+		// lost while armed and intact: a D3 loss. Freeze the canards and ramp the EDF off. A plain cancel would drop
+		// the output stream, leaving the canards unpowered. Loss of admission itself keeps the existing cancel.
+		const bool health_loss = _manual_permission.armed && _manual_permission.flight_admitted
+					 && _manual_permission.measured_condition_valid && !_manual_permission.healthy;
+
+		if (health_loss && _flight_transfer_target == slaaps::ControlMode::None) {
+			_manual_status = _manual.abandon(slaaps::ManualWorkerStatus::ControlRejected);
+		}
+
+		if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
+
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: control lost, canards hold, EDF ramping off");
+		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_REJECTED;
+		updateRecovery(hrt_absolute_time(), vehicle, armed, armed_fresh);
 		return;
 	}
 
@@ -2199,7 +2263,8 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 		uint64_t reserve{};
 		now = hrt_absolute_time();
 
-		if (!slaaps::activationReserveUs(configuration, reserve) || raw_timestamp > UINT64_MAX - raw_age
+		if (!slaaps::activationReserveUs(configuration, slaaps::ActivationTiming::Flight, reserve)
+		    || raw_timestamp > UINT64_MAX - raw_age
 		    || _manual_permission.deadline_us <= now || _manual_permission.deadline_us - now <= reserve
 		    || _preparation_deadline <= now || _preparation_deadline - now <= reserve
 		    || raw_timestamp + raw_age <= now || raw_timestamp + raw_age - now <= reserve) {
@@ -2234,6 +2299,7 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 	}
 
 	const auto activation = _preparation.pollActivationObservedLive(now, configuration, _routing_snapshot, _inventory_fault);
+	noteActivationReplies(static_cast<uint64_t>(configuration.activation_ack_timeout_us), false);
 
 	if (activation == slaaps::ActivationStatus::Waiting) { return; }
 
@@ -2565,7 +2631,7 @@ void Slaaps::updateBench(hrt_abstime now)
 		if (_preparation_status == slaaps::PreparationStatus::Waiting) { return; }
 
 		if (_preparation_status != slaaps::PreparationStatus::Ready
-		    || now > UINT64_MAX - static_cast<uint64_t>(configuration.activation_ack_timeout_us)) {
+		    || now > UINT64_MAX - static_cast<uint64_t>(configuration.bench_activation_ack_timeout_us)) {
 			cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return;
 		}
 
@@ -2579,7 +2645,9 @@ void Slaaps::updateBench(hrt_abstime now)
 			uint64_t reserve{};
 
 			if (_bench_sample.timestamp_sample_us > UINT64_MAX - raw_age
-			    || !slaaps::activationReserveUs(configuration, reserve)) { cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return; }
+			    || !slaaps::activationReserveUs(configuration, slaaps::ActivationTiming::Bench, reserve)) {
+				cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return;
+			}
 
 			edf_raw_deadline = _bench_sample.timestamp_sample_us + raw_age;
 			const uint64_t original_deadline = math::min(_preparation_deadline,
@@ -2598,7 +2666,7 @@ void Slaaps::updateBench(hrt_abstime now)
 		uint64_t reserve{};
 		now = hrt_absolute_time();
 
-		if (!slaaps::activationReserveUs(configuration, reserve)
+		if (!slaaps::activationReserveUs(configuration, slaaps::ActivationTiming::Bench, reserve)
 		    || _manual_permission.deadline_us <= now || _manual_permission.deadline_us - now <= reserve
 		    || _preparation_deadline <= now || _preparation_deadline - now <= reserve
 		    || (edf && (edf_raw_deadline <= now || edf_raw_deadline - now <= reserve))) {
@@ -2614,10 +2682,11 @@ void Slaaps::updateBench(hrt_abstime now)
 			cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return;
 		}
 
-		const uint64_t deadline = math::min(_preparation_deadline, now + static_cast<uint64_t>(configuration.activation_ack_timeout_us));
+		const uint64_t deadline = math::min(_preparation_deadline,
+						    now + static_cast<uint64_t>(configuration.bench_activation_ack_timeout_us));
 
 		if (!_preparation.beginActivationObservedLive(now, configuration, _routing_snapshot, _inventory_fault,
-				_manual_activation_revisions, deadline, configuration.first_command_budget_us)) {
+				_manual_activation_revisions, deadline, configuration.bench_first_command_budget_us)) {
 			cancelBench(now, slaaps_status_s::BENCH_ENTRY_REJECTED); return;
 		}
 
@@ -2627,6 +2696,7 @@ void Slaaps::updateBench(hrt_abstime now)
 	}
 
 	const auto activation = _preparation.pollActivationObservedLive(now, configuration, _routing_snapshot, _inventory_fault);
+	noteActivationReplies(static_cast<uint64_t>(configuration.bench_activation_ack_timeout_us), true);
 
 	if (activation == slaaps::ActivationStatus::Waiting) { return; }
 
@@ -3274,8 +3344,21 @@ void Slaaps::publishStatus(hrt_abstime now)
 		if (status.bench_commissioning_ready) { status.can_arm_mask = status.can_run_mask; }
 	}
 
-	// Only an exact disarmed prepared EDF session permits operator arming.
-	// Neither commissioning mode confers Manual/acceleration flight admission.
+	// SLAAPS Manual may run only for a session the supervisor owns and may be armed only once its disarmed
+	// preparation is complete (captive stage). Acceleration stays denied. Nothing here grants output permission.
+	const auto manual_availability = manualAvailability(now);
+
+	if (manual_availability != slaaps::ManualAvailability::Denied && status.configuration_valid
+	    && _modes[kManualMode].id >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
+	    && _modes[kManualMode].id <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8) {
+		status.can_run_mask |= 1U << _modes[kManualMode].id;
+		status.unavailable_reason = slaaps_status_s::AVAILABLE_MANUAL_CAPTIVE;
+
+		if (manual_availability == slaaps::ManualAvailability::Prepared) { status.can_arm_mask |= 1U << _modes[kManualMode].id; }
+	}
+
+	// Only an exact disarmed prepared EDF session permits operator arming in Bench.
+	// Commissioning modes confer no Manual/acceleration flight admission.
 	_status.publish(status);
 	publishAccelerationStatus(now);
 	publishFlightStatus(now);
@@ -3566,6 +3649,10 @@ int Slaaps::print_status()
 	PX4_INFO("routing snapshot=%d inventory_fault=%u routing_fault=%u index=%d bank=%u channel=%u",
 		 status.routing_snapshot_valid, status.inventory_fault, status.routing_fault, status.io_index,
 		 status.io_bank, status.io_channel);
+	PX4_INFO("activation %s reply main=%llu aux=%llu us banks=%u received=%u limit=%llu us (last attempt; not qualification)",
+		 _activation_reply_bench ? "bench" : "flight",
+		 static_cast<unsigned long long>(_activation_reply_us[0]), static_cast<unsigned long long>(_activation_reply_us[1]),
+		 _activation_reply_banks, _activation_reply_received, static_cast<unsigned long long>(_activation_reply_limit_us));
 	PX4_INFO("manual preparation=%u session=%llu banks=%u deadline=%llu (no flight admission)",
 		 status.manual_preparation_status, static_cast<unsigned long long>(status.manual_preparation_session),
 		 status.manual_preparation_banks, static_cast<unsigned long long>(status.manual_preparation_deadline));
