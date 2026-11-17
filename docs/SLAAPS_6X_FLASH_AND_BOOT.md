@@ -218,3 +218,46 @@ own calibration (1333/1500/1667). Procedure: leave the SLAAPS mode, set SLA_Cn_Z
 prints "canard centre correction: N output limits written"; a rejection names the parameter), check `slaaps status` for
 `routing_fault=0`, re-enter Bench with SLA_BENCH_CH n and the stick centred, and repeat until centred.
 SLA_Cn_TRIM is the modeled zero-moment flight trim, not a mechanical offset.
+
+## Per-mode activation timing (2026-11-10)
+
+Bench and Manual no longer share the activation budgets, so nothing is swapped between them.
+Image: `build/slaaps_firmware/flight-readiness-20261110-timing/` (`56d81d74...`).
+
+| Parameter | Value | Used by |
+| --- | --- | --- |
+| `SLA_BN_ACK_US` | 35000 | Servo and EDF Bench |
+| `SLA_BN_FIRST_US` | 40000 | Servo and EDF Bench |
+| `SLA_BENCH_GAP` | 100 | Servo and EDF Bench |
+| `SLA_ACT_ACK_US` | 6500 | Manual and Acceleration |
+| `SLA_FIRST_CMD_US` | 5000 | Manual and Acceleration |
+
+The Manual values are modeled. After the first armed Manual entry, `slaaps status` shows the measured reply time of each
+bank (`activation flight reply main=... aux=...`) against the limit.
+
+After flashing an image with this change:
+1. Load the parameter file, or set the five values above in the MAVLink console.
+2. Re-enter the board's `SLA_Cn_ZERO` values. The file still has 0.
+3. Increase `SLA_CFG_APPLY` while disarmed.
+
+## Armed Manual, restrained (image `flight-readiness-20261116-manual-arm2`, 2026-11-16)
+
+Image `65afa8656ad9bff7423d11bdd40cfc489d132db812dffdbf9ffd1fdaf34a9476`; `ver all` shows `Build datetime: Nov 16 2026 16:01:05`.
+The earlier image `336e7eba...` is superseded: arming it was accepted, then rejected 0.25 s later. It lets SLAAPS Manual be armed and run
+through Commander for the captive stage (`SLA_FLT_STAGE` 1). Before it, Manual could not be armed (`can_arm_and_run`
+was Bench-only), and force-arming gave an immediate failsafe with no output.
+
+Preconditions, all disarmed: external compass calibrated and selected, `ekf2 status` showing one estimator,
+`power ready=1`, `SLA_IN_INST` matching the joystick link, data record Calibrated, `SLA_CFG_KIND` 1 applied.
+
+1. Select SLAAPS Manual, sticks centred, throttle low. `slaaps status` reaches `manual entry=8` and `flight unavailable=7`.
+2. Arm from QGC, **not** `commander arm -f`. If QGC still refuses, `commander check` names the reason.
+3. Armed Manual holds the EDF at DShot idle (109) at zero throttle: restrain the vehicle, clear the exhaust, keep a hand
+   on the pack disconnect.
+4. `slaaps status` should step to `manual entry=10`, `11`, `12` (activating, first command, running). The line
+   `activation flight reply main=... aux=...` shows the real bank reply time against the 6500 us limit.
+5. Do not raise throttle on the first run. Check that the canards respond to hand-tilting the vehicle in the stabilizing
+   direction, then each stick in the matching direction. A reversed axis is a stop, not a trim.
+6. Stop by disarming, or by leaving the mode (canards freeze, EDF ramps off), or by pulling the pack.
+
+If arming is refused or the mode fails after arming, send `slaaps status`, `commander check` and the ulog.

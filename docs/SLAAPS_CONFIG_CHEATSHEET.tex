@@ -1,0 +1,291 @@
+% SLAAPS configuration cheat sheet.
+% Build: pdflatex SLAAPS_CONFIG_CHEATSHEET.tex
+% Packages: geometry, multicol, booktabs, xcolor, enumitem, fancyhdr, lmodern (TeX Live recommended/extra).
+% Not yet compiled on this machine (no TeX installation): report any build error.
+% Values are those in Tools/slaaps/parameters/slaaps_vehicle.params (data record 20261110) and the
+% firmware image flight-readiness-20261116-manual-arm. Modeled values are marked (M).
+\documentclass[10pt,landscape]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.9cm,top=1.1cm,bottom=1.0cm]{geometry}
+\usepackage{multicol}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+
+\definecolor{hdr}{HTML}{1F4E79}
+\definecolor{warn}{HTML}{9C2B1B}
+\definecolor{ok}{HTML}{2E6B34}
+
+\newcommand{\p}[1]{\texttt{\detokenize{#1}}}          % parameter or command text
+\newcommand{\sect}[1]{\par\vspace{3pt}{\color{hdr}\large\bfseries #1}\par\vspace{-2pt}{\color{hdr}\hrule height 0.6pt}\vspace{3pt}}
+\newcommand{\warn}[1]{{\color{warn}\bfseries #1}}
+\newcommand{\good}[1]{{\color{ok}\bfseries #1}}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2pt}
+\setlength{\columnsep}{0.7cm}
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\setlist{nosep,leftmargin=1.1em,itemsep=1pt}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\lhead{\small\bfseries SLAAPS configuration cheat sheet}
+\rhead{\small image 20261116-manual-arm \quad record 20261110 \quad 2026-11-16}
+\cfoot{\small Software status only. Nothing here is flight acceptance. (M) = modeled value, not measured.}
+
+\begin{document}
+\footnotesize
+\begin{multicols}{3}
+
+%------------------------------------------------------------------------------------------------
+\sect{1. \texttt{SLA\_CFG\_KIND}: which profile is applied}
+\begin{tabular}{@{}c p{1.7cm} p{3.0cm}@{}}
+\toprule
+\textbf{Value} & \textbf{Scope} & \textbf{Use it for}\\
+\midrule
+\p{0} & Servo bench & Canard commissioning with \p{SLA_BENCH_CH} 0--4. Needs \p{COM_PREARM_MODE} so the vehicle is prearmed. EDF inhibited.\\
+\p{1} & Stabilized manual & \textbf{SLAAPS Manual} (restrained or tunnel). Needs power, one estimator, flight data record.\\
+\p{2} & EDF commissioning & Armed EDF Bench, \p{SLA_BENCH_CH} 5. Needs \p{SLA_EDF_BMAX} above 0 and valid power.\\
+\bottomrule
+\end{tabular}
+
+\vspace{3pt}
+\textbf{Apply procedure} (every scope change, every parameter file load, every image flash):
+\begin{enumerate}[label=\arabic*.]
+\item Disarmed, and \emph{outside} the SLAAPS modes (select a stock mode).
+\item \p{param set SLA_CFG_KIND <0|1|2>}
+\item \p{param set SLA_CFG_APPLY <new value>}. The value must \emph{change}: setting the same number does nothing.
+\item \p{slaaps status}: look for \p{configuration valid=1 use=N fault=0}.
+\item Reselect the SLAAPS mode.
+\end{enumerate}
+If \p{valid=0}: read \p{fault=} (section 6) and the line \p{configuration rejected parameter=<name>}.
+
+\textbf{Rules}
+\begin{itemize}
+\item Any edit to a SLAAPS parameter after an apply invalidates the accepted profile until the next apply.
+\item Loading the parameter file resets every value in it, including the canard trims \p{SLA_C1_ZERO}..\p{SLA_C4_ZERO} (file value 0): re-enter them.
+\item An entry rejection latches. Leave the SLAAPS mode and reselect it.
+\item \p{SLA_BENCH_EN} is never restored at boot. Saved 1 reads back as 0.
+\item The profile apply checks values only. Calibration, qualification and flight acceptance are separate.
+\end{itemize}
+
+%------------------------------------------------------------------------------------------------
+\sect{2. Bench targets}
+\begin{tabular}{@{}p{3.1cm} p{3.4cm}@{}}
+\toprule
+\p{SLA_BENCH_CH} & 0 combined mix, 1--4 canard $n$, 5 EDF\\
+\p{SLA_BENCH_SEC} & Session length: servo up to 3600 s, EDF 60 s\\
+\p{SLA_BENCH_EN} & 1 enable, 0 stop and revoke\\
+\p{SLA_BENCH_GAP} & 100 ms maximum bench cycle gap\\
+\p{SLA_EDF_BMAX} & EDF Bench ceiling, 0..1, now \textbf{1}. Full stick $=$ this value (about 39 N)\\
+\bottomrule
+\end{tabular}
+
+\textbf{EDF Bench order:} \p{SLA_CFG_KIND} 2, apply, set CH 5 and SEC, select Bench (mode 25), stick fully low, \p{SLA_BENCH_EN 1}, arm in QGC, raise stick slowly. Stop: \p{SLA_BENCH_EN 0}, disarm, or pull the pack.
+
+%------------------------------------------------------------------------------------------------
+\sect{3. Mode IDs and flight stage}
+Mode IDs: Manual \textbf{23}, Acceleration \textbf{24}, Bench \textbf{25}.
+
+\begin{tabular}{@{}c p{5.6cm}@{}}
+\toprule
+\p{SLA_FLT_STAGE} & Meaning\\
+\midrule
+0 & Off: every flight flag denied\\
+1 & \textbf{Captive}: no airspeed gate. The only stage that can arm Manual\\
+2 & Launcher: needs a fresh airspeed above \p{SLA_LAUNCH_AS}. Manual arming not offered\\
+\bottomrule
+\end{tabular}
+
+Data record: \p{SLA_DATA_REC} 20261110, \p{SLA_DATA_REV} 2 (rev 3 in the file is unsigned), \p{SLA_DATA_STATE} 1 Calibrated (0 Incomplete, 2 Qualified). Flight admission needs state 1 or 2.
+
+%------------------------------------------------------------------------------------------------
+\sect{4. Manual startup: \texttt{manual entry=N}}
+\begin{tabular}{@{}c p{2.15cm} p{3.4cm}@{}}
+\toprule
+\textbf{N} & \textbf{State} & \textbf{What it needs}\\
+\midrule
+0 & Inactive & Manual not selected\\
+1 & Wait config & Applied profile with \p{use=1}\\
+2 & Wait routing & Both banks report expected outputs\\
+14 & Wait power & \p{battery_status} valid, 30--42 V\\
+3 & Wait input & New sample from pinned source; one estimator valid (\p{input metadata=1})\\
+4 & Wait centre & Sticks within 0.05\\
+5 & Wait throttle & Throttle at low end, within 0.05\\
+6 & Wait state & Estimator fresh (20 ms)\\
+7 & Preparing & Banks answering\\
+\textbf{8} & \good{Prepared} & Disarmed, nothing written. \p{flight unavailable=7}, arming offered\\
+9 & \warn{Rejected} & Latched. Leave and reselect\\
+10 & Activating & Armed. Banks confirm (6.5 ms window)\\
+11 & First command & First frame handled\\
+\textbf{12} & \good{Running} & Controller cycling\\
+13 & Wait schedule & Only with the airspeed schedule enabled\\
+\bottomrule
+\end{tabular}
+
+\textbf{Operator window:} \p{SLA_MAN_WAIT} 30 s from selection. If states 1--8 are not reached in time the entry is rejected (9).
+
+%------------------------------------------------------------------------------------------------
+\sect{5. Key parameters (file, plus board settings)}
+\textbf{Pilot input}\\
+\begin{tabular}{@{}p{2.55cm} p{4.0cm}@{}}
+\p{SLA_IN_SOURCE} & 2 pinned MAVLink (1 RC only)\\
+\p{SLA_IN_INST} & MAVLink instance $=$ \p{data_source} $-$ 2. \textbf{2 on USB}, 0 on TELEM1 radio\\
+\p{SLA_IN_SYS/COMP} & 255 / 190 (QGC)\\
+\p{SLA_IN_AGE} & 300 ms pilot sample and request lifetime\\
+\p{SLA_R/P/Y_INPUT} & 0 / 1 / 2\\
+\p{SLA_R/P/Y_SIGN} & +1 / $-$1 / +1 (verified)\\
+\p{SLA_THR_LOW/HIGH} & $-$1 / +1\\
+\p{SLA_STK_ENTER/EXIT} & 0.05 / 0.08\\
+\p{SLA_EDF_ENTRY} & 0.05 low-throttle entry band\\
+\end{tabular}
+
+\textbf{Estimator (SLAAPS observes exactly one)}\\
+\begin{tabular}{@{}p{2.55cm} p{4.0cm}@{}}
+\p{EKF2_MULTI_IMU} & 0\\
+\p{EKF2_MULTI_MAG} & 0\\
+\p{SENS_IMU_MODE} & 1\\
+\p{SENS_MAG_MODE} & 1\\
+\p{CAL_MAG0/1_PRIO} & 75 enables, 0 disables a compass\\
+\end{tabular}
+Any other value gives \p{input metadata=0}: entry stalls at state 3.
+
+\textbf{Power (PM08-CAN on CAN2, node 124)}\\
+\begin{tabular}{@{}p{2.55cm} p{4.0cm}@{}}
+\p{SLA_PWR_INST/ID/SRC} & 0 / 1 / 1 (must equal \p{listener battery_status})\\
+\p{SLA_PWR_VMIN/VMAX} & 30 / 42 V\\
+\p{SLA_PWR_AGE} & 0.5 s (report rate is 10 Hz)\\
+\p{UAVCAN_SUB_BAT} & 2\\
+\p{BAT1_SOURCE} & 1 external\\
+\p{UAVCAN_SUB_DPRES} & 1 (pitot, node 125 on CAN1)\\
+\end{tabular}
+
+\textbf{Timing (M)}\\
+\begin{tabular}{@{}p{2.55cm} p{4.0cm}@{}}
+\p{SLA_CYCLE_MIN/MAX} & 4000 / 12000 \textmu s\\
+\p{SLA_ACT_ACK_US} & 6500 \textmu s flight reply window\\
+\p{SLA_FIRST_CMD_US} & 5000 \textmu s flight first-command budget\\
+\p{SLA_BN_ACK_US} & 35000 \textmu s bench\\
+\p{SLA_BN_FIRST_US} & 40000 \textmu s bench\\
+\p{SLA_OUT_LEASE} & 100 ms frame and permission lease\\
+\p{SLA_STATE_AGE/SKEW} & 20 / 10 ms\\
+\p{SLA_STATUS_AGE} & 1.5 s (EKF2 flags republish at 1 Hz)\\
+\p{SLA_ARM_AGE} & 0.8 s\\
+\end{tabular}
+
+\textbf{Recovery}\\
+\begin{tabular}{@{}p{2.55cm} p{4.0cm}@{}}
+\p{SLA_REC_HOLD} & 2 s attitude and EDF hold (D1)\\
+\p{SLA_REC_RAMP} & 0.5 per second ramp-off\\
+\p{SLA_REC_THR} & 0 recovery thrust\\
+\p{SLA_EDF_RISE/FALL} & 2.5 / 10 per second command slew (M)\\
+\end{tabular}
+
+Limit: D4, EDF off within 60 s of any recovery start.
+
+%------------------------------------------------------------------------------------------------
+\sect{6. Decoding \texttt{slaaps status}}
+\textbf{\p{configuration ... fault=}}\\
+\begin{tabular}{@{}c l c l@{}}
+0 & none & 8 & thrust curve\\
+1 & parameter range & 9 & already active\\
+2 & missing record & 10 & no candidate\\
+3 & inertia & 11 & wrench\\
+4 & servo & 12 & feedback\\
+5 & timing & 13 & acceleration control\\
+6 & effectiveness & 14 & recovery data\\
+7 & controller & 15 & flight data\\
+\end{tabular}
+
+\textbf{\p{power ... status=}}\\
+\begin{tabular}{@{}c l c l@{}}
+1 & \good{valid} & 7 & fault flag\\
+2 & no battery topic & 8 & powering off\\
+3 & publisher changed & 9 & stale or invalid time\\
+4 & id/source mismatch & 10 & invalid voltage\\
+5 & disconnected & 11 & outside VMIN/VMAX\\
+6 & warning flag & 0 & not configured\\
+\end{tabular}
+
+Status 9 after a rejection is a side effect: the held sample ages out. Read the entry state instead.
+
+\textbf{\p{flight unavailable=}}\\
+\begin{tabular}{@{}c l c l@{}}
+0 & configuration & 5 & EDF commissioning ready\\
+1 & output integration & 6 & flight admission denied\\
+2 & acceleration port & 7 & \good{Manual may run}\\
+3 & registration & & \\
+4 & servo bench ready & & \\
+\end{tabular}
+
+%------------------------------------------------------------------------------------------------
+\sect{7. Console commands (MAVLink console)}
+\begin{tabular}{@{}p{3.15cm} p{3.4cm}@{}}
+\p{slaaps status} & All SLAAPS state\\
+\p{listener slaaps_status} & Full status message\\
+\p{listener manual_control_setpoint} & \p{data_source}, sender IDs\\
+\p{listener battery_status} & Voltage, id, source\\
+\p{listener airspeed} & Pitot indicated speed\\
+\p{listener estimator_status_flags} & Alignment, heading\\
+\p{listener failsafe_flags} & Failsafe inputs\\
+\p{uorb top -1 <topic>} & Publish rate\\
+\p{ekf2 status} & Instances, selected mag\\
+\p{uavcan status} & CAN1/CAN2 counters, nodes\\
+\p{commander check} & Preflight result (reasons in \p{dmesg})\\
+\p{param show SLA_IN_*} & Pattern show\\
+\p{hardfault_log rearm} & Clear a stored fault\\
+\p{dmesg} & Boot log and warnings\\
+\end{tabular}
+
+\warn{Do not use \p{commander arm -f} for Manual.} It bypasses every preflight check, including the SLAAPS and estimator gates.
+
+%------------------------------------------------------------------------------------------------
+\sect{8. Symptom to cause}
+\begin{tabular}{@{}p{2.55cm} p{4.0cm}@{}}
+\toprule
+\textbf{Message or state} & \textbf{Check}\\
+\midrule
+Apply a valid SLAAPS manual configuration & \p{use} is not 1, or \p{valid=0}; apply with \p{SLA_CFG_KIND} 1\\
+Needs fresh configured pilot input & \p{SLA_IN_INST} vs \p{data_source}; estimators (\p{input metadata}); new sample after selecting\\
+Check selected propulsion power & \p{battery_status} missing, id/source, or rejected entry masking it (read \p{manual entry=})\\
+Flight admission remains unavailable & Needs the 20261116 image; \p{SLA_FLT_STAGE} 1; entry 8\\
+Heading estimate invalid & Compass priority and calibration; hold still 30 s\\
+Failsafe Descend at arming & Mode cannot run: old image, or entry not prepared\\
+\p{power status=4} & \p{SLA_PWR_ID} and \p{SLA_PWR_SRC} vs listener\\
+\p{routing_fault=3} AUX ch 6 & \p{PWM_AUX_FUNC6} must be 0\\
+No \p{battery_status} & PM08 CAN wiring (splitter), CAN2, node 124 in \p{uavcan status}\\
+\bottomrule
+\end{tabular}
+
+%------------------------------------------------------------------------------------------------
+\sect{9. Hardware map}
+\begin{itemize}
+\item MAIN 1--4: canards (servo 1 top right, then clockwise), PWM 333 Hz, 1333/1500/1667 \textmu s.
+\item AUX 5: EDF, DShot600. AUX 1--4, 6--8 and the ninth FMU output unused.
+\item CAN1: pitot (node 125). CAN2: PM08-CAN (node 124).
+\item POWER1: I\textsuperscript{2}C digital modules only. A DroneCAN module there disturbs the bus.
+\item Compass: external IST8310 on I\textsuperscript{2}C bus 1 (address 0x0E). Internal BMM150 on bus 4.
+\item Armed Manual holds the EDF at DShot idle (109) at zero throttle.
+\end{itemize}
+
+\sect{10. Gain sets in the parameter file}
+\begin{tabular}{@{}l c c@{}}
+\toprule
+& \textbf{Rev 2 (13 m/s, M)} & \textbf{Rev 3 (40 m/s, M)}\\
+\midrule
+\p{SLA_AIRSPD} & 13 & 40\\
+Roll \p{RATE_P/I} & 0.734 / 0.734 & 0.0792 / 0.0792\\
+Pitch, yaw \p{RATE_P/I} & 2.47 / 1.98 & 0.261 / 0.209\\
+\p{SLA_R_M_SCALE} & 0.019 & 0.176\\
+\p{SLA_P/Y_M_SCALE} & 0.0546 & 0.5165\\
+\p{SLA_DATA_STATE} & 1 (signed) & 0 (unsigned)\\
+\bottomrule
+\end{tabular}
+
+Canard authority rises with dynamic pressure ($\propto V^2$). Gains are never retuned while armed: slow the tunnel, disarm, change, apply, re-arm.
+
+\end{multicols}
+\end{document}

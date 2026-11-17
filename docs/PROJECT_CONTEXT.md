@@ -1,6 +1,6 @@
 # SLAAPS implementation: start here
 
-Updated 2026-10-25 by Claude. Software progress is not flight acceptance.
+Updated 2026-11-10 by Claude (latest status: last section). Software progress is not flight acceptance.
 Repository: https://github.com/TheLettuce2023/SLAAPS-PX4; branch `slaaps-sitl`.
 Pushed through `e908e64f1b` (registry, stream IDs, companion integration, docs). Preserve untracked `timestamp`.
 Recovery policy DECIDED 2026-10-25 by project lead: [decision record](SLAAPS_RECOVERY_POLICY.md); not yet implemented.
@@ -46,7 +46,7 @@ Mode names/custom IDs, wire selection, CURRENT_MODE, removal/restore pass; GUI a
 Read [AGENTS.md](../AGENTS.md) and matching scoped/nested instructions before edits.
 Use relevant entries in [RESEARCH_CODE_GRAPH.json](RESEARCH_CODE_GRAPH.json);
 revalidate affected anchors including untracked files, not whole historical graphs.
-Historical startup context: [October 22 archive](PROJECT_CONTEXT_ARCHIVE_20261022.md).
+Historical startup context: [October 22 archive](archive/agent_handoffs/PROJECT_CONTEXT_ARCHIVE_20261022.md).
 
 | Task | Entry / graph nodes |
 | --- | --- |
@@ -56,7 +56,7 @@ Historical startup context: [October 22 archive](PROJECT_CONTEXT_ARCHIVE_2026102
 | Scheduling | `slaaps_control_schedule`, `slaaps_operating_condition`, `slaaps_operating_condition_observation`, `slaaps_schedule_portable_evidence` |
 | Verification | `slaaps_native_build`, `slaaps_native_test`, `slaaps_board_builder`, `slaaps_board_verifier` |
 | Airborne recovery | [Decision record](SLAAPS_RECOVERY_POLICY.md); `EdfOwner`, `ManualOutputBank`, `SlaapsOutputPreparation`, Commander failsafe |
-| Commissioning | [EDF milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-armed-edf-commissioning), [R09/R10 report](MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md) |
+| Commissioning | [EDF milestone](SLAAPS_CONFIGURATION_INTEGRATION.md#october-23-armed-edf-commissioning), [R09/R10 report](archive/manual_bench/MANUAL_BENCH_R09_R10_OPERATOR_REPORT_20261020.md) |
 | Companion integration | `slaaps_companion_protocol_owner`; [acceleration contract](ACCELERATION_WIRE_CONTRACT.md), [state contract](C0B2_STATE_CONTRACT.md); `wire`, `adapter`, `guard`, `clock` |
 
 ## Objective and boundaries
@@ -305,8 +305,8 @@ Not entered: IMU offset (no parameter found), roll/pitch/yaw input slots and sig
 
 Origin is the tail end (x_0): SLA_CG_X 0.2716. IMU uses stock EKF2_IMU_POS_X/Y/Z, defined relative to the vehicle CG: 0.05215, 0,
 -0.010 m (confirmed in src/modules/ekf2/module.yaml). Sticks use the stock PX4 mapping: SLA_R/P/Y_INPUT 0/1/2, signs
-+1/-1/+1 (stick forward is positive pitch in PX4, nose-up is negative; matches the research configuration, not verified on
-a bench), SLA_THR_LOW -1 and SLA_THR_HIGH +1. All added to the QGC parameter file.
++1/-1/+1 (stick forward is positive pitch in PX4, nose-up is negative; matches the research configuration; verified as
+configured by the project lead 2026-11-10), SLA_THR_LOW -1 and SLA_THR_HIGH +1. All added to the QGC parameter file.
 
 ## DShot600 support: library layer (2026-10-27)
 
@@ -427,7 +427,7 @@ timing-sensitive.
   Consequence: the D1 pilot-loss hold now starts at SLA_IN_AGE - 2 x SLA_CYCLE_MIN (292 ms with the QGC parameter file,
   previously 92 ms).
 - Lead decision 2026-11-06: Manual keeps the EDF at DShot idle (109) at zero throttle while armed.
-- Still open before armed Manual on the board: SLA_FIRST_CMD_US / SLA_ACT_ACK_US are shared by all modes. The bench needs
+- Resolved 2026-11-10 by per-mode budgets (see the last section). Was open before armed Manual on the board: SLA_FIRST_CMD_US / SLA_ACT_ACK_US were shared by all modes. The bench needs
   40000 / 35000 us on the board (banks poll every 20 ms in bench), but Manual requires the first-command budget below
   SLA_CYCLE_MAX (12000 us), so the bench values must be restored to the file values (8000 / 3000) before Manual, and
   3000 us may be too short for a real bank reply. Per-mode budgets in code would remove the swap.
@@ -438,3 +438,93 @@ timing-sensitive.
   MIN/CENT/MAX of the one output whose function is the canard (respecting the REV bit); routing then requires the driver
   to report them. Validation keeps the shifted pulses within 500-2500 us. The new parameters change the configuration
   identity, so the accepted profile must be re-applied after flashing. SLA_Cn_TRIM stays the modeled zero-moment flight trim.
+
+## Per-mode activation timing, data sign-off (2026-11-10)
+
+- **Canards:** centred on the board by the lead with `SLA_Cn_ZERO`. The values are on the board only. The QGC parameter
+  file still carries `SLA_Cn_ZERO` 0, so reloading the file resets them until the board values are copied into it.
+- **Stick signs:** verified by the lead as configured.
+- **Data record:** `SLA_DATA_REC` 20261110, `SLA_DATA_REV` 1, `SLA_DATA_STATE` Calibrated, declared by the project lead
+  (Kael Spry) and added to the QGC parameter file. Scope and provenance are in
+  [SLAAPS_DATA_RECORD.md](SLAAPS_DATA_RECORD.md). Modeled values stay modeled. `SLA_EDF_BMAX` is still unset.
+- **Per-mode timing budgets:** the shared-timing swap between Bench and Manual is gone.
+  - Bench now uses its own `SLA_BN_ACK_US` / `SLA_BN_FIRST_US`, checked against the 20 ms bench interval and
+    `SLA_BENCH_GAP`.
+  - `SLA_ACT_ACK_US` / `SLA_FIRST_CMD_US` apply to Manual and Acceleration only (`ActivationTiming`,
+    `activationReserveUs(c, timing, reserve)`, `ManualBankPreparation::activationTiming(mode)`; the barrier checks a
+    commissioning session against the bench pair).
+  - QGC file: bench 35000 / 40000 us with `SLA_BENCH_GAP` 100 (the values that ran the servo bench on the board).
+    Flight 6500 / 5000 us with `SLA_CYCLE_MIN/MAX` 4000/12000.
+  - The old flight 3000 us reply timeout was shorter than one flight bank poll (`SLA_CYCLE_MIN`, 4 ms). The banks poll
+    rather than wake on the activation, so a reply could miss it whenever the poll phase was unlucky.
+  - 6500 us covers one poll plus 2.5 ms of driver time. 5000 us still exceeds one controller period, and the bank's own
+    first-command deadline is `SLA_CYCLE_MAX` after its activation. These values are modeled.
+- **Diagnostic:** `slaaps status` prints `activation flight|bench reply main=... aux=... us banks received limit` for the
+  last attempt. Read it after the first armed Manual entry on the board.
+  - If a reply comes within about 1 ms of the 6500 us limit, raise `SLA_CYCLE_MAX` (for example 16000) and
+    `SLA_ACT_ACK_US` together, keeping `SLA_ACT_ACK_US + SLA_FIRST_CMD_US < SLA_CYCLE_MAX`.
+- **Re-apply needed:** two new parameters (476 vehicle parameters) change the configuration identity. Re-apply the profile
+  after flashing.
+
+## Data sheet revision 2 (2026-11-12)
+
+- The updated CAD data (mass 2.05 kg, CG 0.233 m, IMU 0.268 m, canard COP 0.166 m forward of CG, full MMOI tensor) is in
+  the QGC parameter file, together with recomputed modeled derivatives, moment scales and rate gains.
+- Details and open items are in [SLAAPS_DATA_RECORD.md](SLAAPS_DATA_RECORD.md), revision 2.
+- Revision 2 was declared Calibrated by the lead on 2026-11-12 (`SLA_DATA_REV` 2, `SLA_DATA_STATE` 1). The profile checker
+  reports the Manual flight profile complete.
+- Lead decisions: the CAD moments are about the CG; the thrust curve is unchanged; `SLA_Cn_ZERO` stay 0 in the file, with
+  canards trimmed manually on the board.
+- `SLA_EDF_BMAX` is 1 (lead, 2026-11-12).
+- Board status from the lead on 2026-11-12:
+  - Compass: the external one is restored.
+  - Accelerometers: calibrated.
+  - AUX6 routing fault: cleared.
+  - Hardfault log: cleared.
+- Still open on the board:
+  - The board runs an older parameter set (record 1, revision 1, `SLA_CFG_KIND` 0).
+  - `battery_status` is unpublished: no POWER1 module seen, probably because the board was on USB only.
+
+## Manual arm and run permission, captive stage (2026-11-16)
+
+- **Finding.** SLAAPS reported `can_arm_and_run` only for Bench. For an external mode Commander uses that answer as both
+  the arm and the run permission, so Manual could never be armed through Commander. Force-arming (`commander arm -f`)
+  put the vehicle in a failsafe (action Descend, cause generic) 0.01 s after arming and no output ran. Both ulogs
+  from 2026-11-14 (03_05_53 and 03_07_09) show this, with every actuator output at zero.
+- **Change (lead's decision 2026-11-16: captive stage only).**
+  - `src/lib/slaaps/ManualAvailability.hpp` decides Denied, Run or Prepared. `Slaaps::manualAvailability` feeds it, and
+    `answerChecks` and `publishStatus` publish it (`can_run_mask`, `can_arm_mask`, `unavailable_reason` 7
+    `AVAILABLE_MANUAL_CAPTIVE`).
+  - **Prepared** (arming offered) needs: Manual scope applied, configuration accepted and not invalidated (not `eligible()`,
+    which needs activation after arming), modes registered, routing valid, power valid, estimator state and permission
+    metadata fresh, entry `PREPARED` with both banks ready, `SLA_FLT_STAGE` 1, and `validateFlightConfiguration`
+    (calibrated record, complete D1 data).
+  - **Run** (no arming offered) holds for an owned Manual session through activating, first command, running, recovery
+    and re-entry, so Commander adds no second failsafe to the supervisor's D1-D5 responses. An Acceleration session,
+    including its recovery, never advertises Manual (`recoveryMode()` added to the worker and transport).
+  - Acceleration and the launcher stage stay denied. Output permission is unchanged: activation, the first handled
+    frame, flight admission and recovery remain separate supervisor decisions.
+- **Verification.** Host suite 4,530 checks in Debug/Release/sanitizer. Native `verify_native.py` and `--signed-flight`
+  both PASS (build `/var/tmp/slaaps-native-y7dl9vil`), including new assertions that Manual is offered only for a prepared
+  captive session, stays runnable once armed and running, and never advertises Acceleration.
+- **Native lesson.** The first native runs failed because the predicate counted any active session and used `eligible()`.
+  Both were real defects in the first draft; the host tests alone had not caught them.
+- **Known gap.** The D2 companion-loss handoff from Acceleration asks Commander for Manual. While Acceleration is
+  active, Manual is not advertised, so Commander would refuse that request on a real board. Acceleration flight is
+  out of scope for the tunnel.
+
+### First armed attempt on the board (2026-11-16): two production defects
+
+The ulogs (E:\log6-11-16) showed arming accepted and no failsafe at arm, then an entry rejection about 0.25 s later
+and a Commander Descend failsafe, with no output.
+- **Self-rejecting activation.** `permission.healthy` required `_configuration.eligible()`, true only after the activation
+  that the permission authorizes. Fixed: `hasCandidate()`. The native hook `supplyPermission` had forced `healthy`,
+  `flight_admitted` and `measured_condition_valid`, which hid it; it now leaves `healthy` alone.
+- **Health loss cancelled the session.** With `healthy` real, estimator loss while armed reached
+  `if (!permitted(...)) cancelPreparation(...)`, which stops the output stream, not the decided D3 recovery. Now
+  `abandon()` and D3 when only `healthy` dropped (admission loss keeps the cancel).
+- **Build stamp.** An incremental build left `ver all` on `Nov 10 2026 13:16:19` for two different images. The build
+  script now touches `ver.cpp`, `hardfault_log.c` and `TaskWatchdog.cpp`.
+- **Still timing-sensitive on WSL:** the native verifiers fail intermittently (standard 1 of 5, signed-flight 2 of 7 on
+  the final build), each time on a different check.
+- Image `build/slaaps_firmware/flight-readiness-20261116-manual-arm2/`. The first image of that day is superseded.
