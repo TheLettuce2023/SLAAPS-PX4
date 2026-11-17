@@ -2540,7 +2540,7 @@ selection and overflow rejection semantics are unchanged.
 
 `Tools/slaaps/probe_active_target.py` stages the current SLAAPS headers and a
 forced-interface probe while mounting the retained board source/build read-only.
-Final evidence `build/slaaps_active_target/20261020-verified` compiles producer
+Final evidence `build/archive/slaaps_active_target/20261020-verified` compiles producer
 creation/entry/cycle/stop/destruction and both bank endpoint interfaces, including
 construction/destruction, with ARM GCC 13.2.1. Its 22 input source hashes, 213
 compiler dependencies and resulting object rehash successfully. The initial
@@ -2637,7 +2637,7 @@ permission: the supervisor must still supply independently admitted permission,
 output bindings and advertisement identities. Production scheduling/admission
 and physical-driver attachment remain outstanding.
 
-ARM probe `build/slaaps_active_target/20261020-selected-input-verified` forces
+ARM probe `build/archive/slaaps_active_target/20261020-selected-input-verified` forces
 compilation of both selected-snapshot worker methods and both bank transports
 with retained Cortex-M7/NuttX board flags. Unlinked object text is 10,116 B;
 worker object 1,736 B, EDF owner 848 B, each bank 1,336 B. Largest individual
@@ -2830,7 +2830,7 @@ test files match the sealed snapshot. ELF SHA-256:
 This exercises synthetic in-process preparation and memory handling, not a
 physical driver, active production admission or QGC GUI acceptance.
 
-Final ARM evidence `build/slaaps_active_target/20261020-prepared-bank-verified`
+Final ARM evidence `build/archive/slaaps_active_target/20261020-prepared-bank-verified`
 compiles both bank templates with actual board/NuttX flags. All 34 source bindings
 and 235 compiler dependencies independently rehash. Unlinked object text is
 11,500 B; EDF owner 848 B, worker transport 1,736 B, each bank transport 1,552 B.

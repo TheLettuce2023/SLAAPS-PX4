@@ -53,4 +53,4 @@ TMPDIR=/var/tmp python3 -B Tools/research_sitl/diagnostic_wire/test_generated_ma
 directory with `--keep-dir`; without it, only that invocation's temporary
 directory is removed. `/var/tmp` is recommended because this environment's
 `/tmp` artifacts disappeared between WSL calls. Full evidence and limitations:
-[C1E-W2 verification](../../../docs/C1E_GENERATED_WIRE_CONFORMANCE.md).
+[C1E-W2 verification](../../../docs/archive/research_c0_c1/C1E_GENERATED_WIRE_CONFORMANCE.md).

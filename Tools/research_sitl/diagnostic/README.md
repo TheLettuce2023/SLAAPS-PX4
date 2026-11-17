@@ -96,6 +96,6 @@ no C++ execution.
 
 This oracle accepts exactly one profile. It is not an arbitrary-trajectory or
 all-matrix JSON replay engine. The native guard/adapter/owner suites and
-`docs/C1B_OFFLINE_EXECUTION_LEDGER.md` supply the broader finite matrix coverage.
+`docs/archive/research_c0_c1/C1B_OFFLINE_EXECUTION_LEDGER.md` supply the broader finite matrix coverage.
 Neither those tests nor this evidence establish live PX4 input provenance,
 MAVLink signing, mode/control integration, acceleration tracking or flight safety.

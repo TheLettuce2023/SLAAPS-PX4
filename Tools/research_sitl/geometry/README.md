@@ -26,4 +26,4 @@ path traversal/symlink escape, malformed XML, mass overflow, and source
 preservation. These are software tests, not calibration or physical validation.
 
 Current supplied model findings and hashes are recorded in
-[geometry intake review](../../../docs/GAZEBO_GEOMETRY_INTAKE_REVIEW.md).
+[geometry intake review](../../../docs/archive/sitl_baseline/GAZEBO_GEOMETRY_INTAKE_REVIEW.md).

@@ -3,7 +3,7 @@
 This approved experiment measures an isolated MAVLink loopback path in the existing
 Ubuntu 24.04 WSL environment. Both endpoints bind `127.0.0.1` on OS-assigned ports.
 It has no PX4, Gazebo, QGC, TELEM, serial, hardware, controller-objective or actuator
-connection. Read the [reviewed design](../../../docs/C1H_HOST_LOOPBACK_DESIGN.md)
+connection. Read the [reviewed design](../../../docs/archive/research_c0_c1/C1H_HOST_LOOPBACK_DESIGN.md)
 for the authority boundary and predeclared criteria.
 
 One native context contains the existing owner's single by-value admission guard.

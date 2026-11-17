@@ -7,7 +7,7 @@ No research network endpoint or admission owner is instantiated. PX4 logging
 may publish diagnostic `log_message`; the probe publishes no research/control
 topics. Commander publishes its own state/control-mode topics.
 
-Read `docs/C1_PX4_ATTACHMENT_DESIGN.md` for the reviewed scope and known gaps.
+Read `docs/archive/research_c0_c1/C1_PX4_ATTACHMENT_DESIGN.md` for the reviewed scope and known gaps.
 Use only the existing Ubuntu distribution and installed dependencies:
 
 ```sh

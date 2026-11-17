@@ -19,8 +19,8 @@ ingress correlation, and continue polling independently of console availability.
 inconsistent completion quarantines the broker; there is no reset/retry API.
 Consumed administrative rejection advances the event floor just like success.
 
-Full API/limits: [contract](../../../docs/SITL_SUPERVISOR_BROKER_API.md).
-Evidence: [phase gate](../../../docs/PHASE_GATE_STATUS.md).
+Full API/limits: [contract](../../../docs/archive/sitl_baseline/SITL_SUPERVISOR_BROKER_API.md).
+Evidence: [phase gate](../../../docs/archive/research_c0_c1/PHASE_GATE_STATUS.md).
 
 `HarnessSupervisorOwner` is the O2 offline concrete owner: one by-value adapter,
 explicit fixture state/clock ticks and a copied one-slot ingress receipt. The
@@ -33,7 +33,7 @@ a recovery mechanism for an existing session.
 
 All calls must be serialized on one thread. This is not a live scheduler or
 freshness service: frozen fixture time cannot establish runtime freshness.
-See [O2 design](../../../docs/SITL_SUPERVISOR_OWNER_O2_DESIGN.md) for the complete
+See [O2 design](../../../docs/archive/sitl_baseline/SITL_SUPERVISOR_OWNER_O2_DESIGN.md) for the complete
 receipt, provenance and action boundary. The private test peer can pre-latch
 the real adapter for fault scenarios; it is not a public recovery API.
 

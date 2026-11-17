@@ -3,7 +3,7 @@
   "revision": 2,
   "purpose": "diagnostic logged-evidence criteria only; not flight or control limits",
   "approved_proposal": {
-    "path": "docs/SITL_BASELINE_DIAGNOSTIC_LIMITS_V2_PROPOSAL.md",
+    "path": "docs/archive/sitl_baseline/SITL_BASELINE_DIAGNOSTIC_LIMITS_V2_PROPOSAL.md",
     "sha256": "9c1549b215808dabfbe779c9171f46a426a2ea87e13145fbe5fcdd9aa45b21e6"
   },
   "campaign_id": "slaaps-stock-cessna-phase1-acceptance-02",
@@ -174,7 +174,7 @@
     "telemetry_link_expectation": "declare_separately_in_pre_run_manifest"
   },
   "base_approved_proposal": {
-    "path": "docs/SITL_BASELINE_DIAGNOSTIC_LIMITS_PROPOSAL.md",
+    "path": "docs/archive/sitl_baseline/SITL_BASELINE_DIAGNOSTIC_LIMITS_PROPOSAL.md",
     "sha256": "9bc5c087a8330ce10fd8321b3c432888d9dd87478c84751cd61bcc0d614db290"
   }
 }

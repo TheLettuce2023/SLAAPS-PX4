@@ -30,7 +30,7 @@ returns a partial object.
 `research.xml` defines only the three frozen messages. IDs 200000--200002 are
 local offline-test IDs, not global reservations or deployed assignments.
 `test_generated_mavlink.py` requires the exact clean MAVLink and nested
-pymavlink revisions in `docs/C0C_GENERATED_WIRE_CONFORMANCE.md`, installed lxml
+pymavlink revisions in `docs/archive/research_c0_c1/C0C_GENERATED_WIRE_CONFORMANCE.md`, installed lxml
 and g++. It performs mandatory XSD validation, generates C/Python in a unique
 temporary directory, compiles `GeneratedMavlinkFixture.cpp` and checks both
 directions against an independent field/layout/CRC/full-frame oracle.

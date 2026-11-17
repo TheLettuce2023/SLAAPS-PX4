@@ -34,7 +34,7 @@ SOURCE_GLOBS = (
 REQUIRED_SOURCES = (
     "src/lib/research_acceleration/CMakeLists.txt",
     "platforms/ros2/include/px4_platform_common/defines.h",
-    "docs/C1B_OFFLINE_API_CONTRACT.md", "docs/C1B_OFFLINE_API_TEST_MATRIX.md",
+    "docs/archive/research_c0_c1/C1B_OFFLINE_API_CONTRACT.md", "docs/archive/research_c0_c1/C1B_OFFLINE_API_TEST_MATRIX.md",
     *("Tools/research_sitl/diagnostic/" + name for name in (
         "DiagnosticJson.hpp", "DiagnosticJson.cpp", "DiagnosticCampaign.cpp",
         "check_campaign.py", "test_check_campaign.py", "run_campaign.py")),

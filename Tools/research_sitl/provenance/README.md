@@ -50,7 +50,7 @@ ULog parser. It rejects extra/missing/reordered/modified rows, mismatched
 summaries, duplicate JSON keys, untagged nonfinite numbers and invented authority.
 Successful verification grants no positive diagnostic or control admission.
 
-See [P2A source audit and verification](../../../docs/C1E_P2A_PROVENANCE_COLLECTOR.md)
+See [P2A source audit and verification](../../../docs/archive/research_c0_c1/C1E_P2A_PROVENANCE_COLLECTOR.md)
 for real archive results, source binding and the next live collector gates.
 
 ## Native observation and clock deployment
@@ -58,9 +58,9 @@ for real archive results, source binding and the next live collector gates.
 P2B builds a separate output-disabled EKF observation profile. P3A reuses its
 verified executable for a separate closed deployment capture. Neither installs
 a map, establishes estimator health, links an admission adapter or permits
-positive requests. See the [P2B contract](../../../docs/C1E_P2B_NATIVE_RECEIPT_CONTRACT.md),
-[verification](../../../docs/C1E_P2B_NATIVE_VERIFICATION.md) and
-[P3A scope/results](../../../docs/C1E_P3A_CLOCK_DEPLOYMENT.md).
+positive requests. See the [P2B contract](../../../docs/archive/research_c0_c1/C1E_P2B_NATIVE_RECEIPT_CONTRACT.md),
+[verification](../../../docs/archive/research_c0_c1/C1E_P2B_NATIVE_VERIFICATION.md) and
+[P3A scope/results](../../../docs/archive/research_c0_c1/C1E_P3A_CLOCK_DEPLOYMENT.md).
 
 In Ubuntu-24.04 WSL from the repository root:
 
@@ -90,7 +90,7 @@ python3 -B Tools/research_sitl/provenance/merge/run_merge.py /var/tmp/p2b-native
 python3 -B Tools/research_sitl/provenance/merge/check_merge.py /var/tmp/p2c-merge-NEW
 ```
 
-See [contract and verification](../../../docs/C1E_P2C_CLOSED_RECEIPT_MERGE.md).
+See [contract and verification](../../../docs/archive/research_c0_c1/C1E_P2C_CLOSED_RECEIPT_MERGE.md).
 The payload remains opaque observations. No live publisher, readiness, map,
 adapter or positive authority is provided by the merge API. Retain the original
 build-area paths: independent command/configuration checks bind those paths.
@@ -107,7 +107,7 @@ python3 -B Tools/research_sitl/provenance/native_merge/run_native_merge.py --ulo
 python3 -B Tools/research_sitl/provenance/native_merge/check_native_merge.py /var/tmp/p2d-native-NEW
 ```
 
-See [typed boundary and verification](../../../docs/C1E_P2D_NATIVE_TYPED_MERGE.md).
+See [typed boundary and verification](../../../docs/archive/research_c0_c1/C1E_P2D_NATIVE_TYPED_MERGE.md).
 No simulator, baseline repetition, admission adapter or actuator output is
 involved. Destructor-entry time is distinct from completed teardown; owner
 times bracket queue consumption. No health, clock map or positive authority
@@ -124,7 +124,7 @@ python3 -B Tools/research_sitl/provenance/provider/run_provider.py
 python3 -B Tools/research_sitl/provenance/provider/check_provider.py /var/tmp/p3b-provider-NEW
 ```
 
-See [contract and verification](../../../docs/C1E_P3B_CHECKED_CLOCK_LIFECYCLE.md).
+See [contract and verification](../../../docs/archive/research_c0_c1/C1E_P3B_CHECKED_CLOCK_LIFECYCLE.md).
 The real host trace and Debug/sanitizer contracts use finite experiment
 intervals, not operational timing budgets. Provider/pause/namespace continuity
 and native integration remain open; qualification is always false.
@@ -141,7 +141,7 @@ python3 -B Tools/research_sitl/provenance/native_clock/run_native_clock.py --ulo
 python3 -B Tools/research_sitl/provenance/native_clock/check_native_clock.py /var/tmp/p3c-native-NEW
 ```
 
-See [native receipt-clock verification](../../../docs/C1E_P3C_NATIVE_CHECKED_RECEIPT_CLOCK.md).
+See [native receipt-clock verification](../../../docs/archive/research_c0_c1/C1E_P3C_NATIVE_CHECKED_RECEIPT_CLOCK.md).
 The scheduler and native sample clock remain unchanged. This verifies checked
 receipt-clock propagation, not provider continuity or a qualified map. The
 verification record binds a corrected post-capture checker separately; preserve

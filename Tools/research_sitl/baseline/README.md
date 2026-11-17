@@ -3,14 +3,14 @@
 The project user approved the initial diagnostic-only stock Cessna limits on
 2026-09-27. See
 [`diagnostic_limits_v1.json`](diagnostic_limits_v1.json) and the
-[approval record](../../../docs/SITL_BASELINE_DIAGNOSTIC_LIMITS_APPROVAL.md).
+[approval record](../../../docs/archive/sitl_baseline/SITL_BASELINE_DIAGNOSTIC_LIMITS_APPROVAL.md).
 The registry SHA-256 is
 `42549c019ad500dbb63b184b294170759c315e4333309e8074e3a633e9db7142`
 for future campaign `slaaps-stock-cessna-phase1-acceptance-01`. This does not
 change the v0 auditor or raw inspector: neither applies the approved limits or
 can grant a Phase 1 pass. The new workflow below uses the separately approved
 [revision 2 registry](diagnostic_limits_v2.json) and
-[revision 2 approval](../../../docs/SITL_BASELINE_DIAGNOSTIC_LIMITS_V2_APPROVAL.md)
+[revision 2 approval](../../../docs/archive/sitl_baseline/SITL_BASELINE_DIAGNOSTIC_LIMITS_V2_APPROVAL.md)
 for campaign `slaaps-stock-cessna-phase1-acceptance-02`. Its sole policy change
 is the verified stock synthetic-pressure capture-time exception.
 

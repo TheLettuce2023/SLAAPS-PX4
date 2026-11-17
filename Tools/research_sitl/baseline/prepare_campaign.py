@@ -134,8 +134,8 @@ def main():
         for entry in before["files"]:
             archive.add(source / entry["path"], arcname=entry["path"], recursive=False)
     for original, name in ((REGISTRY_PATH, "registry.json"),
-                           (source / "docs/SITL_BASELINE_DIAGNOSTIC_LIMITS_V2_APPROVAL.md", "approval.md"),
-                           (source / "docs/SITL_BASELINE_REPRODUCIBILITY.md", "signal-inventory.md"),
+                           (source / "docs/archive/sitl_baseline/SITL_BASELINE_DIAGNOSTIC_LIMITS_V2_APPROVAL.md", "approval.md"),
+                           (source / "docs/archive/sitl_baseline/SITL_BASELINE_REPRODUCIBILITY.md", "signal-inventory.md"),
                            (args.parameters, "parameters.bson")):
         shutil.copyfile(original, root / name)
     command = ["runuser", "-u", args.linux_user, "--", "make", "px4_sitl_default"]
