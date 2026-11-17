@@ -229,6 +229,12 @@
 1	1	SLA_PWR_INST	0	6
 1	1	SLA_PWR_ID	1	6
 1	1	SLA_PWR_SRC	1	6
+# DroneCAN sensors: PM08-CAN power module (node 124, CAN2) and the L10D pitot (node 125, CAN1). The battery topic
+# source must be external; SLA_PWR_SRC above matches the source the module reports. Reboot after loading.
+1	1	UAVCAN_ENABLE	2	6
+1	1	UAVCAN_SUB_BAT	2	6
+1	1	BAT1_SOURCE	1	6
+1	1	UAVCAN_SUB_DPRES	1	6
 1	1	SLA_REC_HOLD	2.0	9
 1	1	SLA_REC_RAMP	0.5	9
 1	1	SLA_REC_THR	0.0	9
