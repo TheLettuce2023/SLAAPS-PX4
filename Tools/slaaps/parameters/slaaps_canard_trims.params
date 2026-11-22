@@ -1,0 +1,9 @@
+# SLAAPS canard centre trims, set by the project lead on 2026-11-18 from the servo bench (measured on the vehicle, not modeled).
+# Load this file AFTER slaaps_vehicle.params: that file leaves SLA_Cn_ZERO at 0 by the lead's choice, and a reload resets them.
+# Positive moves toward SLA_Cn_PWM_POS (counter-clockwise viewed from outboard). Limit is +-10 deg; C2 is AT the limit,
+# so its horn is likely mechanically off by 10 deg or more: re-seat it on the spline when convenient.
+# Apply on the board with SLA_CFG_APPLY +1 (disarmed). Not part of the data record revision.
+1	1	SLA_C1_ZERO	3.5	9
+1	1	SLA_C2_ZERO	-10	9
+1	1	SLA_C3_ZERO	-4.5	9
+1	1	SLA_C4_ZERO	2	9

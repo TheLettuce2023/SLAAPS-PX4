@@ -1,0 +1,80 @@
+# SLAAPS launch profile C: launcher stage (SLA_FLT_STAGE 2), operator-stick EDF, fixed gains modeled at 25 m/s indicated, schedule OFF.
+# Written 2026-11-21. NOTHING HERE IS MEASURED. Load AFTER slaaps_vehicle.params and slaaps_canard_trims.params; apply with SLA_CFG_APPLY +1 disarmed.
+#
+# Launcher stage: Manual arms only with a fresh, valid raw airspeed sample (SLA_LAUNCH_AS_I). Canards stay at trim (no attitude authority) until
+# indicated airspeed reaches SLA_LAUNCH_AS, then the attitude loop takes over. The control schedule is not supported in this stage
+# (validateFlightConfiguration rejects SLA_SCH_EN 1): a launch starts at rest, outside the scheduled table.
+# EDF: the operator pushes the throttle stick to full at launch (lead's decision 2026-11-21). Manual entry needs the stick low (SLA_EDF_ENTRY).
+# SLA_EDF_RISE is NOT changed here: at 2.5 per second the EDF reaches full in 0.4 s. A harder step is the lead's decision after thrust-stand tests.
+#
+# SLA_LAUNCH_AS is an UNMEASURED placeholder (12 m/s in slaaps_vehicle.params): set it from captive tests (canard authority with margin over stall).
+# SLA_LAUNCH_AS_I 0 assumes the pitot is airspeed instance 0; confirm with 'uorb top -1 airspeed'. SLA_LAUNCH_AGE 100 ms is above the sensors-module
+# publish period (50 ms or faster). The pitot must read positive and true (boom fix confirmed 2026-11-21) and be zeroed at the launch temperature.
+#
+# Gains (same method as data revision 3): derivatives, SLA_x_M_SCALE and SP_ACC are the revision-3 (40 m/s) values x (25/40)^2 = 0.3906;
+# RATE_P and RATE_I are divided by 0.3906. Best single design speed for 18..40 m/s indicated in the stability analysis (Tools/slaaps/stability_margin.py):
+# stable from about 10 to 64 m/s indicated, worst-case damping 0.35 over 18..40. At the gate speed (12 m/s) the loop is only marginally damped.
+# Model only; the real canard authority and the launch-speed range are unmeasured.
+# This file sets SLA_DATA_REV 6 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
+1	1	SLA_FLT_STAGE	2	6
+1	1	SLA_LAUNCH_AS_I	0	6
+1	1	SLA_LAUNCH_AGE	100	6
+1	1	SLA_SCH_EN	0	6
+1	1	SLA_DATA_REV	6	6
+1	1	SLA_DATA_STATE	0	6
+1	1	SLA_AIRSPD	25	9
+1	1	SLA_C1_WASH	25	9
+1	1	SLA_C1_DFX	0	9
+1	1	SLA_C1_DFY	-1.45093	9
+1	1	SLA_C1_DFZ	-1.45093	9
+1	1	SLA_C1_DMR	-0.08208	9
+1	1	SLA_C1_DMP	0.24085	9
+1	1	SLA_C1_DMY	-0.24085	9
+1	1	SLA_C1_DUR	0.04104	9
+1	1	SLA_C1_DUP	0.12043	9
+1	1	SLA_C1_DUY	0.12043	9
+1	1	SLA_C2_WASH	25	9
+1	1	SLA_C2_DFX	0	9
+1	1	SLA_C2_DFY	-1.45093	9
+1	1	SLA_C2_DFZ	1.45093	9
+1	1	SLA_C2_DMR	0.08208	9
+1	1	SLA_C2_DMP	-0.24085	9
+1	1	SLA_C2_DMY	-0.24085	9
+1	1	SLA_C2_DUR	0.04104	9
+1	1	SLA_C2_DUP	0.12043	9
+1	1	SLA_C2_DUY	0.12043	9
+1	1	SLA_C3_WASH	25	9
+1	1	SLA_C3_DFX	0	9
+1	1	SLA_C3_DFY	1.45093	9
+1	1	SLA_C3_DFZ	1.45093	9
+1	1	SLA_C3_DMR	-0.08208	9
+1	1	SLA_C3_DMP	-0.24085	9
+1	1	SLA_C3_DMY	0.24085	9
+1	1	SLA_C3_DUR	0.04104	9
+1	1	SLA_C3_DUP	0.12043	9
+1	1	SLA_C3_DUY	0.12043	9
+1	1	SLA_C4_WASH	25	9
+1	1	SLA_C4_DFX	0	9
+1	1	SLA_C4_DFY	1.45093	9
+1	1	SLA_C4_DFZ	-1.45093	9
+1	1	SLA_C4_DMR	0.08208	9
+1	1	SLA_C4_DMP	0.24085	9
+1	1	SLA_C4_DMY	0.24085	9
+1	1	SLA_C4_DUR	0.04104	9
+1	1	SLA_C4_DUP	0.12043	9
+1	1	SLA_C4_DUY	0.12043	9
+1	1	SLA_R_M_SCALE	0.06875	9
+1	1	SLA_R_RATE_P	0.20275	9
+1	1	SLA_R_RATE_I	0.20275	9
+1	1	SLA_R_RATE_D	0	9
+1	1	SLA_R_SP_ACC	17.26562	9
+1	1	SLA_P_M_SCALE	0.20176	9
+1	1	SLA_P_RATE_P	0.66816	9
+1	1	SLA_P_RATE_I	0.53504	9
+1	1	SLA_P_RATE_D	0	9
+1	1	SLA_P_SP_ACC	4.17969	9
+1	1	SLA_Y_M_SCALE	0.20176	9
+1	1	SLA_Y_RATE_P	0.66816	9
+1	1	SLA_Y_RATE_I	0.53504	9
+1	1	SLA_Y_RATE_D	0	9
+1	1	SLA_Y_SP_ACC	4.17969	9

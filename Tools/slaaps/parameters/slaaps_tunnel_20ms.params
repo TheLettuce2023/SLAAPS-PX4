@@ -1,0 +1,68 @@
+# SLAAPS wind-tunnel profile A: fixed gains modeled at 20 m/s, schedule OFF. Written 2026-11-19. NOTHING HERE IS MEASURED.
+# Load AFTER slaaps_vehicle.params and slaaps_canard_trims.params. Apply with SLA_CFG_APPLY +1 while disarmed.
+# Same method as data revision 3 (see docs/SLAAPS_DATA_RECORD.md, revision 4): every canard derivative, the moment scales and
+# SLA_AIRSPD / SLA_Cn_WASH are declared at ONE airflow, 20 m/s. The derivatives and SLA_x_M_SCALE / SP_ACC are the revision-3 (40 m/s)
+# values x (20/40)^2 = 0.25; RATE_P and RATE_I are divided by 0.25 (x4), so the loop crossover is unchanged: about 5 rad/s roll and
+# 4 rad/s pitch and yaw at 20 m/s, falling with V^2 at lower speed and rising above it. ATT_P and the stick rates are unchanged.
+# Use ONLY when the true flow at the vehicle is about 20 m/s. At 40 m/s these gains are about 4x too aggressive; at 13 m/s about 2.4x too weak.
+# The pitot must read the true speed (positive, tracking the tunnel reference) before you rely on it.
+# This file sets SLA_DATA_REV 4 and SLA_DATA_STATE 0: the lead must declare it before Manual can arm (SLA_DATA_STATE 1).
+1	1	SLA_SCH_EN	0	6
+1	1	SLA_DATA_REV	4	6
+1	1	SLA_DATA_STATE	0	6
+1	1	SLA_AIRSPD	20	9
+1	1	SLA_C1_WASH	20	9
+1	1	SLA_C1_DFX	0	9
+1	1	SLA_C1_DFY	-0.92859	9
+1	1	SLA_C1_DFZ	-0.92859	9
+1	1	SLA_C1_DMR	-0.05253	9
+1	1	SLA_C1_DMP	0.15415	9
+1	1	SLA_C1_DMY	-0.15415	9
+1	1	SLA_C1_DUR	0.02627	9
+1	1	SLA_C1_DUP	0.07707	9
+1	1	SLA_C1_DUY	0.07707	9
+1	1	SLA_C2_WASH	20	9
+1	1	SLA_C2_DFX	0	9
+1	1	SLA_C2_DFY	-0.92859	9
+1	1	SLA_C2_DFZ	0.92859	9
+1	1	SLA_C2_DMR	0.05253	9
+1	1	SLA_C2_DMP	-0.15415	9
+1	1	SLA_C2_DMY	-0.15415	9
+1	1	SLA_C2_DUR	0.02627	9
+1	1	SLA_C2_DUP	0.07707	9
+1	1	SLA_C2_DUY	0.07707	9
+1	1	SLA_C3_WASH	20	9
+1	1	SLA_C3_DFX	0	9
+1	1	SLA_C3_DFY	0.92859	9
+1	1	SLA_C3_DFZ	0.92859	9
+1	1	SLA_C3_DMR	-0.05253	9
+1	1	SLA_C3_DMP	-0.15415	9
+1	1	SLA_C3_DMY	0.15415	9
+1	1	SLA_C3_DUR	0.02627	9
+1	1	SLA_C3_DUP	0.07707	9
+1	1	SLA_C3_DUY	0.07707	9
+1	1	SLA_C4_WASH	20	9
+1	1	SLA_C4_DFX	0	9
+1	1	SLA_C4_DFY	0.92859	9
+1	1	SLA_C4_DFZ	-0.92859	9
+1	1	SLA_C4_DMR	0.05253	9
+1	1	SLA_C4_DMP	0.15415	9
+1	1	SLA_C4_DMY	0.15415	9
+1	1	SLA_C4_DUR	0.02627	9
+1	1	SLA_C4_DUP	0.07707	9
+1	1	SLA_C4_DUY	0.07707	9
+1	1	SLA_R_M_SCALE	0.044	9
+1	1	SLA_R_RATE_P	0.3168	9
+1	1	SLA_R_RATE_I	0.3168	9
+1	1	SLA_R_RATE_D	0	9
+1	1	SLA_R_SP_ACC	11.05	9
+1	1	SLA_P_M_SCALE	0.12912	9
+1	1	SLA_P_RATE_P	1.044	9
+1	1	SLA_P_RATE_I	0.836	9
+1	1	SLA_P_RATE_D	0	9
+1	1	SLA_P_SP_ACC	2.675	9
+1	1	SLA_Y_M_SCALE	0.12912	9
+1	1	SLA_Y_RATE_P	1.044	9
+1	1	SLA_Y_RATE_I	0.836	9
+1	1	SLA_Y_RATE_D	0	9
+1	1	SLA_Y_SP_ACC	2.675	9

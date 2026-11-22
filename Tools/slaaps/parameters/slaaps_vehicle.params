@@ -191,20 +191,26 @@
 1	1	SLA_Y_MEAS_A	1000.0	9
 1	1	SLA_IN_SOURCE	2	6
 1	1	SLA_IN_AGE	300	6
-1	1	SLA_STATE_AGE	20	6
-1	1	SLA_STATE_SKEW	10	6
+# State limits widened 2026-11-17 (modeled): the first armed Manual run on the 6X faulted a few ms after every (re)start, as the
+# EKF2 attitude (about 10 ms period) makes the newest attitude sample routinely older than the newest gyro sample.
+1	1	SLA_STATE_AGE	40	6
+1	1	SLA_STATE_SKEW	25	6
 1	1	SLA_MAN_WAIT	30	6
 1	1	SLA_STATUS_AGE	1500000	6
 1	1	SLA_ARM_AGE	800000	6
 # Activation timing per mode (2026-11-10, modeled): flight banks poll every SLA_CYCLE_MIN, bench banks every 20 ms.
-# Flight: SLA_ACT_ACK_US covers one 4 ms bank poll plus driver time; SLA_ACT_ACK_US + SLA_FIRST_CMD_US < SLA_CYCLE_MAX.
+# Flight: first armed attempt on the 6X (2026-11-17): AUX replied in 4958 us, MAIN (PX4IO) not within 6500 us. Widened to
+# 30000 / 20000 us with SLA_CYCLE_MAX 60000 (rules: ACK + FIRST_CMD < CYCLE_MAX, CYCLE_MIN < FIRST_CMD < CYCLE_MAX, reserve < OUT_LEASE).
+# Measure the real reply times in 'slaaps status' (activation flight reply) and tighten; modeled until then.
 # Bench: SLA_BN_* and SLA_BENCH_GAP 100 are the values that ran the servo bench on the Pixhawk 6X.
-1	1	SLA_ACT_ACK_US	6500	6
-1	1	SLA_FIRST_CMD_US	5000	6
+1	1	SLA_ACT_ACK_US	30000	6
+1	1	SLA_FIRST_CMD_US	20000	6
 1	1	SLA_BN_ACK_US	35000	6
 1	1	SLA_BN_FIRST_US	40000	6
-1	1	SLA_CYCLE_MIN	4000	6
-1	1	SLA_CYCLE_MAX	12000	6
+# 100 Hz (2026-11-17): at 4000 us the supervisor and both banks used about 54 percent of the CPU and starved the PX4IO queue (idle 2.6 percent,
+# MAIN activation intermittently late). 10000 us halved the supervisor load and left 12.5 percent idle; EKF2 attitude arrives at about 100 Hz anyway.
+1	1	SLA_CYCLE_MIN	10000	6
+1	1	SLA_CYCLE_MAX	60000	6
 1	1	SLA_BENCH_GAP	100	6
 1	1	SLA_OUT_LEASE	100	6
 1	1	SLA_STK_ENTER	0.05	9
@@ -235,6 +241,12 @@
 1	1	UAVCAN_SUB_BAT	2	6
 1	1	BAT1_SOURCE	1	6
 1	1	UAVCAN_SUB_DPRES	1	6
+# No auto-disarm for a vehicle that has not taken off (lead, 2026-11-17): the wind tunnel run is armed and held, never launched.
+# A negative value disables it; the 10 s default disarmed every armed Manual run on the bench.
+1	1	COM_DISARM_PRFLT	-1	9
+# The airspeed_selector module is not started on this airframe, so the stock 'No airspeed data' arming check must stay off.
+# QGC airspeed setup can raise this; SLAAPS reads the raw airspeed topic itself.
+1	1	SYS_HAS_NUM_ASPD	0	6
 1	1	SLA_REC_HOLD	2.0	9
 1	1	SLA_REC_RAMP	0.5	9
 1	1	SLA_REC_THR	0.0	9
