@@ -191,5 +191,5 @@ is unmeasured. Revision 4 (profile A, 20 m/s fixed gains) remains pending the le
 Overlay `Tools/slaaps/parameters/slaaps_launch.params`, written 2026-11-21, `SLA_DATA_REV` 6, `SLA_DATA_STATE` 0. The measured data is
 unchanged from revision 2. It selects the launcher stage (`SLA_FLT_STAGE` 2, `SLA_LAUNCH_AS_I` 0, `SLA_LAUNCH_AGE` 100) with the control schedule
 off, and the same q-scaling method as revision 3 at 25 m/s indicated: derivatives, `SLA_x_M_SCALE` and `SP_ACC` x 0.3906, `RATE_P` and `RATE_I` x 2.56.
-`SLA_LAUNCH_AS` stays the unmeasured 12 m/s placeholder and must be set from captive tests. The EDF is operator-stick triggered
+`SLA_LAUNCH_AS` is 20 m/s indicated, set by the lead on 2026-11-21 (basis not recorded here; model check: damping about 0.5 at that speed). The EDF is operator-stick triggered
 (`SLA_EDF_RISE` unchanged). It needs the lead's declaration before Manual can arm.

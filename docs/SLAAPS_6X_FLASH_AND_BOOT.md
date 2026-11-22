@@ -307,4 +307,4 @@ Confirm any change of mount with a tunnel run: the pitot should read near the tu
 Site density seen in the logs: 0.975 kg/m^3 (baro about 83.4 kPa), so true speed is about 1.12 times indicated.
 
 - **Launch profile C, `slaaps_launch.params`** (data revision 6, pending the lead's declaration): launcher stage, operator-stick EDF, fixed gains
-  modeled at 25 m/s indicated, `SLA_SCH_EN 0`. Needs the measured `SLA_LAUNCH_AS` and the airspeed instance confirmed. Load it instead of A or B.
+  modeled at 25 m/s indicated, `SLA_SCH_EN 0`. `SLA_LAUNCH_AS` is 20 m/s indicated (set by the lead 2026-11-21); confirm the airspeed instance with `uorb top -1 airspeed`. Load it instead of A or B.

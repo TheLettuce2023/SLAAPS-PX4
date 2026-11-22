@@ -7,18 +7,20 @@
 # EDF: the operator pushes the throttle stick to full at launch (lead's decision 2026-11-21). Manual entry needs the stick low (SLA_EDF_ENTRY).
 # SLA_EDF_RISE is NOT changed here: at 2.5 per second the EDF reaches full in 0.4 s. A harder step is the lead's decision after thrust-stand tests.
 #
-# SLA_LAUNCH_AS is an UNMEASURED placeholder (12 m/s in slaaps_vehicle.params): set it from captive tests (canard authority with margin over stall).
+# SLA_LAUNCH_AS 20 m/s indicated: set by the project lead on 2026-11-21 (the basis is not recorded in this repository). It is INDICATED airspeed
+# (about 22.4 m/s true at the 0.975 kg/m^3 site). Model check only: at 20 m/s the loop is at (20/25)^2 = 0.64 of its design authority, about damping 0.5.
 # SLA_LAUNCH_AS_I 0 assumes the pitot is airspeed instance 0; confirm with 'uorb top -1 airspeed'. SLA_LAUNCH_AGE 100 ms is above the sensors-module
 # publish period (50 ms or faster). The pitot must read positive and true (boom fix confirmed 2026-11-21) and be zeroed at the launch temperature.
 #
 # Gains (same method as data revision 3): derivatives, SLA_x_M_SCALE and SP_ACC are the revision-3 (40 m/s) values x (25/40)^2 = 0.3906;
 # RATE_P and RATE_I are divided by 0.3906. Best single design speed for 18..40 m/s indicated in the stability analysis (Tools/slaaps/stability_margin.py):
-# stable from about 10 to 64 m/s indicated, worst-case damping 0.35 over 18..40. At the gate speed (12 m/s) the loop is only marginally damped.
+# stable from about 10 to 64 m/s indicated, worst-case damping 0.35 over 18..40. At the 20 m/s gate speed the modeled damping is about 0.5.
 # Model only; the real canard authority and the launch-speed range are unmeasured.
 # This file sets SLA_DATA_REV 6 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
 1	1	SLA_FLT_STAGE	2	6
 1	1	SLA_LAUNCH_AS_I	0	6
 1	1	SLA_LAUNCH_AGE	100	6
+1	1	SLA_LAUNCH_AS	20	9
 1	1	SLA_SCH_EN	0	6
 1	1	SLA_DATA_REV	6	6
 1	1	SLA_DATA_STATE	0	6

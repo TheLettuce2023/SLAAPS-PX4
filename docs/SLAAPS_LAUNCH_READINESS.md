@@ -30,7 +30,8 @@ verifier. Keep the existing captive behaviour unchanged and tested.
 ## B. Parameters and data
 
 - [ ] `SLA_LAUNCH_AS_I`: the airspeed instance (the pitot published by the sensors module; confirm with `uorb top -1 airspeed`).
-- [ ] `SLA_LAUNCH_AS`: **measured** minimum indicated airspeed for canard authority, with margin over stall. The file value 12 is a placeholder.
+- [x] `SLA_LAUNCH_AS`: 20 m/s indicated, set by the lead on 2026-11-21 (launch profile C). Record the measurement behind it: canard authority versus indicated
+  airspeed with margin over stall, and the EDF reaction torque it must beat. The main file's 12 is an unused placeholder.
 - [ ] `SLA_LAUNCH_AGE`: confirm the pitot publish rate supports it.
 - [ ] Pitot zero (`SENS_DPRES_OFF`) with the EDF off and the sensor shielded. The raw zero reads 3 to 7 m/s at rest and would open the gate early.
 - [ ] Gains at launch speed: the fixed 40 m/s gains give about 9% of design authority at 12 m/s. Either the schedule (after A2/A3, with a corner at or below the launch speed) or a launch-specific gain set.
