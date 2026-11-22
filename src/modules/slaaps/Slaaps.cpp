@@ -141,6 +141,7 @@ private:
 	void beginReentry(hrt_abstime now);
 	void observeLaunchAirspeed(hrt_abstime now);
 	void publishFlightStatus(hrt_abstime now);
+	void recordFault(hrt_abstime now, uint8_t site, uint8_t reason = 0);
 	bool observeNet(hrt_abstime now);
 	void reportNet();
 	bool observePrearmInput(hrt_abstime now, bool armed = false);
@@ -345,6 +346,14 @@ private:
 	uORB::Subscription _launch_airspeed_sub{ORB_ID(airspeed)};
 	float _launch_airspeed{};
 	bool _launch_airspeed_valid{};
+	// Latched record of the last "control lost" D3 event, published in slaaps_flight_status. Observation only.
+	uint32_t _fault_count{};
+	hrt_abstime _fault_time{};
+	uint8_t _fault_site{}, _fault_reason{}, _fault_worker_status{}, _fault_schedule_status{};
+	uint16_t _fault_core_line{}, _fault_transport_line{};
+	int32_t _fault_output_margin_us{}, _fault_permission_margin_us{};
+	uint32_t _fault_state_age_us{}, _fault_pilot_age_us{}, _fault_since_ok_us{};
+	hrt_abstime _diag_prev_deadline{}, _diag_cycle_start{}, _diag_last_ok{};
 	// D6 operator reference: net position relative to QGC's own position. Never guidance.
 	const param_t _net_enabled_param{param_find("SLA_NET_EN")};
 	const param_t _net_north_param{param_find("SLA_NET_N")};
@@ -1589,6 +1598,7 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 
 		if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
 
+		recordFault(hrt_absolute_time(), 3, !slaaps::ManualBankPreparation::flightMode(selected_mode) ? 1 : !_power_valid ? 2 : 3);
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: %s, canards hold, EDF ramping off", loss);
 		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_REJECTED;
 		updateRecovery(hrt_absolute_time(), vehicle, armed, armed_fresh);
@@ -1775,6 +1785,7 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 
 		if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
 
+		recordFault(hrt_absolute_time(), 2);
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: control lost, canards hold, EDF ramping off");
 		// Why the core faulted: worker status and the source lines of the last core and transport rejects.
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: fault detail worker=%u core line=%u transport line=%u",
@@ -1789,11 +1800,16 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 		mavlink_log_info(&_diagnostic_log_pub, "SLAAPS: launch airspeed reached, attitude authority on\t");
 	}
 
+	// Snapshot for the fault record: after a core fault the worker reports no deadline.
+	_diag_cycle_start = hrt_absolute_time();
+	_diag_prev_deadline = _manual.outputDeadline();
 	_manual_status = current_mode == slaaps::ControlMode::Acceleration ?
 			 _manual.cycleAccelerationObserved(_manual_permission, _acceleration_input, _prepared_request.binding) :
 			 _manual.cycleObserved(_manual_permission, _input_observation, _prepared_request.binding,
 					       _manual_first_command_deadline, _condition_valid ? &_condition_sample : nullptr);
 	_acceleration_input = {};
+
+	if (_manual.active()) { _diag_last_ok = _diag_cycle_start; }
 
 	if (_manual.holding()) { reportHold(current_mode == slaaps::ControlMode::Acceleration ? "companion demand infeasible" : "pilot input lost"); }
 
@@ -1807,7 +1823,11 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 		}
 
 		// D3/D4: a core fault after at least one handled frame holds the canards and ramps EDF off.
+		recordFault(hrt_absolute_time(), 1);
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: control lost, canards hold, EDF ramping off");
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: fault detail site=1 worker=%u core line=%u transport line=%u schedule=%u",
+				     static_cast<unsigned>(_fault_worker_status), static_cast<unsigned>(_fault_core_line),
+				     static_cast<unsigned>(_fault_transport_line), static_cast<unsigned>(_fault_schedule_status));
 		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_REJECTED;
 		updateRecovery(hrt_absolute_time(), vehicle, armed, armed_fresh);
 		return;
@@ -1823,6 +1843,29 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 	}
 }
 
+void Slaaps::recordFault(hrt_abstime now, uint8_t site, uint8_t reason)
+{
+	const auto clamp32 = [](int64_t v) { return v > INT32_MAX ? INT32_MAX : v < INT32_MIN ? INT32_MIN : static_cast<int32_t>(v); };
+	const auto age32 = [](uint64_t newer, uint64_t older) { return static_cast<uint32_t>(newer > older && newer - older < UINT32_MAX ? newer - older : 0U); };
+	const auto &state = _input_observation.state;
+	++_fault_count;
+	_fault_time = now;
+	_fault_site = site;
+	_fault_reason = reason;
+	_fault_worker_status = static_cast<uint8_t>(_manual_status);
+	_fault_core_line = static_cast<uint16_t>(_manual.lastWorkerRejectLine() > UINT16_MAX ? UINT16_MAX : _manual.lastWorkerRejectLine());
+	_fault_transport_line = static_cast<uint16_t>(_manual.lastTransportRejectLine() > UINT16_MAX ? UINT16_MAX :
+				_manual.lastTransportRejectLine());
+	_fault_schedule_status = static_cast<uint8_t>(_manual.scheduleStatus());
+	_fault_output_margin_us = _diag_prev_deadline ? clamp32(static_cast<int64_t>(_diag_prev_deadline) - static_cast<int64_t>
+				  (_diag_cycle_start)) : 0;
+	_fault_permission_margin_us = clamp32(static_cast<int64_t>(_manual_permission.deadline_us) - static_cast<int64_t>(now));
+	const uint32_t attitude_age = age32(now, state.attitude_sample_us), rate_age = age32(now, state.rate_sample_us);
+	_fault_state_age_us = attitude_age > rate_age ? attitude_age : rate_age;
+	_fault_pilot_age_us = age32(now, _input_observation.manual.timestamp_sample_us);
+	_fault_since_ok_us = _diag_last_ok ? age32(now, _diag_last_ok) : 0;
+}
+
 void Slaaps::publishFlightStatus(hrt_abstime now)
 {
 	slaaps_flight_status_s status{};
@@ -1836,6 +1879,19 @@ void Slaaps::publishFlightStatus(hrt_abstime now)
 				_manual.recovering() ? slaaps_flight_status_s::RECOVERY_RAMP_OFF : slaaps_flight_status_s::RECOVERY_NONE;
 	status.recovery_start = _manual.holdStart();
 	status.failed_banks = _manual.failedBanks();
+	status.fault_count = _fault_count;
+	status.fault_time = _fault_time;
+	status.fault_site = _fault_site;
+	status.fault_reason = _fault_reason;
+	status.fault_worker_status = _fault_worker_status;
+	status.fault_core_line = _fault_core_line;
+	status.fault_transport_line = _fault_transport_line;
+	status.fault_schedule_status = _fault_schedule_status;
+	status.fault_output_margin_us = _fault_output_margin_us;
+	status.fault_permission_margin_us = _fault_permission_margin_us;
+	status.fault_state_age_us = _fault_state_age_us;
+	status.fault_pilot_age_us = _fault_pilot_age_us;
+	status.fault_since_ok_us = _fault_since_ok_us;
 	const bool recovering = _manual.holding() || _manual.recovering();
 
 	if (recovering) { (void)observeNet(now); }
