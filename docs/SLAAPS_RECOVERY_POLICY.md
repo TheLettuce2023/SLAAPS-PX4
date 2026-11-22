@@ -29,7 +29,8 @@ verification of this increment pending. Not flashed, not bench- or flight-tested
   so the supervisor applies its decided response, or it terminates (`Commander.cpp`, `failsafe_mode`).
 - **Launch** done: SLA_FLT_STAGE 0 off, 1 captive (no airspeed gate), 2 launcher. In the launcher stage canards stay at trim
   with non-integrating controller history until the selected raw airspeed reaches SLA_LAUNCH_AS; the gate then latches open.
-  A launcher-stage profile without a fresh airspeed source is not admitted.
+  A launcher-stage profile without a fresh airspeed source is not admitted. Manual may be armed in the launcher stage only with a fresh,
+valid launch airspeed sample (2026-11-21), and the launcher stage requires `SLA_SCH_EN` 0 (fixed gains) until the schedule has gate-closed handling.
 - **Flight admission**: production now sets the flight flags. `flight_admitted` needs `validateFlightConfiguration` (stage 1
   or 2, complete D1 data, SLA_DATA_STATE Calibrated or Qualified with a record ID) plus the launcher airspeed source when
   staged; Acceleration also needs `validateAccelerationControlConfiguration`. `healthy` needs fresh selected estimator

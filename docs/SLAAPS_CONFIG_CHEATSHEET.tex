@@ -68,6 +68,7 @@ If \p{valid=0}: read \p{fault=} (section 6) and the line \p{configuration reject
 \item Any edit to a SLAAPS parameter after an apply invalidates the accepted profile until the next apply.
 \item Loading the parameter file resets every value in it, including the canard trims \p{SLA_C1_ZERO}..\p{SLA_C4_ZERO} (file value 0): re-enter them.
 \item An entry rejection latches. Leave the SLAAPS mode and reselect it.
+\item \warn{Reboot after a servo or EDF Bench session before selecting Manual.} On 2026-11-18 Manual entry was rejected at the worker's first cycle (mask \p{0x900000d5}) after a Bench session until the board was rebooted.
 \item \p{SLA_BENCH_EN} is never restored at boot. Saved 1 reads back as 0.
 \item The profile apply checks values only. Calibration, qualification and flight acceptance are separate.
 \end{itemize}
@@ -119,7 +120,7 @@ Data record: \p{SLA_DATA_REC} 20261110, \p{SLA_DATA_REV} 2 (rev 3 in the file is
 7 & Preparing & Banks answering\\
 \textbf{8} & \good{Prepared} & Disarmed, nothing written. \p{flight unavailable=7}, arming offered\\
 9 & \warn{Rejected} & Latched. Leave and reselect\\
-10 & Activating & Armed. Banks confirm (6.5 ms window)\\
+10 & Activating & Armed. Banks confirm (30 ms window)\\
 11 & First command & First frame handled\\
 \textbf{12} & \good{Running} & Controller cycling\\
 13 & Wait schedule & Only with the airspeed schedule enabled\\
@@ -165,9 +166,9 @@ Any other value gives \p{input metadata=0}: entry stalls at state 3.
 
 \textbf{Timing (M)}\\
 \begin{tabular}{@{}p{2.55cm} p{4.0cm}@{}}
-\p{SLA_CYCLE_MIN/MAX} & 4000 / 12000 \textmu s\\
-\p{SLA_ACT_ACK_US} & 6500 \textmu s flight reply window\\
-\p{SLA_FIRST_CMD_US} & 5000 \textmu s flight first-command budget\\
+\p{SLA_CYCLE_MIN/MAX} & 4000 / 60000 \textmu s\\
+\p{SLA_ACT_ACK_US} & 30000 \textmu s flight reply window (PX4IO needs more than 6500)\\
+\p{SLA_FIRST_CMD_US} & 20000 \textmu s flight first-command budget\\
 \p{SLA_BN_ACK_US} & 35000 \textmu s bench\\
 \p{SLA_BN_FIRST_US} & 40000 \textmu s bench\\
 \p{SLA_OUT_LEASE} & 100 ms frame and permission lease\\

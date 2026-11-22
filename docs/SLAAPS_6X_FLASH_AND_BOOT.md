@@ -229,8 +229,9 @@ Image: `build/slaaps_firmware/flight-readiness-20261110-timing/` (`56d81d74...`)
 | `SLA_BN_ACK_US` | 35000 | Servo and EDF Bench |
 | `SLA_BN_FIRST_US` | 40000 | Servo and EDF Bench |
 | `SLA_BENCH_GAP` | 100 | Servo and EDF Bench |
-| `SLA_ACT_ACK_US` | 6500 | Manual and Acceleration |
-| `SLA_FIRST_CMD_US` | 5000 | Manual and Acceleration |
+| `SLA_ACT_ACK_US` | 30000 | Manual and Acceleration |
+| `SLA_FIRST_CMD_US` | 20000 | Manual and Acceleration |
+| `SLA_CYCLE_MAX` | 60000 | Manual and Acceleration |
 
 The Manual values are modeled. After the first armed Manual entry, `slaaps status` shows the measured reply time of each
 bank (`activation flight reply main=... aux=...`) against the limit.
@@ -261,3 +262,49 @@ Preconditions, all disarmed: external compass calibrated and selected, `ekf2 sta
 6. Stop by disarming, or by leaving the mode (canards freeze, EDF ramps off), or by pulling the pack.
 
 If arming is refused or the mode fails after arming, send `slaaps status`, `commander check` and the ulog.
+
+### Measured activation reply (2026-11-17)
+
+The first armed attempt with the rejection diagnostic showed `activation flight reply main=0 aux=4958 us banks=3
+received=2 limit=6500 us`: the AUX (DShot) bank replied in 4958 us and the MAIN (PX4IO) bank did not reply inside the
+6500 us window, so the barrier timed out (`entry rejected at line 2331 mask 0x0`). The flight values were widened to
+`SLA_ACT_ACK_US` 30000, `SLA_FIRST_CMD_US` 20000, `SLA_CYCLE_MAX` 60000. Read the same line after a successful entry to
+see the real reply times of both banks, then tighten the values.
+
+### Known issue: Manual after a Bench session (2026-11-18)
+
+After a servo Bench session (re-trimming the canards), switching `SLA_CFG_KIND` back to 1 and selecting Manual gave
+`SLAAPS: entry rejected at line 1810 mask 0x900000d5`: worker status 9 (`OutputRejected`), core reject line 213 of
+`ManualWorker.hpp` (the first-cycle deadline guard), transport line 0. A **reboot cleared it** with no parameter change.
+Root cause not found: some supervisor or bank state left by the Bench path survives the scope switch. Until it is understood,
+**reboot the board after any servo or EDF Bench session before selecting Manual**.
+
+## Parameter overlays (2026-11-18)
+
+Load order in QGC: `slaaps_vehicle.params`, then `slaaps_canard_trims.params`, then (tunnel only) `slaaps_tunnel_schedule.params`.
+Apply each time with `SLA_CFG_APPLY` +1 while disarmed.
+
+- **`slaaps_canard_trims.params`**: measured trims from the servo bench. C1 +3.5, C2 -10 (at the +-10 deg limit), C3 -4.5, C4 +2 deg.
+- **Tunnel profile A, `slaaps_tunnel_20ms.params`** (data revision 4): fixed gains modeled at 20 m/s, `SLA_SCH_EN 0`. Use only if the true flow is about 20 m/s.
+- **Tunnel profile B, `slaaps_tunnel_schedule.params`** (data revision 5, declared Calibrated 2026-11-21): modeled 2x2 control schedule (16/40 m/s x EDF 0/1), `SLA_SCH_EN 1`. Load A or B, not both. It needs the pitot zeroed
+  (`SENS_DPRES_OFF`) and indicated airspeed in 18..40 m/s with EDF 0 at entry. **Do not load it for bench work at rest:** Manual
+  refuses to enter below 18 m/s. To go back, set `SLA_SCH_EN 0` and re-apply.
+
+## Pitot mounting (2026-11-20)
+
+The tunnel logs of 2026-11-19 showed the pitot reading about 20% of the dynamic pressure implied by the board's barometer drop
+(ratio 0.11 to 0.31, dips toward 0 Pa while the flow was steady, reversed sign in the earlier runs). The probe was mounted directly on the
+nosecone, so its static ports sat in the nose's raised-pressure region. **Extending the probe forward on a boom resolved it** (reported by the
+project lead and **confirmed by the 2026-11-21 log `00_26_33`**: pitot steady within about 4% in each speed step, correlation with the
+barometer drop 0.99, indicated 18.4, 24.6, 27.7 and 34.4 m/s). The barometer drop is about 1.5 times the pitot dynamic pressure plus roughly
+120 Pa, so it is not a reliable flow proxy; use the pitot or the tunnel reference. The sensor zero shifts about -3 Pa for a 10 C cooling
+(23 to 20 Pa), so zero it at tunnel temperature. Tubes: 120 mm, 2 mm inner diameter, equal length. The tube parameters `CAL_AIR_TUBELEN` and
+`CAL_AIR_TUBED_MM` have no effect for this sensor (device type 0x83 is not an SDP3x).
+
+Rules for the mount: static holes about 6 to 8 probe diameters behind the tip, probe tip at least about 1 nose diameter ahead of the nose,
+alignment within about 10 degrees of the local flow, and no probe or tube kinks. Keep `SENS_DPRES_OFF` set from a zero check with the EDF off.
+Confirm any change of mount with a tunnel run: the pitot should read near the tunnel reference and the barometer-implied dynamic pressure.
+Site density seen in the logs: 0.975 kg/m^3 (baro about 83.4 kPa), so true speed is about 1.12 times indicated.
+
+- **Launch profile C, `slaaps_launch.params`** (data revision 6, pending the lead's declaration): launcher stage, operator-stick EDF, fixed gains
+  modeled at 25 m/s indicated, `SLA_SCH_EN 0`. Needs the measured `SLA_LAUNCH_AS` and the airspeed instance confirmed. Load it instead of A or B.
