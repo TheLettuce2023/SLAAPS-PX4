@@ -659,6 +659,10 @@ ConfigurationResult validateFlightConfiguration(const VehicleConfiguration &c)
 		if (!positive(c.launch.minimum_airspeed_m_s)) { return {ConfigurationFault::InvalidFlight, "SLA_LAUNCH_AS"}; }
 
 		if (c.launch.airspeed_age_ms <= 0) { return {ConfigurationFault::InvalidFlight, "SLA_LAUNCH_AGE"}; }
+
+		// A launch starts at rest, outside the scheduled table, and the schedule's source checks (positive airspeed,
+		// zero-EDF entry, condition loss) have no gate-closed handling. Until that exists the launcher runs fixed gains.
+		if (c.schedule.enabled) { return {ConfigurationFault::InvalidFlight, "SLA_SCH_EN"}; }
 	}
 
 	return {};

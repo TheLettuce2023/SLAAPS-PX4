@@ -40,6 +40,9 @@ public:
 	// D3/D4 recovery keeps command publication and acknowledgment subscriptions after a controller fault.
 	// The supervisor must call recoverObserved every cycle; stop() ends recovery for good.
 	bool recovering() const { return _recovering; }
+	// Source lines of the last rejection, transport and core (0 if none); diagnostics only.
+	unsigned lastTransportRejectLine() const { return _transport_reject_line; }
+	unsigned lastWorkerRejectLine() const { return _worker.lastRejectLine(); }
 	// Mode of the session being recovered; None when no recovery is in progress.
 	ControlMode recoveryMode() const { return _recovering ? _worker.recoveryMode() : ControlMode::None; }
 	// Loss detected outside the core. Recovery starts only if the core has a handled flight frame.
@@ -490,13 +493,15 @@ private:
 	}
 
 	BoundSubscription<slaaps_manual_ack_s> &acknowledgment(unsigned bank) { return bank == 0 ? _main_ack : _aux_ack; }
-	ManualWorkerStatus reject()
+	ManualWorkerStatus reject(unsigned line = __builtin_LINE())
 	{
+		_transport_reject_line = line;
 		_worker.stop(ManualWorkerStatus::OutputRejected, hrt_absolute_time());
 		stop();
 		return ManualWorkerStatus::OutputRejected;
 	}
 	ManualWorker _worker;
+	unsigned _transport_reject_line{};
 	SelectedManualInput _selected_input{};
 	bool _selected_session{};
 	ControlMode _bench_mode{ControlMode::None};

@@ -117,11 +117,7 @@ private:
 	void updatePreparation(hrt_abstime now);
 	void updateBench(hrt_abstime now);
 	bool observeBenchInput(hrt_abstime &now, bool centered, bool edf = false);
-	void cancelBench(hrt_abstime now, uint8_t status, bool normal_stop = false
-#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS) || defined(CONFIG_SLAAPS_ROUTING_TEST)
-			 , unsigned caller_line = __builtin_LINE()
-#endif
-			);
+	void cancelBench(hrt_abstime now, uint8_t status, bool normal_stop = false, unsigned caller_line = __builtin_LINE());
 #if defined(CONFIG_SLAAPS_ROUTING_TEST)
 	uint64_t _native_cancel_session {}; // Supervisor queue only; retain the first call per session.
 	uint64_t _native_preparation_cancel_session{};
@@ -148,11 +144,8 @@ private:
 	bool observeNet(hrt_abstime now);
 	void reportNet();
 	bool observePrearmInput(hrt_abstime now, bool armed = false);
-	void cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm = false
-#if defined(CONFIG_SLAAPS_ROUTING_TEST)
-			       , unsigned caller_line = __builtin_LINE()
-#endif
-			      );
+	void cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm = false,
+			       unsigned caller_line = __builtin_LINE());
 	bool publishManualPermission(hrt_abstime now, bool *waiting = nullptr,
 				     slaaps::ControlMode flight_mode = slaaps::ControlMode::None, uint64_t transition_us = 0,
 				     bool *normal_disarm = nullptr);
@@ -202,6 +195,10 @@ private:
 	slaaps::ManualPreparationRequest _prepared_request{};
 	unsigned _manual_activation_revisions[2] {};
 	uint64_t _manual_first_command_deadline{};
+	// Where the last session rejection happened (caller line and failing-term mask); diagnostics only.
+	uint64_t _reject_reported_session{};
+	unsigned _last_reject_line{};
+	uint32_t _reject_mask{}, _last_reject_mask{};
 	// Last activation attempt's measured bank replies (diagnostic only, never an admission input).
 	uint64_t _activation_reply_us[2] {};
 	uint64_t _activation_reply_limit_us{};
@@ -449,9 +446,18 @@ void Slaaps::updateParameters(hrt_abstime now, bool changed)
 {
 	if (!changed && !_restore_pending) { return; }
 
-	// A stop may reuse only an unchanged accepted profile. Even a queued edit
-	// observed before the final disarmed snapshot cancels that opportunity.
-	if (changed) { _manual_profile_restore_pending = false; }
+	// A stop may reuse only an unchanged accepted profile. A parameter update cancels that opportunity only if the SLAAPS
+	// profile itself differs from the retained one. Updates to unrelated parameters must not: PX4 writes magnetometer
+	// calibration parameters at every disarm, which cancelled the restore every time and forced a new SLA_CFG_APPLY.
+	if (changed && _manual_profile_restore_pending) {
+		slaaps::ParameterSnapshot retained_check{};
+		const bool unchanged = _parameters.capture(retained_check, _snapshot_duration, _parameter_scratch)
+				       && retained_check.use == static_cast<int32_t>(_configuration.use())
+				       && retained_check.apply_counter == _last_apply && slaaps::Px4ConfigurationSource::remembered(retained_check)
+				       && slaaps::equal(retained_check.configuration, _configuration.configuration());
+
+		if (!unchanged) { _manual_profile_restore_pending = false; }
+	}
 
 	vehicle_status_s vehicle{};
 	const bool copied = _vehicle_status.copy(&vehicle);
@@ -605,6 +611,8 @@ slaaps::ManualAvailability Slaaps::manualAvailability(hrt_abstime now) const
 	state.input_valid = _input_metadata_valid;
 	state.prepared = _manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED
 			 && _preparation_status == slaaps::PreparationStatus::Ready && now < _preparation_deadline;
+	// Launcher stage: the same fresh, valid raw airspeed sample the flight admission requires.
+	state.launch_airspeed_valid = _launch_airspeed_valid;
 	// Only a session this supervisor prepared as Manual owns the Manual run permission. An Acceleration or Bench
 	// session, including its recovery, never advertises Manual.
 	// A session handed over to Acceleration keeps its prepared Manual request, so the worker's own mode decides.
@@ -715,11 +723,7 @@ void Slaaps::updateRouting(hrt_abstime now)
 	_last_routing_diagnostic = hrt_absolute_time();
 }
 
-void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm
-#if defined(CONFIG_SLAAPS_ROUTING_TEST)
-			       , unsigned caller_line
-#endif
-			      )
+void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status, bool normal_disarm, unsigned caller_line)
 {
 #if defined(CONFIG_SLAAPS_ROUTING_TEST)
 
@@ -733,6 +737,19 @@ void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status
 	}
 
 #endif
+
+	// Report where a session was rejected, once per session. The line is the caller's; the mask names the failing
+	// terms of the two compound activation checks (bits 0-16 authority, 20-27 permission and preparation).
+	if (status == slaaps::PreparationStatus::Rejected && !normal_disarm && _preparation_session
+	    && _reject_reported_session != _preparation_session) {
+		_reject_reported_session = _preparation_session;
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: entry rejected at line %u mask 0x%x", caller_line,
+				     static_cast<unsigned>(_reject_mask));
+	}
+
+	_last_reject_line = caller_line;
+	_last_reject_mask = _reject_mask;
+	_reject_mask = 0;
 
 	if (_manual_activation_owned) { _preparation.cancelActivation(now); }
 
@@ -755,7 +772,12 @@ void Slaaps::cancelPreparation(hrt_abstime now, slaaps::PreparationStatus status
 	_power_bound = false;
 
 	if (_manual_configuration_active) {
-		_manual_profile_restore_pending = normal_disarm && _configuration.eligible();
+		// Lead decision 2026-11-17: restore the accepted profile after ANY disarm, not only an ordinary one, so a
+		// fault or a PX4 auto-disarm no longer forces a new SLA_CFG_APPLY. restoreStoppedProfile still re-reads the
+		// profile after a fresh disarm and recommits it only if it is identical, with the same apply and acceptance
+		// markers, so an edited or unaccepted profile still needs a deliberate apply. The entry latch is untouched:
+		// the mode must still be left and reselected after a fault.
+		_manual_profile_restore_pending = _configuration.eligible();
 		_configuration.disable();
 		_manual_configuration_active = false;
 	}
@@ -897,11 +919,7 @@ bool Slaaps::resetBenchEnable()
 	return param_set(_bench_enable_parameter, &disabled) == 0;
 }
 
-void Slaaps::cancelBench(hrt_abstime now, uint8_t status, bool normal_stop
-#if defined(SLAAPS_SUPERVISOR_TEST_ACCESS) || defined(CONFIG_SLAAPS_ROUTING_TEST)
-			 , unsigned caller_line
-#endif
-			)
+void Slaaps::cancelBench(hrt_abstime now, uint8_t status, bool normal_stop, unsigned caller_line)
 {
 #if defined(CONFIG_SLAAPS_ROUTING_TEST)
 
@@ -940,7 +958,8 @@ void Slaaps::cancelBench(hrt_abstime now, uint8_t status, bool normal_stop
 	}
 
 	_bench_restore_after_disarm = edf && normal_stop && _manual_configuration_active && _configuration.eligible();
-	cancelPreparation(now, slaaps::PreparationStatus::Rejected, normal_stop);
+	// Report the line of the cancelBench() caller, not this shared exit: it is what names the bench rejection.
+	cancelPreparation(now, slaaps::PreparationStatus::Rejected, normal_stop, caller_line);
 	_bench_can_arm = false;
 	_bench_can_arm_deadline = 0;
 	_bench_arming_authorized = false;
@@ -1757,6 +1776,9 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 		if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
 
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: control lost, canards hold, EDF ramping off");
+		// Why the core faulted: worker status and the source lines of the last core and transport rejects.
+		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: fault detail worker=%u core line=%u transport line=%u",
+				     static_cast<unsigned>(_manual_status), _manual.lastWorkerRejectLine(), _manual.lastTransportRejectLine());
 		_manual_entry_status = slaaps_status_s::MANUAL_ENTRY_REJECTED;
 		updateRecovery(hrt_absolute_time(), vehicle, armed, armed_fresh);
 		return;
@@ -1776,7 +1798,13 @@ void Slaaps::updateFlightControl(hrt_abstime now, const vehicle_status_s &vehicl
 	if (_manual.holding()) { reportHold(current_mode == slaaps::ControlMode::Acceleration ? "companion demand infeasible" : "pilot input lost"); }
 
 	if (!_manual.active()) {
-		if (!_manual.recovering()) { cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected); return; }
+		// Worker fault before any recovery: report the worker status and where the transport and the core rejected.
+		if (!_manual.recovering()) {
+			_reject_mask = (static_cast<uint32_t>(_manual_status) & 0xFU) << 28
+				       | (_manual.lastTransportRejectLine() & 0x3FFFU) << 14 | (_manual.lastWorkerRejectLine() & 0x3FFFU);
+			cancelPreparation(hrt_absolute_time(), slaaps::PreparationStatus::Rejected);
+			return;
+		}
 
 		// D3/D4: a core fault after at least one handled frame holds the canards and ramps EDF off.
 		mavlink_log_critical(&_diagnostic_log_pub, "SLAAPS: control lost, canards hold, EDF ramping off");
@@ -2197,12 +2225,18 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 		activation_lifetimes &= _manual_activation_revisions[1] && _aux_activation_lifetime.revision() == _manual_activation_revisions[1];
 	}
 
-	if (!armed_fresh || !current_authority || !selected || armed.kill || armed.lockdown || armed.termination || armed.in_esc_calibration_mode
-	    || !_configuration.hasCandidate() || _selected_use != 1 || !_routing_valid
-	    || !activation_lifetimes || !_manual.commandRevision() || !permissionRevision() || !_preparation.revision()
-	    || !_preparation.transitionRevision()
-	    || _manual.commandRevision() != _prepared_request.command_revision
-	    || permissionRevision() != _prepared_request.permission_revision) {
+	const uint32_t authority_mask = (!armed_fresh ? 1U << 0 : 0U) | (!current_authority ? 1U << 1 : 0U) | (!selected ? 1U << 2 : 0U)
+					| (armed.kill ? 1U << 3 : 0U) | (armed.lockdown ? 1U << 4 : 0U) | (armed.termination ? 1U << 5 : 0U)
+					| (armed.in_esc_calibration_mode ? 1U << 6 : 0U) | (!_configuration.hasCandidate() ? 1U << 7 : 0U)
+					| (_selected_use != 1 ? 1U << 8 : 0U) | (!_routing_valid ? 1U << 9 : 0U)
+					| (!activation_lifetimes ? 1U << 10 : 0U) | (!_manual.commandRevision() ? 1U << 11 : 0U)
+					| (!permissionRevision() ? 1U << 12 : 0U) | (!_preparation.revision() ? 1U << 13 : 0U)
+					| (!_preparation.transitionRevision() ? 1U << 14 : 0U)
+					| (_manual.commandRevision() != _prepared_request.command_revision ? 1U << 15 : 0U)
+					| (permissionRevision() != _prepared_request.permission_revision ? 1U << 16 : 0U);
+
+	if (authority_mask) {
+		_reject_mask = authority_mask;
 		cancelPreparation(now, slaaps::PreparationStatus::Rejected);
 		return;
 	}
@@ -2240,20 +2274,26 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 		return;
 	}
 
-	if (!slaaps::manualActivationTimingConfigured(configuration)
-	    || !publishManualPermission(now) || !_manual_permission.flight_admitted || !_manual_permission.healthy
-	    || !_manual_permission.measured_condition_valid || !_manual_permission.armed) {
+	const bool timing_configured = slaaps::manualActivationTimingConfigured(configuration);
+	const bool permission_published = timing_configured && publishManualPermission(now);
+	const uint32_t permission_mask = (!timing_configured ? 1U << 20 : 0U) | (!permission_published ? 1U << 21 : 0U)
+					 | (!_manual_permission.flight_admitted ? 1U << 22 : 0U) | (!_manual_permission.healthy ? 1U << 23 : 0U)
+					 | (!_manual_permission.measured_condition_valid ? 1U << 24 : 0U) | (!_manual_permission.armed ? 1U << 25 : 0U);
+
+	if (permission_mask) {
+		_reject_mask = permission_mask;
 		cancelPreparation(now, slaaps::PreparationStatus::Rejected);
 		return;
 	}
 
 	now = hrt_absolute_time();
 
-	if (!observePrearmInput(now, true)) { cancelPreparation(now, slaaps::PreparationStatus::Rejected); return; }
+	if (!observePrearmInput(now, true)) { _reject_mask = 1U << 26; cancelPreparation(now, slaaps::PreparationStatus::Rejected); return; }
 
 	if (!_manual_activation_owned) {
 		if (!_preparation_pending || _preparation_status != slaaps::PreparationStatus::Ready
 		    || now >= _preparation_deadline || now > UINT64_MAX - static_cast<uint64_t>(configuration.activation_ack_timeout_us)) {
+			_reject_mask = 1U << 27;
 			cancelPreparation(now, slaaps::PreparationStatus::Rejected);
 			return;
 		}
@@ -3345,14 +3385,16 @@ void Slaaps::publishStatus(hrt_abstime now)
 	}
 
 	// SLAAPS Manual may run only for a session the supervisor owns and may be armed only once its disarmed
-	// preparation is complete (captive stage). Acceleration stays denied. Nothing here grants output permission.
+	// preparation is complete (captive stage, or launcher stage with a fresh airspeed sample). Acceleration stays
+	// denied. Nothing here grants output permission.
 	const auto manual_availability = manualAvailability(now);
 
 	if (manual_availability != slaaps::ManualAvailability::Denied && status.configuration_valid
 	    && _modes[kManualMode].id >= vehicle_status_s::NAVIGATION_STATE_EXTERNAL1
 	    && _modes[kManualMode].id <= vehicle_status_s::NAVIGATION_STATE_EXTERNAL8) {
 		status.can_run_mask |= 1U << _modes[kManualMode].id;
-		status.unavailable_reason = slaaps_status_s::AVAILABLE_MANUAL_CAPTIVE;
+		status.unavailable_reason = _configuration.configuration().launch.stage == static_cast<int32_t>(slaaps::FlightStage::Launcher)
+					    ? slaaps_status_s::AVAILABLE_MANUAL_LAUNCHER : slaaps_status_s::AVAILABLE_MANUAL_CAPTIVE;
 
 		if (manual_availability == slaaps::ManualAvailability::Prepared) { status.can_arm_mask |= 1U << _modes[kManualMode].id; }
 	}
@@ -3653,6 +3695,7 @@ int Slaaps::print_status()
 		 _activation_reply_bench ? "bench" : "flight",
 		 static_cast<unsigned long long>(_activation_reply_us[0]), static_cast<unsigned long long>(_activation_reply_us[1]),
 		 _activation_reply_banks, _activation_reply_received, static_cast<unsigned long long>(_activation_reply_limit_us));
+	PX4_INFO("last rejection line=%u mask=0x%x (diagnostic; 0 is none)", _last_reject_line, static_cast<unsigned>(_last_reject_mask));
 	PX4_INFO("manual preparation=%u session=%llu banks=%u deadline=%llu (no flight admission)",
 		 status.manual_preparation_status, static_cast<unsigned long long>(status.manual_preparation_session),
 		 status.manual_preparation_banks, static_cast<unsigned long long>(status.manual_preparation_deadline));

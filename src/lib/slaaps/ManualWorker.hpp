@@ -507,6 +507,8 @@ public:
 	}
 	uint64_t handledSequence() const { return _active ? _handled_sequence : 0; }
 	bool recovering() const { return _recovering; }
+	// Source line of the last core reject(); diagnostics only, 0 if none.
+	unsigned lastRejectLine() const { return _reject_line; }
 	// Mode of the session being recovered; None when no recovery is in progress.
 	ControlMode recoveryMode() const { return _recovering ? _recovery_mode : ControlMode::None; }
 	uint8_t failedBanks() const { return _recovering ? _failed_banks : 0; }
@@ -1178,8 +1180,9 @@ private:
 	// A fault in an active flight session with at least one fully handled frame starts D3/D4 recovery:
 	// canards hold the last handled values and the shared EDF owner ramps propulsion off. Every other
 	// stop, including deliberate stop() and begin(), ends recovery.
-	ManualWorkerStatus reject(ManualWorkerStatus reason, uint64_t observed_us = 0)
+	ManualWorkerStatus reject(ManualWorkerStatus reason, uint64_t observed_us = 0, unsigned line = __builtin_LINE())
 	{
+		_reject_line = line;
 		const bool recover = _active && _have_handled && ManualBankPreparation::flightMode(_mode);
 		const auto canards = _handled_output.canards;
 		const auto mode = _mode;
@@ -1223,6 +1226,7 @@ private:
 	float _hold_edf{};
 	research_stabilized_manual::CanardVector _recovery_canards{};
 	ControlMode _recovery_mode{ControlMode::None};
+	unsigned _reject_line{};
 	uint64_t _recovery_transition_us{}, _recovery_base_sequence{};
 	EdfOwner &_edf;
 	AccelerationControllerPort _acceleration{};

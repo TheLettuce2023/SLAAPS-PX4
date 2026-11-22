@@ -46,6 +46,10 @@ public:
 		const bool vehicle_fresh = readVehicle(now);
 		const bool actually_armed = armed.armed || _vehicle_sample.arming_state == vehicle_status_s::ARMING_STATE_ARMED;
 		const bool actuator_fresh = armed.timestamp && armed.timestamp <= now && now - armed.timestamp < kCommanderAgeUs;
+		_diag_ready = ready;
+		_diag_driver = driver != 0;
+		_diag_vehicle = vehicle_fresh;
+		_diag_actuator = actuator_fresh;
 
 		// The first arming publication may precede the other one. A retained
 		// prearm denial is not a falling edge. Once this owner has observed both
@@ -451,6 +455,22 @@ private:
 				   && routing_read && routingFresh(now)
 				   && _routing.driver[Bank] == driver;
 
+		// A bank still waiting for its grant 15 ms after arming says which condition is false, once per session.
+		if (awaiting_grant && both_armed && !(permission_fresh && local)) {
+			if (!_diag_wait_start) { _diag_wait_start = now; }
+
+			else if (now - _diag_wait_start > 15000 && _diag_reported_session != _request.session) {
+				_diag_reported_session = _request.session;
+				PX4_WARN("SLAAPS bank %u grant wait: read=%d fresh=%d ready=%d drv=%d veh=%d auth=%d conf=%d sup=%d sel=%d rt=%d rtfresh=%d rdrv=%d",
+					 Bank, static_cast<int>(permission_read), permission_fresh, ready, driver == _request.binding.driver[Bank],
+					 vehicle_read && fresh(_vehicle_sample.timestamp, now) && fresh(armed.timestamp, now),
+					 !armed.kill && !armed.lockdown && !armed.termination && !armed.in_esc_calibration_mode, configured,
+					 supervisor_read && fresh(_supervisor_sample.timestamp, now), selected_mode || transfer_wait, routing_read,
+					 routingFresh(now), _routing.driver[Bank] == driver);
+			}
+
+		} else { _diag_wait_start = 0; }
+
 		if (permission_fresh && local) {
 			// The local grant cannot outlive any copied authority sample. The
 			// bank rechecks this shortened lease after its later command copy,
@@ -498,8 +518,16 @@ private:
 		return true;
 	}
 
-	SlaapsOutputStatus fail(uint64_t now, bool armed)
+	SlaapsOutputStatus fail(uint64_t now, bool armed, unsigned line = __builtin_LINE())
 	{
+		// An armed bank gives up for good here. Say why, once, with the readiness inputs it last saw: this decides
+		// whether the supervisor's activation can ever be acknowledged (read it with dmesg).
+		if (armed && !_fault_latched) {
+			PX4_WARN("SLAAPS bank %u fault at line %u: init=%d ready=%d driver=%d vehicle=%d actuator=%d listening=%d claimed=%d active=%d",
+				 Bank, line, _initialized, _diag_ready, _diag_driver, _diag_vehicle, _diag_actuator, _listening, _claimed,
+				 _bank.active());
+		}
+
 		cancel(now);
 
 		// Ground commissioning never owns an airborne recovery policy. Any loss
@@ -547,6 +575,9 @@ private:
 	uint64_t _session{};
 	uint64_t _stop_driver{}, _stop_session{};
 	slaaps::ControlMode _stop_mode{slaaps::ControlMode::None};
+	// Last readiness inputs seen by poll(), reported when this bank latches an armed fault.
+	bool _diag_ready{}, _diag_driver{}, _diag_vehicle{}, _diag_actuator{};
+	uint64_t _diag_wait_start{}, _diag_reported_session{};
 	bool _initialized{}, _listening{}, _have_configuration{}, _configuration_valid{}, _claimed{}, _fault_latched{}, _waiting_for_grant{},
 	     _waiting_for_transfer{};
 	bool _stop_pending{}, _stop_complete{}, _armed_seen{}, _ordinary_disarm_stop{};

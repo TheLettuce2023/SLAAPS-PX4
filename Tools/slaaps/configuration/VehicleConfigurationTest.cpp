@@ -855,12 +855,60 @@ static void manualAvailabilityTests()
 		      "every missing preparation condition denies run and arm");
 	}
 
+	// Launcher stage: arming needs the complete launcher profile and a fresh launch airspeed sample.
 	auto launcher = c;
 	launcher.launch.stage = static_cast<int32_t>(FlightStage::Launcher);
 	launcher.launch.airspeed_instance = 0;
-	check(manualAvailability(launcher, ready) == ManualAvailability::Denied, "the launcher stage is never offered for arming");
+	launcher.launch.minimum_airspeed_m_s = 12.F;
+	launcher.launch.airspeed_age_ms = 100;
+	check(validateFlightConfiguration(launcher).valid(), "the launcher fixture is a complete launcher flight profile");
+	check(manualAvailability(launcher, ready) == ManualAvailability::Denied,
+	      "the launcher stage is not offered for arming without a fresh launch airspeed sample");
+	auto launcher_ready = ready;
+	launcher_ready.launch_airspeed_valid = true;
+	check(manualAvailability(launcher, launcher_ready) == ManualAvailability::Prepared,
+	      "a prepared launcher Manual session with a fresh airspeed sample may be armed");
+
+	for (unsigned field = 0; field < 7; ++field) {
+		auto state = launcher_ready;
+		bool *flag[] = {&state.manual_use_selected, &state.configuration_eligible, &state.modes_registered,
+				&state.routing_valid, &state.power_valid, &state.input_valid, &state.prepared
+			       };
+		*flag[field] = false;
+		check(manualAvailability(launcher, state) == ManualAvailability::Denied,
+		      "every missing preparation condition also denies the launcher stage");
+	}
+
+	// The launch sample never grants arming outside the launcher stage's own profile.
+	check(manualAvailability(c, launcher_ready) == ManualAvailability::Prepared,
+	      "the captive stage ignores the launch airspeed sample");
+	auto no_source = launcher;
+	no_source.launch.airspeed_instance = -1;
+	check(manualAvailability(no_source, launcher_ready) == ManualAvailability::Denied,
+	      "a launcher profile without an airspeed source denies arming");
+	no_source = launcher;
+	no_source.launch.minimum_airspeed_m_s = 0.F;
+	check(manualAvailability(no_source, launcher_ready) == ManualAvailability::Denied,
+	      "a launcher profile without a measured gate speed denies arming");
+	no_source = launcher;
+	no_source.launch.airspeed_age_ms = 0;
+	check(manualAvailability(no_source, launcher_ready) == ManualAvailability::Denied,
+	      "a launcher profile without an airspeed age limit denies arming");
+	auto scheduled_launcher = launcher;
+	scheduled_launcher.schedule.enabled = 1;
+	const auto scheduled_result = validateFlightConfiguration(scheduled_launcher);
+	check(scheduled_result.fault == ConfigurationFault::InvalidFlight && scheduled_result.parameter
+	      && std::strcmp(scheduled_result.parameter, "SLA_SCH_EN") == 0,
+	      "the launcher stage rejects the control schedule until its gate-closed handling exists");
+	check(manualAvailability(scheduled_launcher, launcher_ready) == ManualAvailability::Denied,
+	      "a scheduled launcher profile denies arming");
+	auto scheduled_captive = c;
+	scheduled_captive.schedule.enabled = 1;
+	check(validateFlightConfiguration(scheduled_captive).valid(),
+	      "the captive stage is unaffected by the launcher schedule rule");
+
 	launcher.launch.stage = static_cast<int32_t>(FlightStage::Off);
-	check(manualAvailability(launcher, ready) == ManualAvailability::Denied, "stage Off is never offered for arming");
+	check(manualAvailability(launcher, launcher_ready) == ManualAvailability::Denied, "stage Off is never offered for arming");
 
 	auto incomplete = c;
 	incomplete.data_assessment = static_cast<int32_t>(DataAssessment::Incomplete);
@@ -11232,6 +11280,9 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		}
 
 		publish_power = publish_estimates = true;
+		// PX4 writes unrelated parameters (magnetometer calibration) at every disarm. That update must not cancel the restore.
+		const int32_t unrelated = static_cast<int32_t>(loss);
+		check(param_set(param_find("COM_PREARM_MODE"), &unrelated) == 0, "write an unrelated parameter around the disarm");
 		vehicle_armed = armed.armed = false;
 		SlaapsNativeTest::admitted.store(false);
 		slaaps_manual_command_s stopped{}, later{};
@@ -11243,6 +11294,9 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		while (hrt_absolute_time() < quiet) { pump(); px4_usleep(1000); }
 
 		check(command_sub.copy(&later) && later.sequence == stopped.sequence, "no recovery frame follows disarm");
+		// Lead decision 2026-11-17: the accepted profile comes back after ANY disarm, including the one that ends a recovery.
+		wait([&]() { return status.configuration_valid; }, 1000000,
+		"the accepted profile is restored after the disarm that ended a recovery, without another apply");
 	}
 
 	// D1 then D5 through the actual supervisor, both banks and the real driver adapters: pilot input lost in Manual

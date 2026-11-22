@@ -10,7 +10,7 @@ namespace slaaps
 // Commander uses the same "can arm and run" answer as the mode's run permission. A mode that cannot run
 // triggers the fallback failsafe at the moment of arming, so the answer must stay true for the whole session
 // the supervisor owns, and must be true before the operator arms. Arming is permitted only for a prepared
-// captive-stage session: every condition the supervisor itself requires before it will activate, and none
+// captive-stage or launcher-stage session: every condition the supervisor itself requires before it will activate, and none
 // that it will not. This grants no output permission: activation, the first handled frame, flight admission
 // and every recovery response remain separate supervisor decisions.
 enum class ManualAvailability : uint8_t {
@@ -28,6 +28,7 @@ struct ManualAvailabilityState {
 	bool input_valid{};             // Selected estimator state and Commander permission metadata fresh.
 	bool prepared{};                // Entry PREPARED, both banks ready, original preparation deadline not passed.
 	bool active{};                  // Activating, first command, running, recovering or re-entering.
+	bool launch_airspeed_valid{};   // Launcher stage only: the configured raw airspeed sample is fresh and valid.
 };
 
 inline ManualAvailability manualAvailability(const VehicleConfiguration &configuration, const ManualAvailabilityState &state)
@@ -44,8 +45,12 @@ inline ManualAvailability manualAvailability(const VehicleConfiguration &configu
 		return ManualAvailability::Denied;
 	}
 
-	// Captive tests only. The launcher stage has an airspeed gate this permission does not cover.
-	if (configuration.launch.stage != static_cast<int32_t>(FlightStage::Captive)) { return ManualAvailability::Denied; }
+	// Captive and launcher stages. The launcher also needs its own fresh airspeed sample, exactly what the supervisor
+	// requires for flight admission; the attitude gate itself stays closed (canards at trim) until the worker opens it.
+	const bool captive = configuration.launch.stage == static_cast<int32_t>(FlightStage::Captive);
+	const bool launcher = configuration.launch.stage == static_cast<int32_t>(FlightStage::Launcher);
+
+	if (!captive && !(launcher && state.launch_airspeed_valid)) { return ManualAvailability::Denied; }
 
 	if (!validateFlightConfiguration(configuration).valid()) { return ManualAvailability::Denied; }
 
