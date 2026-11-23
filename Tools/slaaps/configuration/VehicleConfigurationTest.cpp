@@ -11991,6 +11991,52 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 	wait([&]() { return status.bench_entry_status == slaaps_status_s::BENCH_ENTRY_INACTIVE; }, 1000000,
 	"completed EDF commissioning exits deliberately with no armed fallback or automatic reentry");
+
+	// Board 2026-11-18: after a Bench session, Manual entry was rejected (worker status 9, the first-cycle guard) until a
+	// reboot. Same supervisor object, no restart: reapply the Manual scope, select Manual, arm, and require Running.
+	{
+		const int32_t manual_scope = 1, manual_apply = 600;
+		// The EDF commissioning fixtures above install their own profile; the board kept its vehicle profile, so restore
+		// the Manual fixture profile this test started with before the reapply.
+		installNativeMixerConfiguration(c);
+		check(param_set(param_find("SLA_CFG_KIND"), &manual_scope) == 0
+		      && param_set(param_find("SLA_CFG_APPLY"), &manual_apply) == 0, "reapply the Manual scope after commissioning");
+		wait([&]() { return status.configuration_valid && status.apply_counter == manual_apply && status.configuration_use == 1; },
+		     1000000, "Manual scope reapplies after the Bench sessions without a restart");
+		vehicle_armed = armed.armed = false;
+		vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+		// The Bench fixtures stop the synthetic estimator; Manual needs it, as the board's EKF2 always runs.
+		publish_inputs = publish_estimates = publish_manual = pump_aux = true;
+		roll = 0.F;
+		throttle = -1.F;
+		power_scenario = 0;
+		SlaapsNativeTest::admitted.store(true);
+		auto report_entry = [&](const char *step) {
+			std::fprintf(stderr, "POST_BENCH_ENTRY step=%s entry=%u preparation=%u session=%llu worker=%d power=%d/%u config=%d/%u "
+				     "routing=%d/%u can_run=0x%x can_arm=0x%x\n", step, static_cast<unsigned>(status.manual_entry_status),
+				     static_cast<unsigned>(status.manual_preparation_status),
+				     static_cast<unsigned long long>(status.manual_preparation_session), status.manual_worker_active,
+				     status.power_ready, static_cast<unsigned>(status.power_status), status.configuration_valid,
+				     static_cast<unsigned>(status.configuration_use), status.routing_snapshot_valid,
+				     static_cast<unsigned>(status.routing_fault), static_cast<unsigned>(status.can_run_mask),
+				     static_cast<unsigned>(status.can_arm_mask));
+		};
+		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE; }, 1000000,
+		     "Manual entry starts inactive after the Bench sessions");
+		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[0];
+		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED; }, 1000000,
+		     "Manual prepares both banks after the Bench sessions");
+		report_entry("prepared");
+		vehicle_armed = armed.armed = true;
+		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING && status.manual_worker_active; },
+		     500000, "Manual reaches Running after the Bench sessions without a restart");
+		report_entry("running");
+		vehicle_armed = armed.armed = false;
+		wait([&]() { return !status.manual_worker_active; }, 1000000, "disarm ends the post-Bench Manual session");
+		SlaapsNativeTest::admitted.store(false);
+		vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+	}
+
 	subject = ModuleBase::get_instance<SlaapsNativeTestSubject>(SlaapsNativeTestSubject::desc);
 	check(subject != nullptr, "commissioning uses the genuine scheduled supervisor object");
 	subject->request_stop();

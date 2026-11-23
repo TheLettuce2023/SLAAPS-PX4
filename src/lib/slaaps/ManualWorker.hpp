@@ -209,8 +209,12 @@ public:
 
 		if (_holding) { return holdCycle(now, permission, state, output, binding, ack, condition); }
 
-		if (_mode != ControlMode::Manual || !sameManualOutputBinding(binding, _binding)
-		    || now >= _deadline) { return reject(ManualWorkerStatus::OutputRejected); }
+		// Three separate guards (same behavior) so the reported core line names the failing term.
+		if (_mode != ControlMode::Manual) { return reject(ManualWorkerStatus::OutputRejected); }
+
+		if (!sameManualOutputBinding(binding, _binding)) { return reject(ManualWorkerStatus::OutputRejected); }
+
+		if (now >= _deadline) { return reject(ManualWorkerStatus::OutputRejected); }
 
 		_clock = math::max(_clock, now);
 
