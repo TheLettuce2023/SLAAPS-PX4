@@ -31,6 +31,10 @@ verification of this increment pending. Not flashed, not bench- or flight-tested
   with non-integrating controller history until the selected raw airspeed reaches SLA_LAUNCH_AS; the gate then latches open.
   A launcher-stage profile without a fresh airspeed source is not admitted. Manual may be armed in the launcher stage only with a fresh,
 valid launch airspeed sample (2026-11-21), and the launcher stage requires `SLA_SCH_EN` 0 (fixed gains) until the schedule has gate-closed handling.
+  Since 2026-11-23 (`LaunchAirspeed.hpp`): a sample is valid when it is fresh (age at most `SLA_LAUNCH_AGE`) and at or above -5 m/s.
+  A zeroed pitot's small negative reading counts as below the gate speed, not as a fault. The airspeed term of flight admission is
+  needed only to admit an arming. That arming then stays admitted through stale or noisy samples, so a pitot dropout mid-launch no
+  longer cancels the session and unpowers the canards. The gate stays where it is. A disarm or a new arming needs a valid sample again.
 - **Flight admission**: production now sets the flight flags. `flight_admitted` needs `validateFlightConfiguration` (stage 1
   or 2, complete D1 data, SLA_DATA_STATE Calibrated or Qualified with a record ID) plus the launcher airspeed source when
   staged; Acceleration also needs `validateAccelerationControlConfiguration`. `healthy` needs fresh selected estimator

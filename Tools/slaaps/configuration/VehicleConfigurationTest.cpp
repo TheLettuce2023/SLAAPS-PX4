@@ -8,6 +8,7 @@
 #include <lib/slaaps/ManualBankPreparation.hpp>
 #include <lib/slaaps/ManualActivationBarrier.hpp>
 #include <lib/slaaps/ManualAvailability.hpp>
+#include <lib/slaaps/LaunchAirspeed.hpp>
 #include <lib/slaaps/ManualActivationTransport.hpp>
 #include <lib/slaaps/ObservedRoutingBinding.hpp>
 #include <lib/slaaps/ManualPreparationTransport.hpp>
@@ -823,6 +824,70 @@ static void manualTimingConfigurationTests()
 	staged.manual_ready_wait_s = 5;
 	check(!validate(staged, ConfigurationUse::StabilizedManual).valid(),
 	      "an operator wait alone cannot make otherwise absent manual timing configured");
+}
+
+// Board 2026-11-23: the DroneCAN pitot publishes at 10 Hz with timestamp_sample about 28 ms behind, and once zeroed reads
+// -0.69 to +0.93 m/s in still air. A negative or stale sample withdrew launcher flight admission while armed, which cancels
+// the session and unpowers the canards. A valid sample now admits an arming, and that arming stays admitted.
+static void launchAirspeedTests()
+{
+	const uint64_t now = 10000000;
+	LaunchAirspeedSample sample{};
+	sample.timestamp_sample_us = now - 28000;
+	sample.indicated_m_s = 0.5F;
+	sample.confidence = 1.F;
+	check(launchAirspeedValid(sample, now, 250), "a fresh still-air sample is valid");
+
+	auto negative = sample;
+	negative.indicated_m_s = -0.69F;
+	check(launchAirspeedValid(negative, now, 250), "a zeroed pitot's small negative reading is valid, below the gate speed");
+	negative.indicated_m_s = kLaunchAirspeedReversedM_s;
+	check(launchAirspeedValid(negative, now, 250), "the reversed-tube limit itself is still valid");
+	negative.indicated_m_s = kLaunchAirspeedReversedM_s - 0.01F;
+	check(!launchAirspeedValid(negative, now, 250), "a strongly negative reading (bad zero or reversed tubes) is invalid");
+
+	auto aged = sample;
+	aged.timestamp_sample_us = now - 128000;
+	check(!launchAirspeedValid(aged, now, 100), "the old 100 ms age fails a 10 Hz sample late in its period");
+	check(launchAirspeedValid(aged, now, 250), "250 ms accepts a 10 Hz sample late in its period");
+	aged.timestamp_sample_us = now - 228000;
+	check(launchAirspeedValid(aged, now, 250), "250 ms rides out one missed 10 Hz publication");
+	aged.timestamp_sample_us = now - 250000;
+	check(launchAirspeedValid(aged, now, 250), "an age equal to the limit is still fresh");
+	aged.timestamp_sample_us = now - 250001;
+	check(!launchAirspeedValid(aged, now, 250), "an age beyond the limit is stale");
+
+	auto bad = sample;
+	bad.timestamp_sample_us = 0;
+	check(!launchAirspeedValid(bad, now, 250), "a sample without a time is invalid");
+	bad = sample;
+	bad.timestamp_sample_us = now + 1;
+	check(!launchAirspeedValid(bad, now, 250), "a sample from the future is invalid");
+	bad = sample;
+	bad.indicated_m_s = NAN;
+	check(!launchAirspeedValid(bad, now, 250), "a non-finite airspeed is invalid");
+	bad = sample;
+	bad.confidence = 0.F;
+	check(!launchAirspeedValid(bad, now, 250), "zero confidence is invalid");
+	bad.confidence = 1.01F;
+	check(!launchAirspeedValid(bad, now, 250), "confidence above one is invalid");
+	check(!launchAirspeedValid(sample, now, 0), "an unconfigured age admits nothing");
+
+	LaunchAdmission admission{};
+	check(admission.update(false, true, 5, false) && !admission.admitted(), "the captive stage does not need the airspeed term");
+	check(!admission.update(true, false, 0, true), "a disarmed launcher is never admitted");
+	check(!admission.update(true, true, 5, false), "arming without a valid sample is not admitted");
+	check(admission.update(true, true, 5, true), "a valid sample admits the arming");
+	check(admission.update(true, true, 5, false), "a stale or invalid sample later in the same arming keeps admission");
+	check(admission.update(true, true, 5, false), "admission does not decay during a long pitot dropout");
+	check(!admission.update(true, true, 9, false), "a new arming needs a valid sample again");
+	check(admission.update(true, true, 9, true), "the new arming is admitted on a valid sample");
+	check(!admission.update(true, false, 9, false) && !admission.admitted(), "disarm clears the admission");
+	check(!admission.update(true, true, 9, false), "re-arming with the same armed time after a disarm still needs a valid sample");
+	check(admission.update(true, true, 9, true), "and is admitted on one");
+	check(admission.update(false, true, 9, false) && !admission.admitted(),
+	      "leaving the launcher stage clears the latch while the term no longer applies");
+	check(!admission.update(true, true, 9, false), "returning to the launcher stage needs a valid sample again");
 }
 
 // Commander's run/arm answer for SLAAPS Manual. A mode that cannot run triggers the fallback failsafe at the moment
@@ -4851,6 +4916,7 @@ static int runConfigurationTests()
 	activationReserveConfigurationTests();
 	perModeActivationTimingTests();
 	manualAvailabilityTests();
+	launchAirspeedTests();
 	powerConfigurationTests();
 	profileTests();
 	benchTravelBoundsTests();
@@ -12002,7 +12068,7 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		check(param_set(param_find("SLA_CFG_KIND"), &manual_scope) == 0
 		      && param_set(param_find("SLA_CFG_APPLY"), &manual_apply) == 0, "reapply the Manual scope after commissioning");
 		wait([&]() { return status.configuration_valid && status.apply_counter == manual_apply && status.configuration_use == 1; },
-		     1000000, "Manual scope reapplies after the Bench sessions without a restart");
+		1000000, "Manual scope reapplies after the Bench sessions without a restart");
 		vehicle_armed = armed.armed = false;
 		vehicle.nav_state = vehicle.nav_state_user_intention = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 		// The Bench fixtures stop the synthetic estimator; Manual needs it, as the board's EKF2 always runs.
@@ -12022,14 +12088,14 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 				     static_cast<unsigned>(status.can_arm_mask));
 		};
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_INACTIVE; }, 1000000,
-		     "Manual entry starts inactive after the Bench sessions");
+		"Manual entry starts inactive after the Bench sessions");
 		vehicle.nav_state = vehicle.nav_state_user_intention = status.mode_id[0];
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_PREPARED; }, 1000000,
-		     "Manual prepares both banks after the Bench sessions");
+		"Manual prepares both banks after the Bench sessions");
 		report_entry("prepared");
 		vehicle_armed = armed.armed = true;
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING && status.manual_worker_active; },
-		     500000, "Manual reaches Running after the Bench sessions without a restart");
+		500000, "Manual reaches Running after the Bench sessions without a restart");
 		report_entry("running");
 		vehicle_armed = armed.armed = false;
 		wait([&]() { return !status.manual_worker_active; }, 1000000, "disarm ends the post-Bench Manual session");

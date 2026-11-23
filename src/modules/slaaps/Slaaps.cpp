@@ -3,6 +3,7 @@
 #include <lib/slaaps/ManualExecution.hpp>
 #include <lib/slaaps/ManualPreparationCoordinator.hpp>
 #include <lib/slaaps/ManualPermissionTransport.hpp>
+#include <lib/slaaps/LaunchAirspeed.hpp>
 #include <lib/slaaps/ManualAvailability.hpp>
 #include <lib/research_stabilized_manual/SelectedStateObservation.hpp>
 #include <lib/slaaps/OperatingConditionObservation.hpp>
@@ -355,6 +356,7 @@ private:
 	uORB::Subscription _launch_airspeed_sub{ORB_ID(airspeed)};
 	float _launch_airspeed{};
 	bool _launch_airspeed_valid{};
+	slaaps::LaunchAdmission _launch_admission{};
 	// Latched record of the last "control lost" D3 event, published in slaaps_flight_status. Observation only.
 	uint32_t _fault_count{};
 	hrt_abstime _fault_time{};
@@ -1504,7 +1506,8 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting, slaaps::Con
 	// Flight admission (SLA_FLT_STAGE, docs/SLAAPS_RECOVERY_POLICY.md). Captive and launcher stages admit
 	// SLAAPS Manual/Acceleration only with complete D1 data and a declared calibrated record, a fresh healthy
 	// estimator, valid routing and power inside the measured EDF-curve condition. The launcher stage also
-	// needs its airspeed source; canard authority there waits for the worker's airspeed gate. Stage Off
+	// needs a valid airspeed sample to admit an arming (LaunchAdmission: that arming then stays admitted through a
+	// stale or noisy sample); canard authority there waits for the worker's airspeed gate. Stage Off
 	// keeps every flight flag denied. Servo-only Bench health is a separate disarmed/prearmed predicate and
 	// never sets either flight flag.
 	if (!bench) {
@@ -1516,8 +1519,10 @@ bool Slaaps::publishManualPermission(hrt_abstime now, bool *waiting, slaaps::Con
 				     && !_registration_fault;
 		// A disarmed permission is always a complete denial, whatever the profile or power state.
 		permission.measured_condition_valid = permission.armed && _power_valid && now < _power_sample.deadline_us;
+		const bool launch_admitted = _launch_admission.update(launcher, permission.armed, vehicle.armed_time,
+					     _launch_airspeed_valid);
 		permission.flight_admitted = permission.armed && slaaps::validateFlightConfiguration(configuration).valid()
-					     && (!launcher || _launch_airspeed_valid)
+					     && launch_admitted
 					     && (output_mode != slaaps::ControlMode::Acceleration
 						 || slaaps::validateAccelerationControlConfiguration(configuration).valid());
 	}
@@ -1930,10 +1935,12 @@ void Slaaps::observeLaunchAirspeed(hrt_abstime now)
 
 	if (!_launch_airspeed_sub.copy(&airspeed)) { return; }
 
-	const uint64_t age = static_cast<uint64_t>(launch.airspeed_age_ms) * 1000;
-	_launch_airspeed_valid = airspeed.timestamp_sample && airspeed.timestamp_sample <= now && now - airspeed.timestamp_sample <= age
-				 && PX4_ISFINITE(airspeed.indicated_airspeed_m_s) && airspeed.indicated_airspeed_m_s >= 0.F
-				 && PX4_ISFINITE(airspeed.confidence) && airspeed.confidence > 0.F && airspeed.confidence <= 1.F;
+	// A small negative reading is a zeroed pitot's noise in still air, valid and below the gate speed.
+	slaaps::LaunchAirspeedSample sample{};
+	sample.timestamp_sample_us = airspeed.timestamp_sample;
+	sample.indicated_m_s = airspeed.indicated_airspeed_m_s;
+	sample.confidence = airspeed.confidence;
+	_launch_airspeed_valid = slaaps::launchAirspeedValid(sample, now, launch.airspeed_age_ms);
 	_launch_airspeed = _launch_airspeed_valid ? airspeed.indicated_airspeed_m_s : 0.F;
 }
 

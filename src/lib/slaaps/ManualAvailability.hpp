@@ -28,7 +28,7 @@ struct ManualAvailabilityState {
 	bool input_valid{};             // Selected estimator state and Commander permission metadata fresh.
 	bool prepared{};                // Entry PREPARED, both banks ready, original preparation deadline not passed.
 	bool active{};                  // Activating, first command, running, recovering or re-entering.
-	bool launch_airspeed_valid{};   // Launcher stage only: the configured raw airspeed sample is fresh and valid.
+	bool launch_airspeed_valid{};   // Launcher stage only: the configured raw airspeed sample is valid (launchAirspeedValid).
 };
 
 inline ManualAvailability manualAvailability(const VehicleConfiguration &configuration, const ManualAvailabilityState &state)

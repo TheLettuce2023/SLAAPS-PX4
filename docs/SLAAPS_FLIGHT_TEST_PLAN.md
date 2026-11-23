@@ -29,7 +29,8 @@ What the tunnel would have given, and what replaces it:
   The armed-Manual bench test reports the real bank reply times (`activation flight reply main=... aux=...`).
 - [ ] Joystick link fixed (observed 4.8 Hz) or the input age and activation reserve proven to cope with it. Likely closed: the 4.8 Hz
   matches the logger's 200 ms sampling of `manual_control_setpoint` (`logged_topics.cpp`, default profile), not the link. Confirm the
-  live rate with `uorb top manual_control_setpoint`.
+  live rate with `uorb top manual_control_setpoint`. Measured on the board 2026-11-23: 24 Hz (about 42 ms between samples), about
+  seven samples within `SLA_IN_AGE` 300 ms. Ready for the lead to close.
 - [ ] Logger stack warning removed; logging rates raised for the tests below (canard commands at 50 Hz or faster). Still seen
   2026-11-23: `log_writer_file low on stack! (296 bytes left)`.
 - [ ] The image on the board is built from a committed tree; hash recorded. Partly: the board image (`flight-readiness-20261123-axis-bound`)
@@ -39,6 +40,10 @@ What the tunnel would have given, and what replaces it:
 ## G1. Ground measurements
 - [ ] EDF thrust curve and **reaction torque** on a thrust stand with a torque arm, at several throttle values. Record the supply current against the power module limit.
 - [ ] Pitot zeroed at launch temperature and checked against a reference (fan and anemometer, or GPS speed on G4).
+  2026-11-23: read 6.15 m/s indicated in still air (an offset of about 23 Pa). The true/indicated ratio 1.124 matches the 0.975 kg/m^3
+  site density. Zeroed the same day with `commander calibrate airspeed` at a sensor temperature of 33 C: `SENS_DPRES_OFF` 23.0085, and still
+  air now reads -0.69 to +0.93 m/s. The value is in `Tools/slaaps/parameters/slaaps_sensor_cal.params`. The reference check is still open,
+  and the zero is redone at the launch temperature.
 - [ ] CG and inertia checked against the data sheet.
 - [ ] Basis for `SLA_LAUNCH_AS` (20 m/s indicated, set by the lead 2026-11-21) recorded: canard authority with margin over stall, and the reaction torque it must beat.
 
@@ -51,6 +56,15 @@ Each decided response (docs/SLAAPS_RECOVERY_POLICY.md) is triggered on purpose a
 
 ## G3. Launcher-stage dry run on the ground
 - [ ] Flash the A1 (or later) image, declare revision 6, load profile C.
+  Airspeed is instance 0 at 10 Hz (measured 2026-11-23); profile C now sets `SLA_LAUNCH_AGE` 250 ms (was 100, which failed part of every period).
+- [ ] Launcher-stage airspeed handling checked on the board. Found 2026-11-23: a stale sample (a CAN dropout longer than `SLA_LAUNCH_AGE`)
+  or a negative one withdrew flight admission while armed. That cancels the session, so the canards went unpowered with no hold or ramp.
+  A zeroed pitot reads slightly negative about half the time in still air (-0.69 m/s), so an arm at rest would have cancelled within
+  a few samples. Fixed the same day (lead's decision): a sample down to -5 m/s is valid and below the gate speed. A valid sample is
+  needed to admit an arming, and that arming then stays admitted. The gate keeps its state. Native tests cover the decision; the
+  supervisor scenarios use synthetic admission, so the board check is: arm in the launcher stage at rest, stay armed 60 s with the
+  pitot uncovered, then unplug the pitot's own CAN lead (not the bus segment the power module is on) and see the session keep running
+  (the gate stays closed).
 - [ ] Arm in the launcher stage with a fresh airspeed sample. Push the pitot through 20 m/s indicated with a fan or hand-held airflow and see the gate open
   ("launch airspeed reached, attitude authority on"). EDF off.
 - [ ] Operator-stick EDF path with `SLA_EDF_BMAX` set low, vehicle restrained, then at the planned value on the thrust stand.

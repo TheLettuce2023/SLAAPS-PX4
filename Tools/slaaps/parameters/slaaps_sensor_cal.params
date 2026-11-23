@@ -1,0 +1,5 @@
+# SLAAPS sensor calibration values measured on the board, kept so that a parameter reset can be restored from files.
+# SENS_DPRES_OFF: pitot zero, 'commander calibrate airspeed' on 2026-11-23, tip covered, sensor at 33 C, Holybro DroneCAN DLVR on the boom.
+# Afterwards still air read -0.69 to +0.93 m/s indicated. The zero drifts with temperature: redo it at the launch site and temperature.
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	SENS_DPRES_OFF	23.0085	9
