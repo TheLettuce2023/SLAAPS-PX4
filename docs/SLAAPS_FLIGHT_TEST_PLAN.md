@@ -13,13 +13,28 @@ What the tunnel would have given, and what replaces it:
 | Closed-loop stability and tracking | SITL with the identified model, plus `Tools/slaaps/stability_margin.py`, plus doublets in G4 and G5 |
 | A free-pivot stability demonstration | Not replaced. The first launches carry this risk; keep gains conservative (G5) |
 
+## Progress 2026-11-23
+- EDF moved to PWM 400 Hz on AUX1 (1000-2000 us, zero throttle = stop); the Lucid never armed on DShot600 under the SLAAPS
+  image. It now arms while disarmed (commits 29dd65208c, 0a911aa2e5).
+- EDF Bench ran cleanly through full stick after the full-stick fix (commit fe2cc90837): QGC full stick arrived as throttle
+  1.000000119 and the strict [-1, 1] check cancelled the session. Manual uses the same input path.
+- Battery warning cleared with charged packs (`power ready=1` at 41.9 V).
+- Output wiring values now live in `Tools/slaaps/parameters/slaaps_outputs.params`; a parameter reset is restored from files.
+
 ## G0. Software defects closed (before any hardware test that matters)
 - [ ] "Control lost" events root-caused and removed. Build `flight-readiness-20261121-faultdiag`, run on the bench, read `fault_site`,
   `fault_core_line` and the margins from `slaaps_flight_status`, fix, and show zero events over [lead] armed minutes (proposed: 30).
+  The diagnostic is in every image since commit 73a739b5de; the armed-Manual bench run has not been done yet.
 - [ ] Timing windows final and committed: `SLA_ACT_ACK_US`, `SLA_CYCLE_MAX`, `SLA_OUT_LEASE` (the board still carries temporary 120 ms / 200 ms / 200 ms).
-- [ ] Joystick link fixed (observed 4.8 Hz) or the input age and activation reserve proven to cope with it.
-- [ ] Logger stack warning removed; logging rates raised for the tests below (canard commands at 50 Hz or faster).
-- [ ] The image on the board is built from a committed tree; hash recorded.
+  The armed-Manual bench test reports the real bank reply times (`activation flight reply main=... aux=...`).
+- [ ] Joystick link fixed (observed 4.8 Hz) or the input age and activation reserve proven to cope with it. Likely closed: the 4.8 Hz
+  matches the logger's 200 ms sampling of `manual_control_setpoint` (`logged_topics.cpp`, default profile), not the link. Confirm the
+  live rate with `uorb top manual_control_setpoint`.
+- [ ] Logger stack warning removed; logging rates raised for the tests below (canard commands at 50 Hz or faster). Still seen
+  2026-11-23: `log_writer_file low on stack! (296 bytes left)`.
+- [ ] The image on the board is built from a committed tree; hash recorded. Partly: the board image (`flight-readiness-20261123-axis-bound`)
+  has the sources of fe2cc90837, but was built from a working copy, so `ver all` shows the parent hash. One clean rebuild closes it.
+- [ ] Manual entry after a Bench session fails until a reboot (`entry rejected at line 1810`, since 2026-11-18); root cause not found.
 
 ## G1. Ground measurements
 - [ ] EDF thrust curve and **reaction torque** on a thrust stand with a torque arm, at several throttle values. Record the supply current against the power module limit.
@@ -39,6 +54,7 @@ Each decided response (docs/SLAAPS_RECOVERY_POLICY.md) is triggered on purpose a
 - [ ] Arm in the launcher stage with a fresh airspeed sample. Push the pitot through 20 m/s indicated with a fan or hand-held airflow and see the gate open
   ("launch airspeed reached, attitude authority on"). EDF off.
 - [ ] Operator-stick EDF path with `SLA_EDF_BMAX` set low, vehicle restrained, then at the planned value on the thrust stand.
+  (EDF Bench on 2026-11-23 exercised the EDF output and the stick path in Bench mode, not in Manual.)
 
 ## G4. Vehicle-mounted captive test (closed road or runway, 20 to 30 m/s)
 - [ ] Mount on a low-friction pivot or a force balance, the pitot on its boom, GPS speed logged as the reference.
