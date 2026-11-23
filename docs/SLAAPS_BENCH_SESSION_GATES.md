@@ -47,6 +47,14 @@ Start each from armed SLAAPS Manual, running (`manual entry=12`). Log the start 
 Pass criteria (response time, expected states) are the lead's to set; the script prints the measured time from the
 preceding input, mode or arming change to each recovery change, and how long the EDF output took to reach the stop pulse.
 
+## 2b. Manual right after a Bench session (G0: "Manual fails after Bench until a reboot")
+
+Run an EDF Bench session (throttle at zero is enough), end it, then **without rebooting** set `SLA_CFG_KIND 1`, raise
+`SLA_CFG_APPLY`, select SLAAPS Manual and arm. Since 2026-11-23 the native suite runs this sequence and reaches Running, so
+the 2026-11-18 failure (`entry rejected at line 1810 mask 0x900000d5`, then 60 ms `SLA_CYCLE_MAX`) does not reproduce in
+simulation. If it fails on the board, send `slaaps status` (its `last rejection line` and `mask`) and the log: from image
+`bc0868faba`'s successor on, the worker's first-cycle guard reports mode, binding and deadline on separate lines.
+
 ## 3. If a fan is available (G3)
 
 Launch profile C loaded and declared, airspeed instance set. Arm in the launcher stage (EDF at zero), push airflow through
