@@ -215,6 +215,15 @@ private:
 		_activation_reply_limit_us = limit_us;
 		_activation_reply_bench = bench;
 	}
+	// Once per completed activation attempt, so the ulog carries the measured bank reply times (flight-test plan G0:
+	// timing windows) without a manual `slaaps status`. status: slaaps::ActivationStatus (Ready is accepted).
+	void reportActivationReplies(slaaps::ActivationStatus activation) const
+	{
+		PX4_INFO("SLAAPS: activation %s status=%u reply main=%llu aux=%llu us banks=%u received=%u limit=%llu us",
+			 _activation_reply_bench ? "bench" : "flight", static_cast<unsigned>(activation),
+			 static_cast<unsigned long long>(_activation_reply_us[0]), static_cast<unsigned long long>(_activation_reply_us[1]),
+			 _activation_reply_banks, _activation_reply_received, static_cast<unsigned long long>(_activation_reply_limit_us));
+	}
 	slaaps::ControlMode _flight_transfer_target{slaaps::ControlMode::None};
 	uint64_t _flight_transfer_us{}, _flight_transfer_deadline{};
 	slaaps::EdfPermission _flight_previous_permission{};
@@ -2399,6 +2408,8 @@ void Slaaps::updateManualActivation(hrt_abstime now, const vehicle_status_s &veh
 
 	if (activation == slaaps::ActivationStatus::Waiting) { return; }
 
+	reportActivationReplies(activation);
+
 	if (activation != slaaps::ActivationStatus::Ready
 	    || !_preparation.consumeActivation(now, _manual_first_command_deadline)
 	    || !((_reentry && _manual_configuration_active && _configuration.eligible()) || _configuration.activate())) {
@@ -2795,6 +2806,8 @@ void Slaaps::updateBench(hrt_abstime now)
 	noteActivationReplies(static_cast<uint64_t>(configuration.bench_activation_ack_timeout_us), true);
 
 	if (activation == slaaps::ActivationStatus::Waiting) { return; }
+
+	reportActivationReplies(activation);
 
 	if (!_manual_activation_owned || activation != slaaps::ActivationStatus::Ready
 	    || !_preparation.consumeActivation(now, _manual_first_command_deadline) || !_configuration.activate()) {

@@ -312,6 +312,16 @@ void LoggedTopics::add_default_topics()
 #ifdef CONFIG_BOARD_UAVCAN_INTERFACES
 	add_topic_multi("can_interface_status", 100, CONFIG_BOARD_UAVCAN_INTERFACES);
 #endif
+
+#if defined(CONFIG_MODULES_SLAAPS)
+	// SLAAPS bench and flight evidence (flight-test plan G0/G2/G3). A topic added again only takes the new interval.
+	// 50 Hz canard and EDF outputs, pilot input (its real rate and full-stick values) and recovery states, so a
+	// response time is measured to 20 ms; airspeed at 20 Hz to see the launcher gate open.
+	add_optional_topic_multi("actuator_outputs", 20, 3);
+	add_topic("manual_control_setpoint", 20);
+	add_optional_topic("slaaps_flight_status", 20);
+	add_topic("airspeed", 50);
+#endif
 }
 
 void LoggedTopics::add_high_rate_topics()

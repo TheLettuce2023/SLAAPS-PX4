@@ -41,6 +41,7 @@
 #include <mathlib/mathlib.h>
 #include <px4_platform_common/posix.h>
 #include <px4_platform_common/log.h>
+#include <px4_platform_common/px4_config.h>
 
 #if defined(PX4_CRYPTO)
 # include <px4_platform_common/crypto.h>
@@ -293,6 +294,9 @@ int LogWriterFile::thread_start()
 
 #ifdef CONFIG_FS_LITTLEFS
 	pthread_attr_setstacksize(&thr_attr, PX4_STACK_ADJUSTED(1800));  /* littlefs needs more stack */
+#elif defined(CONFIG_MODULES_SLAAPS)
+	/* SLAAPS 6X: load_mon reported "log_writer_file low on stack! (296 bytes left)" on 2026-11-23; +512 B */
+	pthread_attr_setstacksize(&thr_attr, PX4_STACK_ADJUSTED(1170 + 512));
 #else
 	pthread_attr_setstacksize(&thr_attr, PX4_STACK_ADJUSTED(1170));
 #endif
