@@ -24,17 +24,29 @@ What the tunnel would have given, and what replaces it:
 ## G0. Software defects closed (before any hardware test that matters)
 - [ ] "Control lost" events root-caused and removed. Build `flight-readiness-20261121-faultdiag`, run on the bench, read `fault_site`,
   `fault_core_line` and the margins from `slaaps_flight_status`, fix, and show zero events over [lead] armed minutes (proposed: 30).
-  The diagnostic is in every image since commit 73a739b5de; the armed-Manual bench run has not been done yet.
+  The diagnostic is in every image since commit 73a739b5de.
+  **Armed Manual soak 2026-11-23** (image 31706e0c6d, `test_data/Logs/30 min run/log_53_2026-11-23-13-11-20.ulg`): 32.3 armed Manual
+  minutes, no disarm, and **one control-lost event** at 1415.2 s. It recovered by itself, re-entering Manual 0.26 s later, and was not
+  noticed at the bench. Cause: EKF2 reset its attitude (`quat_reset_counter` 2 to 3) when it switched from magnetometer heading fusion to
+  3D magnetometer fusion (`cs_mag_aligned_in_flight` 0 to 1). That was a yaw correction of about 3 degrees. The stabilized controller's
+  state check treats any attitude reset as a changed source (`StabilizedInputValidation.cpp`, `StateChanged`), so the worker rejected
+  the cycle (core line 241, worker status 6) and D3 fired. Pilot age 20 ms, state age 5 ms, margins normal. EKF2 resets like this
+  also happen in flight, so this is a real defect, not a bench artifact. Not met: zero events needed.
 - [ ] Timing windows final and committed: `SLA_ACT_ACK_US`, `SLA_CYCLE_MAX`, `SLA_OUT_LEASE` (the board still carries temporary 120 ms / 200 ms / 200 ms).
-  The armed-Manual bench test reports the real bank reply times (`activation flight reply main=... aux=...`).
+  The armed-Manual bench test reports the real bank reply times (`activation flight reply main=... aux=...`). Soak 2026-11-23: one
+  logged activation (the re-entry), MAIN 6.2 ms and AUX 3.3 ms against the 120 ms limit. The first entry came before the log started,
+  so the sample is thin: disarm and re-arm a few times in the next run.
 - [ ] Joystick link fixed (observed 4.8 Hz) or the input age and activation reserve proven to cope with it. Likely closed: the 4.8 Hz
   matches the logger's 200 ms sampling of `manual_control_setpoint` (`logged_topics.cpp`, default profile), not the link. Confirm the
   live rate with `uorb top manual_control_setpoint`. Measured on the board 2026-11-23: 24 Hz (about 42 ms between samples), about
   seven samples within `SLA_IN_AGE` 300 ms. Ready for the lead to close.
 - [ ] Logger stack warning removed; logging rates raised for the tests below (canard commands at 50 Hz or faster). Still seen
-  2026-11-23: `log_writer_file low on stack! (296 bytes left)`.
+  2026-11-23: `log_writer_file low on stack! (296 bytes left)`. Soak 2026-11-23 on image 31706e0c6d (larger writer stack, 50 Hz evidence
+  topics): no stack warning in 32 minutes, `actuator_outputs` at 50 Hz on both banks, 3 dropouts totalling 59 ms. Ready for the lead to close.
 - [ ] The image on the board is built from a committed tree; hash recorded. Partly: the board image (`flight-readiness-20261123-axis-bound`)
   has the sources of fe2cc90837, but was built from a working copy, so `ver all` shows the parent hash. One clean rebuild closes it.
+  2026-11-23: the soak log records `ver_sw` 31706e0c6d39ed6ed0386974cbe61b13dad52fef, the clean build of a committed and pushed tree.
+  Ready for the lead to close.
 - [ ] Manual entry after a Bench session fails until a reboot (`entry rejected at line 1810`, since 2026-11-18); root cause not found.
 
 ## G1. Ground measurements
