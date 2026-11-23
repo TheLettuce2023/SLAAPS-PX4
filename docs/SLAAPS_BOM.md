@@ -31,7 +31,7 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | Power module (PM08-CAN) pass-through | EDF ESC (TBS Lucid) | Main power | Stated by the project lead 2026-11-22. The full EDF current (about 70 A average) flows through the module. |
 | Power module (PM08-CAN) | Pixhawk 6X CAN bus | DroneCAN | `UAVCAN_ENABLE 2`, `UAVCAN_SUB_BAT 2` in the params file. CAN port (CAN1 or CAN2) not documented. |
 | Pitot (Holybro DLVR) | Pixhawk 6X CAN bus | DroneCAN | `UAVCAN_SUB_DPRES 1`. Shares the CAN bus with the power module. |
-| GPS (Holybro M9N) | Pixhawk 6X | Not documented | No `UAVCAN_SUB_GPS` setting, so it is probably serial. Port and variant not recorded. |
+| GPS (Holybro M9N) | Pixhawk 6X GPS1 | Serial | GPS1 stated by the project lead 2026-11-22. No `UAVCAN_SUB_GPS` setting in the params file. Variant not confirmed. |
 | SiK radio | Pixhawk 6X TELEM1 | MAVLink at 57600 | TELEM1 stated by the project lead 2026-11-22. `mavlink status` instance 0 on `/dev/ttyS6`. |
 | QGC and joystick | Pixhawk 6X USB | MAVLink over USB CDC | `mavlink status` instance 2 (`/dev/ttyACM0`). Source of the manual input (sysid 255, compid 190). |
 | Raspberry Pi 4B | Pixhawk 6X TELEM2 | MAVLink serial (planned) | TELEM2 stated by the project lead 2026-11-22. Baud rate and the `MAV_1_CONFIG` setting are not recorded. |
