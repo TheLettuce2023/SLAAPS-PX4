@@ -359,6 +359,11 @@ private:
 	bool _slaaps_inventory_invalidated{};
 	bool _slaaps_bank_excluded{};
 	uint16_t _slaaps_writing_mask{};
+	// Idle EDF off-value diagnostics. skip: 0 wrote, 1 bank not idle, 2 authority armed/stale/calibrating,
+	// 3 bank not ready, 4 driver report differs from the mixer, 5 no EDF channel with a stop off value
+	// (DShot 0; PWM equal to its non-zero minimum and failsafe).
+	uint32_t _slaaps_idle_writes{}, _slaaps_idle_handled{};
+	uint8_t _slaaps_idle_skip{UINT8_MAX};
 	SlaapsOutputStatus _slaaps_output_status{SlaapsOutputStatus::Inactive};
 	void destroySlaapsPreparation();
 #endif

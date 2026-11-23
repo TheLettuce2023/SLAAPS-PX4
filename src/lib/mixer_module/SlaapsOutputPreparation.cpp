@@ -730,11 +730,12 @@ bool MixingOutput::updateSlaapsPreparation()
 
 void MixingOutput::writeSlaapsIdleDisarmFrame(const actuator_armed_s &armed, bool armed_known)
 {
-	// Stock PX4 streams the DShot disarm frame whenever the vehicle is disarmed, and a DShot ESC arms on that signal.
-	// An idle SLAAPS bank otherwise writes nothing, so the EDF ESC saw no signal until armed Manual. This writes only
-	// the disarm frame (driver value 0, sent as MOTOR_STOP), only to the EDF channel of a ready DShot bank, and only
-	// while fresh local authority says disarmed and the bank holds no session, command or pending stop ticket. It
-	// changes no bank state and grants or acknowledges nothing. PWM banks stay silent (0 is already no pulse there).
+	// Stock PX4 outputs the disarmed value whenever the vehicle is disarmed, and an ESC arms on that signal: the DShot
+	// disarm frame, or a PWM ESC's minimum (stop) pulse. An idle SLAAPS bank otherwise writes nothing, so the EDF ESC
+	// saw no signal until armed Manual. This writes only the EDF channel's off value, only while fresh local authority
+	// says disarmed and the bank holds no session, command or pending stop ticket. It changes no bank state and grants
+	// or acknowledges nothing. DShot: the disarm frame (0, sent as MOTOR_STOP). PWM: only an off value equal to the
+	// calibrated minimum, as routing admits it; an off value of 0 is already no pulse and is not written.
 	static constexpr uint8_t kDshotProtocol = 1; // slaaps_output_bank.protocol
 	const auto status = _slaaps_output_status;
 	const bool idle = status == SlaapsOutputStatus::Inactive || status == SlaapsOutputStatus::Prepared
@@ -744,23 +745,39 @@ void MixingOutput::writeSlaapsIdleDisarmFrame(const actuator_armed_s &armed, boo
 			      && !armed.armed && !armed.in_esc_calibration_mode;
 	const auto &report = _slaaps_last_inventory;
 
-	if (!idle || !disarmed || report.protocol != kDshotProtocol || !report.ready || !slaapsLocallyReady()) { return; }
+	// Diagnostic only (printed by the driver's status command): why the last call wrote nothing.
+	if (!idle) { _slaaps_idle_skip = 1; return; }
 
+	if (!disarmed) { _slaaps_idle_skip = 2; return; }
+
+	if (!report.ready) { _slaaps_idle_skip = 3; return; }
+
+	if (!slaapsLocallyReady()) { _slaaps_idle_skip = 4; return; }
+
+	const bool dshot = report.protocol == kDshotProtocol;
 	uint16_t mask = 0;
+	float outputs[MAX_ACTUATORS] {};
 
 	for (unsigned i = 0; i < _max_num_outputs && i < report.channel_count; ++i) {
+		const uint16_t off = _disarmed_value[i];
+		const bool stop_value = dshot ? off == 0 : (off != 0 && off == _min_value[i] && !(report.reversed_mask & (1U << i)));
+
 		if (_function_assignment[i] == OutputFunction::SLAAPS_EDF && report.function[i] == static_cast<uint16_t>(OutputFunction::SLAAPS_EDF)
-		    && report.disarmed_us[i] == 0 && _disarmed_value[i] == 0) {
+		    && report.disarmed_us[i] == off && report.failsafe_us[i] == off && stop_value) {
 			mask |= 1U << i;
+			outputs[i] = off;
 		}
 	}
 
-	if (!mask) { return; }
+	if (!mask) { _slaaps_idle_skip = 5; return; }
 
-	float outputs[MAX_ACTUATORS] {};
 	_slaaps_writing_mask = mask;
-	_interface.updateOutputs(outputs, _max_num_outputs, 1);
+	const bool handled = _interface.updateOutputs(outputs, _max_num_outputs, 1);
 	_slaaps_writing_mask = 0;
+	_slaaps_idle_skip = 0;
+	++_slaaps_idle_writes;
+
+	if (handled) { ++_slaaps_idle_handled; }
 }
 
 void MixingOutput::destroySlaapsPreparation()

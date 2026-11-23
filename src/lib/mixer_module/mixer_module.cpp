@@ -145,6 +145,15 @@ void MixingOutput::printStatus() const
 {
 	PX4_INFO("Param prefix: %s", _param_prefix);
 	perf_print_counter(_control_latency_perf);
+#if defined(CONFIG_MODULES_SLAAPS)
+
+	if (_slaaps_preparation) {
+		PX4_INFO("SLAAPS output status=%u idle_writes=%" PRIu32 " handled=%" PRIu32 " last_skip=%u",
+			 static_cast<unsigned>(_slaaps_output_status), _slaaps_idle_writes, _slaaps_idle_handled,
+			 static_cast<unsigned>(_slaaps_idle_skip));
+	}
+
+#endif
 
 	if (_wq_switched) {
 		PX4_INFO("Switched to rate_ctrl work queue");

@@ -12858,14 +12858,23 @@ static int nativeMixingOutputTests()
 	return 0;
 }
 
-// Stock PX4 streams the DShot disarm frame while disarmed and a DShot ESC arms on it. An idle SLAAPS EDF bank on
-// DShot must do the same, write only that frame, and stop as soon as authority is armed, stale or calibrating.
-// Run after nativeMixingOutputTests() has destroyed its banks: each bank endpoint admits one publisher.
-static int nativeIdleDisarmFrameTests()
+// Stock PX4 outputs the disarmed value while disarmed and the ESC arms on it: the DShot disarm frame, or a PWM ESC's
+// minimum (stop) pulse. An idle SLAAPS EDF bank must do the same, write only that off value to the EDF channel, and
+// stop as soon as authority is armed, stale or calibrating. A PWM EDF whose off value is 0 (no pulse) writes nothing.
+// Each scenario builds fresh banks; each bank endpoint admits one publisher at a time.
+static void nativeIdleOffValueScenario(uint8_t protocol, int32_t pwm_off)
 {
-	checks = 0;
+	constexpr unsigned kEdfChannel = 3; // routingFixture(): the EDF is AUX channel index 3 (PWM_AUX_*4)
 	installNativeMixerConfiguration(fixture());
-	NativeSlaapsOutput main("PWM_MAIN"), aux("PWM_AUX", 1);
+
+	if (!protocol) {
+		check(param_set(param_find("PWM_AUX_DIS4"), &pwm_off) == 0 && param_set(param_find("PWM_AUX_FAIL4"), &pwm_off) == 0,
+		      "configure the PWM EDF off value for this scenario");
+	}
+
+	const float off = protocol ? 0.F : static_cast<float>(pwm_off);
+	const bool writes_expected = protocol || pwm_off != 0;
+	NativeSlaapsOutput main("PWM_MAIN"), aux("PWM_AUX", protocol);
 	uORB::Publication<vehicle_status_s> vehicle_pub{ORB_ID(vehicle_status)};
 	uORB::Publication<actuator_armed_s> armed_pub{ORB_ID(actuator_armed)};
 	vehicle_status_s vehicle{};
@@ -12887,8 +12896,21 @@ static int nativeIdleDisarmFrameTests()
 	// The first inventory precedes function resolution (ready=0); the next is due 100 ms later.
 	for (unsigned i = 0; i < 15; ++i) { main.pump(); aux.pump(); px4_usleep(20000); publishState(false, false); }
 
-	check(idle(aux.mixing().slaapsOutputStatus()) && aux.writes() >= 2 && aux.nonzeroWrites() == 0
-	      && near(aux.lastOutput(3), 0.F), "idle disarmed DShot EDF bank streams only the disarm frame");
+	bool only_edf = true;
+
+	for (unsigned i = 0; i < 8; ++i) {
+		if (i != kEdfChannel && !near(aux.lastOutput(i), 0.F)) { only_edf = false; }
+	}
+
+	check(idle(aux.mixing().slaapsOutputStatus()), "idle disarmed EDF bank holds no session");
+
+	if (!writes_expected) {
+		check(aux.writes() == 0 && main.writes() == 0, "a PWM EDF whose off value is no pulse is not written while idle");
+		return;
+	}
+
+	check(aux.writes() >= 2 && near(aux.lastOutput(kEdfChannel), off) && only_edf,
+	      "idle disarmed EDF bank writes only its stop off value to the EDF channel");
 	check(main.writes() == 0, "idle PWM canard bank still writes nothing");
 
 	publishState(false, true);
@@ -12896,25 +12918,35 @@ static int nativeIdleDisarmFrameTests()
 
 	for (unsigned i = 0; i < 3; ++i) { aux.pump(); px4_usleep(20000); }
 
-	check(aux.writes() == before_calibration, "ESC calibration suppresses the idle disarm frame");
+	check(aux.writes() == before_calibration, "ESC calibration suppresses the idle off value");
 
 	publishState(false, false);
 	aux.pump();
-	check(aux.writes() == before_calibration + 1 && aux.nonzeroWrites() == 0, "idle disarm frame resumes after calibration ends");
+	check(aux.writes() == before_calibration + 1 && near(aux.lastOutput(kEdfChannel), off),
+	      "idle off value resumes after calibration ends");
 
 	px4_usleep(1100000);
 	const unsigned before_stale = aux.writes();
 	aux.pump();
-	check(aux.writes() == before_stale, "stale local authority suppresses the idle disarm frame");
+	check(aux.writes() == before_stale, "stale local authority suppresses the idle off value");
 
-	// Arming without a prepared session latches the bank's own fault; the idle frame must stop at once either way.
+	// Arming without a prepared session latches the bank's own fault; the idle write must stop at once either way.
 	publishState(true, false);
 	const unsigned before_armed = aux.writes();
 	aux.pump(); aux.pump();
-	check(aux.writes() == before_armed && aux.nonzeroWrites() == 0, "armed authority suppresses the idle disarm frame");
+	check(aux.writes() == before_armed, "armed authority suppresses the idle off value");
 
 	publishState(false, false);
 	aux.pump();
+}
+
+static int nativeIdleDisarmFrameTests()
+{
+	checks = 0;
+	nativeIdleOffValueScenario(1, 0);    // DShot: disarm frame 0
+	nativeIdleOffValueScenario(0, 1000); // PWM: stop pulse equal to the 1000 us minimum
+	nativeIdleOffValueScenario(0, 0);    // PWM: no pulse
+	installNativeMixerConfiguration(fixture());
 	PX4_INFO("SLAAPS_IDLE_DISARM_FRAME_TEST_PASS checks=%u synthetic_authority=1 physical_outputs=0", checks);
 	return 0;
 }
