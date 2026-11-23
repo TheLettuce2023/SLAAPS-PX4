@@ -1,7 +1,27 @@
 #include "Px4ManualControlInput.hpp"
 
+#include <cmath>
+
 namespace research_actuator_command
 {
+namespace
+{
+// Full stick arrives one float step beyond the [-1, 1] contract: MAVLink MANUAL_CONTROL z = 1000 became throttle
+// 1.000000119 on the Pixhawk 6X (bench log 2026-11-23), and every consumer rejects or cancels on it. Within this
+// tolerance (about 84 float steps at 1, far below the 0.001 MAVLink resolution) a value is the bound itself. Anything
+// further, and NaN, passes through unchanged for the consumers to reject.
+constexpr float kAxisBoundTolerance{1e-5F};
+
+float boundedAxis(float value)
+{
+	if (std::isfinite(value) && std::fabs(value) > 1.F && std::fabs(value) <= 1.F + kAxisBoundTolerance) {
+		return value > 0.F ? 1.F : -1.F;
+	}
+
+	return value;
+}
+}
+
 ManualControlSample manualControlSampleFromMessage(const manual_control_setpoint_s &message)
 {
 	ManualControlSample sample{};
@@ -9,10 +29,10 @@ ManualControlSample manualControlSampleFromMessage(const manual_control_setpoint
 	sample.timestamp_sample_us = message.timestamp_sample;
 	sample.source_system_id = message.source_system_id;
 	sample.source_component_id = message.source_component_id;
-	sample.axes[static_cast<std::size_t>(ManualAxis::Roll)] = message.roll;
-	sample.axes[static_cast<std::size_t>(ManualAxis::Pitch)] = message.pitch;
-	sample.axes[static_cast<std::size_t>(ManualAxis::Yaw)] = message.yaw;
-	sample.axes[static_cast<std::size_t>(ManualAxis::Throttle)] = message.throttle;
+	sample.axes[static_cast<std::size_t>(ManualAxis::Roll)] = boundedAxis(message.roll);
+	sample.axes[static_cast<std::size_t>(ManualAxis::Pitch)] = boundedAxis(message.pitch);
+	sample.axes[static_cast<std::size_t>(ManualAxis::Yaw)] = boundedAxis(message.yaw);
+	sample.axes[static_cast<std::size_t>(ManualAxis::Throttle)] = boundedAxis(message.throttle);
 	sample.buttons = message.buttons;
 	sample.valid = message.valid;
 	sample.sticks_moving = message.sticks_moving;

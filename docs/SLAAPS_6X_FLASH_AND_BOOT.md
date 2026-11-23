@@ -296,6 +296,16 @@ After a servo Bench session (re-trimming the canards), switching `SLA_CFG_KIND` 
 Root cause not found: some supervisor or bank state left by the Bench path survives the scope switch. Until it is understood,
 **reboot the board after any servo or EDF Bench session before selecting Manual**.
 
+## EDF Bench: full-stick cut-out (2026-11-23)
+
+The first EDF Bench sessions on PWM (logs 49 and 50, `test_data/Logs/EDF bench testing/`) spun the EDF and cut out as
+the throttle reached full: `SLAAPS: entry rejected at line 2579`, then `SLAAPS bank 0/1 fault at line 139` and a
+Commander disarm. QGC full stick arrives as throttle 1.000000119, one float step above 1, and the strict [-1, 1] stick
+check rejected it. From image `flight-readiness-20261123-axis-bound`, values within 1e-5 of +-1 are taken as +-1; anything
+further still rejects. Manual uses the same input path. In those sessions `SLA_EDF_BMAX` was 1.0, because the parameter
+restore carries the recorded value, and the EDF reached 1952 us. Check `param show SLA_EDF_BMAX` after any parameter load.
+The logged joystick rate (about 5 Hz) is the logger's sampling of `manual_control_setpoint`, not the link rate.
+
 ## Parameter overlays (2026-11-18)
 
 Load order in QGC: `slaaps_vehicle.params`, then `slaaps_canard_trims.params`, then `slaaps_outputs.params` (MAIN canard and

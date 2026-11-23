@@ -4909,6 +4909,7 @@ static int runConfigurationTests()
 #error SLAAPS control fixture requires the explicit native wall-clock test target
 #endif
 #include <modules/research_stabilized_manual/SelectedStateInput.hpp>
+#include <lib/research_actuator_command/Px4ManualControlInput.hpp>
 
 // Advertisement alone supplies identity for preparation, never permission.
 struct NativePermissionPublisher {
@@ -7394,6 +7395,33 @@ static void nativeSelectedWorkerTests()
 	check(!guard.begin(1000, snapshot, SelectedInputPolicy{}), "zero selected metadata age budgets reject entry");
 	check(guard.begin(1000, snapshot, policy) && !guard.check(11001, snapshot), "retained metadata expires at consumption");
 	check(!guard.check(1000, snapshot), "metadata expiry latches until deliberate entry");
+}
+
+// Bench 2026-11-23: full stick arrived as throttle 1.000000119 and the strict [-1, 1] checks cancelled the EDF session.
+// The PX4 message conversion bounds values within 1e-5 of +-1; anything further, and NaN, still reaches the consumers.
+static void nativeManualAxisBoundTests()
+{
+	using namespace research_actuator_command;
+	const float just_over = std::nextafter(1.F, 2.F);
+	manual_control_setpoint_s message{};
+	message.timestamp = message.timestamp_sample = 1000;
+	message.valid = true;
+	message.data_source = manual_control_setpoint_s::SOURCE_MAVLINK_0;
+	message.throttle = just_over;
+	message.roll = -just_over;
+	message.pitch = 1.0001F;
+	message.yaw = NAN;
+	const auto sample = manualControlSampleFromMessage(message);
+	check(sameFloatBits(sample.axes[static_cast<std::size_t>(ManualAxis::Throttle)], 1.F)
+	      && sameFloatBits(sample.axes[static_cast<std::size_t>(ManualAxis::Roll)], -1.F),
+	      "full stick one float step beyond +-1 becomes the bound");
+	check(sameFloatBits(sample.axes[static_cast<std::size_t>(ManualAxis::Pitch)], 1.0001F)
+	      && std::isnan(sample.axes[static_cast<std::size_t>(ManualAxis::Yaw)]),
+	      "values beyond the tolerance and NaN pass through for the consumers to reject");
+	float command = .375F;
+	check(normalizeManualThrottle(sample.axes[static_cast<std::size_t>(ManualAxis::Throttle)], -1.F, 1.F, command)
+	      && sameFloatBits(command, 1.F), "bounded full stick normalizes to full throttle");
+	check(!normalizeManualThrottle(just_over, -1.F, 1.F, command), "the throttle normalizer itself stays strict");
 }
 
 static void nativeDisarmedInputTests()
@@ -13050,6 +13078,7 @@ int slaaps_control_test_main(int argc, char *argv[])
 	nativeLiveReadTimingTests();
 	nativeLiveHandshakeTimingTests();
 	nativeDisarmedInputTests();
+	nativeManualAxisBoundTests();
 	PX4_INFO("SLAAPS_CONTROL_TEST_PASS checks=%u", checks);
 	return result;
 }
