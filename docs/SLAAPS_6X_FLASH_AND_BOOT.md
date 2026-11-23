@@ -150,26 +150,43 @@ param set PWM_MAIN_FAIL4 0
 param set PWM_MAIN_REV 0
 param set PWM_MAIN_TIM0 333
 param set PWM_MAIN_TIM1 333
-param set PWM_AUX_FUNC5 10104
-param set PWM_AUX_TIM0 0
-param set PWM_AUX_TIM1 -3
+param set PWM_AUX_FUNC1 10104
+param set PWM_AUX_FUNC5 0
+param set PWM_AUX_MIN1 1000
+param set PWM_AUX_MAX1 2000
+param set PWM_AUX_DIS1 1000
+param set PWM_AUX_FAIL1 1000
+param set PWM_AUX_REV 0
+param set PWM_AUX_TIM0 400
+param set PWM_AUX_TIM1 0
 param set PWM_AUX_TIM2 0
 param set PWM_AUX_TIM3 0
 ```
 
+**EDF moved to PWM 400 Hz on AUX1 (2026-11-22).** The TBS Lucid never armed on DShot600 under the SLAAPS image, on AUX1
+or AUX5, with any airframe or parameters, while stock PX4 (v1.17.0 and this tree's `px4_fmu-v6x_default`) armed it on
+AUX1 and PWM 400 Hz armed it under the SLAAPS image. Root cause not found. The lead chose PWM 400 Hz on AUX1 (Timer 5),
+ESC range 1000-2000 us, and zero throttle = stop. The values above replace the earlier `PWM_AUX_FUNC5 10104` /
+`PWM_AUX_TIM1 -3` (DShot600 on AUX5). Run the ESC's throttle calibration to 1000-2000 us before the first armed test.
+
 | Values | Why |
 | --- | --- |
-| FUNC 10100-10103 | SLAAPS Canard 1-4 on MAIN1-4; 10104 SLAAPS EDF on AUX5 |
+| FUNC 10100-10103 | SLAAPS Canard 1-4 on MAIN1-4; 10104 SLAAPS EDF on AUX1 |
+| PWM_AUX_MIN1/MAX1 1000/2000, DIS1/FAIL1 1000 | EDF ESC range. Routing admits a PWM EDF off value only as no pulse or exactly the calibrated minimum, with failsafe equal to it; 1000 us is the stop pulse the ESC arms on while disarmed. Zero throttle maps to the minimum, so the EDF stops at zero throttle |
+| PWM_AUX_TIM0 400 | PWM 400 Hz for AUX1-4 (Timer 5); 2000 us x 400 Hz < 1 s |
 | MIN/CENT/MAX 1333/1500/1667 | Must equal SLA_Cn_PWM_NEG/CTR/POS exactly (swap MIN and MAX roles only with PWM_MAIN_REV) |
 | DIS/FAIL 0 | Canards revoke to no pulse; any other value is rejected |
 | PWM_MAIN_TIM0/1 333 | 333 Hz servo rate for MAIN1-4 (1667 us x 333 Hz < 1 s) |
-| PWM_AUX_TIM1 -3 | DShot600 for AUX5-6; DShot is accepted only for the EDF |
-| PWM_AUX_TIM0 0, PWM_AUX_TIM2 0, PWM_AUX_TIM3 0 | AUX1-4, AUX7-8 and the ninth FMU output (AUX9/capture, Timer 1) unused, so pwm_out drives nothing. Otherwise pwm_out and dshot both report the AUX bank and SLAAPS rejects the inventory (`inventory_fault=4`, duplicate bank). Needs the image in `flight-readiness-20261029-edf` |
+| PWM_AUX_TIM1 0, PWM_AUX_TIM2 0, PWM_AUX_TIM3 0 | AUX5-6, AUX7-8 and the ninth FMU output (AUX9/capture, Timer 1) unused. No timer runs DShot, so the dshot driver finds no channels and pwm_out alone is the AUX bank (two drivers reporting it is `inventory_fault=4`, duplicate bank) |
 
-The DShot driver sets its own range (1-1999) and disarm frame and ignores PWM_AUX_MIN/MAX/DIS/FAIL. Before the
-2026-10-28 DShot fix it reported an unresolved failsafe marker, which SLAAPS rejects. The EDF channel therefore needs
-the image in `build/slaaps_firmware/flight-readiness-20261028-dshot/`. Afterwards `slaaps status` should show
-`routing snapshot=1` and `routing_fault=0`; a remaining fault names the exact bank and channel.
+Afterwards `listener slaaps_output_bank` should show bank 1 from pwm_out with function 10104 on channel 0 at 400 Hz,
+1000/2000 us, disarmed and failsafe 1000, ready, and `slaaps status` `routing snapshot=1` and `routing_fault=0`; a
+remaining fault names the exact bank and channel. While disarmed and idle, SLAAPS writes the 1000 us stop pulse to the
+EDF so the ESC arms (image `flight-readiness-20261122-edf-pwm` or later); `dshot status` is no longer used, `pwm_out
+status` prints `SLAAPS output status=... idle_writes=...`.
+
+DShot history: the DShot driver sets its own range (1-1999) and disarm frame and ignores PWM_AUX_MIN/MAX/DIS/FAIL;
+before the 2026-10-28 fix it reported an unresolved failsafe marker. DShot600 routing remains in the firmware but is unused.
 
 Routing accepted on the board (2026-10-29, image `e515e07f...` in `flight-readiness-20261029-edf`). After the MAIN
 limits were entered in the console, saved and the board rebooted, `listener slaaps_output_bank` shows exactly two banks:
@@ -253,8 +270,8 @@ Preconditions, all disarmed: external compass calibrated and selected, `ekf2 sta
 
 1. Select SLAAPS Manual, sticks centred, throttle low. `slaaps status` reaches `manual entry=8` and `flight unavailable=7`.
 2. Arm from QGC, **not** `commander arm -f`. If QGC still refuses, `commander check` names the reason.
-3. Armed Manual holds the EDF at DShot idle (109) at zero throttle: restrain the vehicle, clear the exhaust, keep a hand
-   on the pack disconnect.
+3. Armed Manual holds the EDF at its 1000 us stop pulse at zero throttle (lead, 2026-11-22; replaces the 2026-11-06
+   DShot idle 109). Restrain the vehicle, clear the exhaust, keep a hand on the pack disconnect: any throttle spins it.
 4. `slaaps status` should step to `manual entry=10`, `11`, `12` (activating, first command, running). The line
    `activation flight reply main=... aux=...` shows the real bank reply time against the 6500 us limit.
 5. Do not raise throttle on the first run. Check that the canards respond to hand-tilting the vehicle in the stabilizing
@@ -281,7 +298,8 @@ Root cause not found: some supervisor or bank state left by the Bench path survi
 
 ## Parameter overlays (2026-11-18)
 
-Load order in QGC: `slaaps_vehicle.params`, then `slaaps_canard_trims.params`, then (tunnel only) `slaaps_tunnel_schedule.params`.
+Load order in QGC: `slaaps_vehicle.params`, then `slaaps_canard_trims.params`, then `slaaps_outputs.params` (MAIN canard and
+AUX1 EDF outputs, added 2026-11-23; reboot after it), then (tunnel only) `slaaps_tunnel_schedule.params`.
 Apply each time with `SLA_CFG_APPLY` +1 while disarmed.
 
 - **`slaaps_canard_trims.params`**: measured trims from the servo bench. C1 +3.5, C2 -10 (at the +-10 deg limit), C3 -4.5, C4 +2 deg.

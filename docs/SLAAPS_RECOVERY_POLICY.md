@@ -98,8 +98,7 @@ implement them. The measured values are not yet in the repository.
 
 ## Vehicle facts recorded 2026-10-26
 
-- The EDF is driven by DShot600, not PWM. The firmware's routing supports only PWM
-  (`OutputProtocol { Pwm, Unsupported }` in `ActuatorRouting.hpp`), so the EDF channel is rejected as
-  `UnsupportedProtocol` today. DShot support in routing, EDF command conversion and the output banks is
-  required before any EDF operation, including recovery.
+- The EDF was driven by DShot600 at the time, which routing did not yet support. DShot600 support was added on
+  2026-10-27; on 2026-11-22 the EDF moved to PWM 400 Hz on AUX1 (1000-2000 us, off = minimum = 1000 us), because the
+  Lucid never armed on DShot under the SLAAPS image. Recovery ramps use the same minimum-to-maximum PWM mapping.
 - Rear fins exist and are static. The firmware should model their stabilizing effect.

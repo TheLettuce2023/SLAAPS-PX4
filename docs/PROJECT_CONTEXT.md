@@ -426,7 +426,8 @@ timing-sensitive.
   over USB arrives with gaps up to about 100 ms, which ended sessions under min(SLA_IN_AGE, SLA_OUT_LEASE).
   Consequence: the D1 pilot-loss hold now starts at SLA_IN_AGE - 2 x SLA_CYCLE_MIN (292 ms with the QGC parameter file,
   previously 92 ms).
-- Lead decision 2026-11-06: Manual keeps the EDF at DShot idle (109) at zero throttle while armed.
+- Lead decision 2026-11-06: Manual keeps the EDF at DShot idle (109) at zero throttle while armed. Superseded 2026-11-22:
+  the EDF runs PWM 400 Hz on AUX1 (1000-2000 us; off = minimum = failsafe = 1000 us), so zero throttle stops it.
 - Resolved 2026-11-10 by per-mode budgets (see the last section). Was open before armed Manual on the board: SLA_FIRST_CMD_US / SLA_ACT_ACK_US were shared by all modes. The bench needs
   40000 / 35000 us on the board (banks poll every 20 ms in bench), but Manual requires the first-command budget below
   SLA_CYCLE_MAX (12000 us), so the bench values must be restored to the file values (8000 / 3000) before Manual, and

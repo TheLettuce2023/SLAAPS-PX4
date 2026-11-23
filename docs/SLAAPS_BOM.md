@@ -9,7 +9,7 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | Flight controller | Pixhawk 6X | 1 | Pixhawk 6X (carrier and variant not recorded) | MAIN rail is PX4IO (bank 0), AUX is FMU (bank 1). Onboard IMU, baro, magnetometer. |
 | Propulsion | EDF unit | 1 | EJets Jetfan 90 | Measured thrust 0 to 39.2 N (about 4.0 kgf) at 42 V and about 70 A (about 2.9 kW). Earlier user estimate 5.5 kgf. |
 | Propulsion | EDF motor | 1 | Hacker E50-M 2.5D | |
-| Propulsion | EDF ESC | 1 | TBS Lucid 12S 90A | DShot600 on AUX5. The pack is 10S and the measured draw is about 70 A. |
+| Propulsion | EDF ESC | 1 | TBS Lucid 12S 90A | PWM 400 Hz on AUX1, 1000-2000 us (moved from DShot600 on AUX5 on 2026-11-22: it never armed on DShot under the SLAAPS image). The pack is 10S and the measured draw is about 70 A. |
 | Power | Battery packs | 2 | Ovonic Rebel 5S 1300 mAh 18.5 V 130C LiPo, XT90 | Two in series for 10S (`SLA_PWR_VMIN` 30 V, `SLA_PWR_VMAX` 42 V). In series the capacity stays 1.3 Ah. |
 | Power | Power module (`POWER1`) | 1 | Holybro PM08-CAN | Measures the EDF pack. Written "PMO8-CAN" in the request; assumed PM08-CAN. |
 | Actuation | Canard servos | 4 | EMAX ES3059MD | Identical. 500 to 2500 us (+-90 deg), 333 Hz, slew 0.11 s per 60 deg. MAIN1 to MAIN4. |
@@ -24,7 +24,7 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | From | To | Interface | Source / status |
 |---|---|---|---|
 | Canard servos 1 to 4 | Pixhawk 6X MAIN1 to MAIN4 (PX4IO, bank 0) | PWM 333 Hz, 1333/1500/1667 us | `SLAAPS_6X_FLASH_AND_BOOT.md`. Servos 3 and 4 plugs were swapped and fixed on 2026-11-05. |
-| EDF ESC (TBS Lucid) | Pixhawk 6X AUX5 (FMU, bank 1) | DShot600 | `SLAAPS_6X_FLASH_AND_BOOT.md`. AUX1-4 and AUX7-8 are unused. |
+| EDF ESC (TBS Lucid) | Pixhawk 6X AUX1 (FMU, bank 1) | PWM 400 Hz | `SLAAPS_6X_FLASH_AND_BOOT.md`. AUX2-8 are unused. |
 | EDF motor | EDF ESC | Three-phase motor leads | Not documented. |
 | Battery packs (2x 5S) | Each other | Series, XT90 | Gives 10S. Series lead and connector arrangement not documented. |
 | Battery stack (10S) | Power module (PM08-CAN) input | Main power | Stated by the project lead 2026-11-22. The module measures the EDF pack (`SLA_PWR_INST 0`, `SLA_PWR_ID 1`). |

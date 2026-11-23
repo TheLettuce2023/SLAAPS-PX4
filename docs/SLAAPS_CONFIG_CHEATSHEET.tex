@@ -265,11 +265,11 @@ No \p{battery_status} & PM08 CAN wiring (splitter), CAN2, node 124 in \p{uavcan 
 \sect{9. Hardware map}
 \begin{itemize}
 \item MAIN 1--4: canards (servo 1 top right, then clockwise), PWM 333 Hz, 1333/1500/1667 \textmu s.
-\item AUX 5: EDF, DShot600. AUX 1--4, 6--8 and the ninth FMU output unused.
+\item AUX 1: EDF, PWM 400 Hz, 1000--2000 \textmu s, disarmed and failsafe 1000 \textmu s. AUX 2--8 and the ninth FMU output unused.
 \item CAN1: pitot (node 125). CAN2: PM08-CAN (node 124).
 \item POWER1: I\textsuperscript{2}C digital modules only. A DroneCAN module there disturbs the bus.
 \item Compass: external IST8310 on I\textsuperscript{2}C bus 1 (address 0x0E). Internal BMM150 on bus 4.
-\item Armed Manual holds the EDF at DShot idle (109) at zero throttle.
+\item Armed Manual holds the EDF at its 1000 \textmu s stop pulse at zero throttle.
 \end{itemize}
 
 \sect{10. Gain sets in the parameter file}

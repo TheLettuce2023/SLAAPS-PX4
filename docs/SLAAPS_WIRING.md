@@ -21,7 +21,7 @@ flowchart LR
         PIN1["POWER1"]
         PIN2["POWER2"]
         MAIN["MAIN1-4<br/>PX4IO, PWM 333 Hz"]
-        AUX5["AUX5<br/>DShot600"]
+        AUX1["AUX1<br/>PWM 400 Hz"]
         CAN["CAN bus<br/>DroneCAN"]
         T1["TELEM1"]
         T2["TELEM2"]
@@ -69,7 +69,7 @@ flowchart LR
     MAIN -->|"PWM"| S2
     MAIN -->|"PWM"| S3
     MAIN -->|"PWM"| S4
-    AUX5 -->|"DShot600"| ESC
+    AUX1 -->|"PWM 400 Hz"| ESC
 
     %% DroneCAN
     PM <-->|"DroneCAN"| CAN
@@ -90,5 +90,7 @@ flowchart LR
 - **Not documented:** the M9N variant (it is on GPS1, a serial port), the CAN port (CAN1 or CAN2) and bus termination, the Pi's baud rate, and how the rail is distributed
   to the four servos.
 - **Servo order:** servos 1 to 4 are on MAIN1 to MAIN4. The plugs for servos 3 and 4 were swapped and fixed on 2026-11-05.
+- **EDF signal:** AUX1, PWM 400 Hz, 1000-2000 us (2026-11-22). It was on AUX5 at DShot600, which the Lucid never armed on
+  under the SLAAPS image; AUX5 itself was never shown working with DShot on any image.
 - **MAIN versus AUX:** the servos are on the PX4IO rail (bank 0) and the EDF is on the FMU rail (bank 1). On 2026-11-22 the MAIN bank was the slow
   one to acknowledge activation (about 43 ms against 7 ms for AUX).
