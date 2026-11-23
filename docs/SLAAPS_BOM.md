@@ -10,7 +10,7 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | Propulsion | EDF unit | 1 | EJets Jetfan 90 | Measured thrust 0 to 39.2 N (about 4.0 kgf) at 42 V and about 70 A (about 2.9 kW). Earlier user estimate 5.5 kgf. |
 | Propulsion | EDF motor | 1 | Hacker E50-M 2.5D | |
 | Propulsion | EDF ESC | 1 | TBS Lucid 12S 90A | DShot600 on AUX5. The pack is 10S and the measured draw is about 70 A. |
-| Power | Battery packs | 2 | 5S LiPo, not recorded | Two in series for 10S (`SLA_PWR_VMIN` 30 V, `SLA_PWR_VMAX` 42 V). Capacity and C rating not recorded. |
+| Power | Battery packs | 2 | Ovonic Rebel 5S 1300 mAh 18.5 V 130C LiPo, XT90 | Two in series for 10S (`SLA_PWR_VMIN` 30 V, `SLA_PWR_VMAX` 42 V). In series the capacity stays 1.3 Ah. |
 | Power | Power module (`POWER1`) | 1 | Holybro PM08-CAN | Measures the EDF pack. Written "PMO8-CAN" in the request; assumed PM08-CAN. |
 | Actuation | Canard servos | 4 | EMAX ES3059MD | Identical. 500 to 2500 us (+-90 deg), 333 Hz, slew 0.11 s per 60 deg. MAIN1 to MAIN4. |
 | Aero | Canards | 4 | In-house, NACA 0012 | X layout, 40 mm from the centerline, +-15 deg vehicle limit, 12 deg aerodynamic limit. |
@@ -27,7 +27,8 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 ## Open items
 - Weigh each item and the assembled vehicle, then fill a mass column. Record how the 1.9 kg was measured (scale, configuration, battery fitted or not).
 - Update `SLA_MASS` (file value 2.05) and the inertia and CG data if the 1.9 kg is confirmed.
-- Battery cell make, capacity and C rating.
+- Runtime: 1.3 Ah at the measured 70 A is about 67 s, and less with a usable-capacity limit (for example about 50 s at 80%). Confirm the burn rate on the bench
+  and set the bench or flight time limits to match. 70 A is about 54C, inside the 130C rating.
 - Servo-rail regulator or BEC, if any (requirement `PWR-02`).
 - Confirm the power module model (PM08-CAN) and the Holybro M9N variant (UART or DroneCAN).
 - Check the ESC and power module current limits against the measured peak, not just the 70 A average.
