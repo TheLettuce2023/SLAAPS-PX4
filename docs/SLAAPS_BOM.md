@@ -19,6 +19,23 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | Comms | Telemetry radio | 1 pair | Holybro SiK 915 MHz | Instance 0 on `/dev/ttyS6` at 57600. |
 | Companion | Raspberry Pi 4B | 1 | Raspberry Pi 4B | Planned for acceleration requests; not confirmed as fitted. |
 
+## Connections
+
+| From | To | Interface | Source / status |
+|---|---|---|---|
+| Canard servos 1 to 4 | Pixhawk 6X MAIN1 to MAIN4 (PX4IO, bank 0) | PWM 333 Hz, 1333/1500/1667 us | `SLAAPS_6X_FLASH_AND_BOOT.md`. Servos 3 and 4 plugs were swapped and fixed on 2026-11-05. |
+| EDF ESC (TBS Lucid) | Pixhawk 6X AUX5 (FMU, bank 1) | DShot600 | `SLAAPS_6X_FLASH_AND_BOOT.md`. AUX1-4 and AUX7-8 are unused. |
+| EDF motor | EDF ESC | Three-phase motor leads | Not documented. |
+| Battery packs (2x 5S) | Each other | Series, XT90 | Gives 10S. Series lead and connector arrangement not documented. |
+| Battery stack (10S) | EDF ESC, through the power module | Main power | The power module measures the EDF pack (`SLA_PWR_INST 0`, `SLA_PWR_ID 1`). Wiring order not documented. |
+| Power module (PM08-CAN) | Pixhawk 6X CAN bus | DroneCAN | `UAVCAN_ENABLE 2`, `UAVCAN_SUB_BAT 2` in the params file. CAN port (CAN1 or CAN2) not documented. |
+| Pitot (Holybro DLVR) | Pixhawk 6X CAN bus | DroneCAN | `UAVCAN_SUB_DPRES 1`. Shares the CAN bus with the power module. |
+| GPS (Holybro M9N) | Pixhawk 6X | Not documented | No `UAVCAN_SUB_GPS` setting, so it is probably serial. Port and variant not recorded. |
+| SiK radio | Pixhawk 6X TELEM serial | MAVLink at 57600 | `mavlink status` instance 0 on `/dev/ttyS6`. Which TELEM port is not recorded. |
+| QGC and joystick | Pixhawk 6X USB | MAVLink over USB CDC | `mavlink status` instance 2 (`/dev/ttyACM0`). Source of the manual input (sysid 255, compid 190). |
+| Raspberry Pi 4B | Pixhawk 6X | MAVLink on a TELEM serial (planned) | Planned only. Port not recorded. |
+| Servo power rail | Not documented | | Servo supply and BEC are not recorded (requirement `PWR-02`). |
+
 ## Known figures
 - All-up mass 1.9 kg (current, stated by the project lead 2026-11-22). This replaces the 3.04 kg assumed from the 2026-09-19 SDF model.
   The vehicle parameter file carries `SLA_MASS 2.05` and the SDF model still uses the older figure; both need review. Not a weighed breakdown.
