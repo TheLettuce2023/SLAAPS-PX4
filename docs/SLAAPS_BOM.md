@@ -27,14 +27,16 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | EDF ESC (TBS Lucid) | Pixhawk 6X AUX5 (FMU, bank 1) | DShot600 | `SLAAPS_6X_FLASH_AND_BOOT.md`. AUX1-4 and AUX7-8 are unused. |
 | EDF motor | EDF ESC | Three-phase motor leads | Not documented. |
 | Battery packs (2x 5S) | Each other | Series, XT90 | Gives 10S. Series lead and connector arrangement not documented. |
-| Battery stack (10S) | EDF ESC, through the power module | Main power | The power module measures the EDF pack (`SLA_PWR_INST 0`, `SLA_PWR_ID 1`). Wiring order not documented. |
+| Battery stack (10S) | Power module (PM08-CAN) input | Main power | Stated by the project lead 2026-11-22. The module measures the EDF pack (`SLA_PWR_INST 0`, `SLA_PWR_ID 1`). |
+| Power module (PM08-CAN) pass-through | EDF ESC (TBS Lucid) | Main power | Stated by the project lead 2026-11-22. The full EDF current (about 70 A average) flows through the module. |
 | Power module (PM08-CAN) | Pixhawk 6X CAN bus | DroneCAN | `UAVCAN_ENABLE 2`, `UAVCAN_SUB_BAT 2` in the params file. CAN port (CAN1 or CAN2) not documented. |
 | Pitot (Holybro DLVR) | Pixhawk 6X CAN bus | DroneCAN | `UAVCAN_SUB_DPRES 1`. Shares the CAN bus with the power module. |
 | GPS (Holybro M9N) | Pixhawk 6X | Not documented | No `UAVCAN_SUB_GPS` setting, so it is probably serial. Port and variant not recorded. |
-| SiK radio | Pixhawk 6X TELEM serial | MAVLink at 57600 | `mavlink status` instance 0 on `/dev/ttyS6`. Which TELEM port is not recorded. |
+| SiK radio | Pixhawk 6X TELEM1 | MAVLink at 57600 | TELEM1 stated by the project lead 2026-11-22. `mavlink status` instance 0 on `/dev/ttyS6`. |
 | QGC and joystick | Pixhawk 6X USB | MAVLink over USB CDC | `mavlink status` instance 2 (`/dev/ttyACM0`). Source of the manual input (sysid 255, compid 190). |
-| Raspberry Pi 4B | Pixhawk 6X | MAVLink on a TELEM serial (planned) | Planned only. Port not recorded. |
-| Servo power rail | Not documented | | Servo supply and BEC are not recorded (requirement `PWR-02`). |
+| Raspberry Pi 4B | Pixhawk 6X TELEM2 | MAVLink serial (planned) | TELEM2 stated by the project lead 2026-11-22. Baud rate and the `MAV_1_CONFIG` setting are not recorded. |
+| Power module (PM08-CAN) POWER1 output | Pixhawk 6X (flight controller) | Regulated supply | Stated by the project lead 2026-11-22. |
+| Power module (PM08-CAN) POWER2 output | Servo power rail (4x EMAX ES3059MD) and Raspberry Pi 4B | Regulated supply | Stated by the project lead 2026-11-22. Same PM08-CAN as POWER1. How the rail is distributed to the servos is not recorded. |
 
 ## Known figures
 - All-up mass 1.9 kg (current, stated by the project lead 2026-11-22). This replaces the 3.04 kg assumed from the 2026-09-19 SDF model.
@@ -46,6 +48,10 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 - Update `SLA_MASS` (file value 2.05) and the inertia and CG data if the 1.9 kg is confirmed.
 - Runtime: 1.3 Ah at the measured 70 A is about 67 s, and less with a usable-capacity limit (for example about 50 s at 80%). Confirm the burn rate on the bench
   and set the bench or flight time limits to match. 70 A is about 54C, inside the 130C rating.
-- Servo-rail regulator or BEC, if any (requirement `PWR-02`).
+- Power budget (requirement `PWR-02`): one PM08-CAN carries everything. The battery stack feeds it, it passes the EDF current through to the ESC,
+  and its POWER1 output feeds the flight controller while POWER2 feeds the servo rail and the Raspberry Pi.
+  Check the module's pass-through current rating (about 70 A average, peak unmeasured) and its regulated output voltage and current against the servo supply
+  range, the servo stall and peak current, and the Pi load. Record a brownout test with the EDF at full throttle and the canards moving.
+  A fault or sag on the module takes out the flight controller, servos, Pi and EDF together, so there is no isolation between them.
 - Confirm the power module model (PM08-CAN) and the Holybro M9N variant (UART or DroneCAN).
-- Check the ESC and power module current limits against the measured peak, not just the 70 A average.
+- Check the ESC (90 A) and PM08-CAN pass-through current limits against the measured peak, not just the 70 A average.
