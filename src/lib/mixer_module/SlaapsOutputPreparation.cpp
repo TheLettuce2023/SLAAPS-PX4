@@ -656,9 +656,15 @@ bool MixingOutput::updateSlaapsPreparation()
 
 	// Inactive/prepared is still exclusively owned. Falling through would let
 	// stock function providers or actuator_test drive a mixed invalid mapping.
-	if (_slaaps_output_status != SlaapsOutputStatus::Command && _slaaps_output_status != SlaapsOutputStatus::Inhibited) { return true; }
+	if (_slaaps_output_status != SlaapsOutputStatus::Command && _slaaps_output_status != SlaapsOutputStatus::Inhibited) {
+		writeSlaapsIdleDisarmFrame(current, current_known);
+		return true;
+	}
 
-	if (_slaaps_output_status == SlaapsOutputStatus::Inhibited && !_slaaps_preparation->inhibitPending()) { return true; }
+	if (_slaaps_output_status == SlaapsOutputStatus::Inhibited && !_slaaps_preparation->inhibitPending()) {
+		writeSlaapsIdleDisarmFrame(current, current_known);
+		return true;
+	}
 
 	// Recheck complete independent authority immediately before writing.
 	// Retained dispatch preserves the pending ticket and never renews its lease.
@@ -720,6 +726,41 @@ bool MixingOutput::updateSlaapsPreparation()
 	}
 
 	return true;
+}
+
+void MixingOutput::writeSlaapsIdleDisarmFrame(const actuator_armed_s &armed, bool armed_known)
+{
+	// Stock PX4 streams the DShot disarm frame whenever the vehicle is disarmed, and a DShot ESC arms on that signal.
+	// An idle SLAAPS bank otherwise writes nothing, so the EDF ESC saw no signal until armed Manual. This writes only
+	// the disarm frame (driver value 0, sent as MOTOR_STOP), only to the EDF channel of a ready DShot bank, and only
+	// while fresh local authority says disarmed and the bank holds no session, command or pending stop ticket. It
+	// changes no bank state and grants or acknowledges nothing. PWM banks stay silent (0 is already no pulse there).
+	static constexpr uint8_t kDshotProtocol = 1; // slaaps_output_bank.protocol
+	const auto status = _slaaps_output_status;
+	const bool idle = status == SlaapsOutputStatus::Inactive || status == SlaapsOutputStatus::Prepared
+			  || (status == SlaapsOutputStatus::Inhibited && !_slaaps_preparation->inhibitPending());
+	const hrt_abstime now = hrt_absolute_time();
+	const bool disarmed = armed_known && armed.timestamp && armed.timestamp <= now && now - armed.timestamp < kCommanderAgeUs
+			      && !armed.armed && !armed.in_esc_calibration_mode;
+	const auto &report = _slaaps_last_inventory;
+
+	if (!idle || !disarmed || report.protocol != kDshotProtocol || !report.ready || !slaapsLocallyReady()) { return; }
+
+	uint16_t mask = 0;
+
+	for (unsigned i = 0; i < _max_num_outputs && i < report.channel_count; ++i) {
+		if (_function_assignment[i] == OutputFunction::SLAAPS_EDF && report.function[i] == static_cast<uint16_t>(OutputFunction::SLAAPS_EDF)
+		    && report.disarmed_us[i] == 0 && _disarmed_value[i] == 0) {
+			mask |= 1U << i;
+		}
+	}
+
+	if (!mask) { return; }
+
+	float outputs[MAX_ACTUATORS] {};
+	_slaaps_writing_mask = mask;
+	_interface.updateOutputs(outputs, _max_num_outputs, 1);
+	_slaaps_writing_mask = 0;
 }
 
 void MixingOutput::destroySlaapsPreparation()

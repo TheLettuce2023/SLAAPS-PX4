@@ -8025,10 +8025,12 @@ static int nativeSelectedCommand(const char *operation)
 class NativeSlaapsOutput final : public OutputModuleInterface
 {
 public:
-	explicit NativeSlaapsOutput(const char *prefix) :
+	// protocol follows slaaps_output_bank: 0 PWM (50 Hz), 1 DShot (600 kbit/s).
+	explicit NativeSlaapsOutput(const char *prefix, uint8_t protocol = 0) :
 		OutputModuleInterface("slaaps_fake_output", px4::wq_configurations::hp_default),
 		_mixing(prefix, 8, *this, MixingOutput::SchedulingPolicy::Disabled, false, false),
-		_ack(strcmp(prefix, "PWM_MAIN") == 0 ? ORB_ID(slaaps_manual_ack_main) : ORB_ID(slaaps_manual_ack_aux)) {}
+		_ack(strcmp(prefix, "PWM_MAIN") == 0 ? ORB_ID(slaaps_manual_ack_main) : ORB_ID(slaaps_manual_ack_aux)),
+		_protocol(protocol) {}
 	void start() { _running.store(true); ScheduleOnInterval(20000); }
 	void stop() { _running.store(false); ScheduleClear(); }
 	unsigned writes() const { return _writes.load(); }
@@ -8046,9 +8048,9 @@ public:
 		_mixing.update();
 		uint16_t rates[16] {};
 
-		for (unsigned i = 0; i < 8; ++i) { rates[i] = 50; }
+		for (unsigned i = 0; i < 8; ++i) { rates[i] = _protocol ? 600 : 50; }
 
-		if (_mixing.slaapsInventoryDue()) { _mixing.reportSlaapsInventory(8, 255, rates, true); }
+		if (_mixing.slaapsInventoryDue()) { _mixing.reportSlaapsInventory(8, 255, rates, true, _protocol); }
 
 		_mixing.updateSubscriptions(false);
 	}
@@ -8100,6 +8102,7 @@ public:
 private:
 	MixingOutput _mixing;
 	uORB::Subscription _ack;
+	const uint8_t _protocol;
 	uORB::Publication<slaaps_manual_permission_s> *_revoke_publisher{};
 	slaaps_manual_permission_s _denied_permission{};
 	float _last_output[MAX_ACTUATORS] {};
@@ -12855,6 +12858,67 @@ static int nativeMixingOutputTests()
 	return 0;
 }
 
+// Stock PX4 streams the DShot disarm frame while disarmed and a DShot ESC arms on it. An idle SLAAPS EDF bank on
+// DShot must do the same, write only that frame, and stop as soon as authority is armed, stale or calibrating.
+// Run after nativeMixingOutputTests() has destroyed its banks: each bank endpoint admits one publisher.
+static int nativeIdleDisarmFrameTests()
+{
+	checks = 0;
+	installNativeMixerConfiguration(fixture());
+	NativeSlaapsOutput main("PWM_MAIN"), aux("PWM_AUX", 1);
+	uORB::Publication<vehicle_status_s> vehicle_pub{ORB_ID(vehicle_status)};
+	uORB::Publication<actuator_armed_s> armed_pub{ORB_ID(actuator_armed)};
+	vehicle_status_s vehicle{};
+	actuator_armed_s armed{};
+	auto publishState = [&](bool is_armed, bool calibrating) {
+		vehicle.timestamp = armed.timestamp = hrt_absolute_time();
+		vehicle.arming_state = is_armed ? vehicle_status_s::ARMING_STATE_ARMED : vehicle_status_s::ARMING_STATE_DISARMED;
+		armed.armed = is_armed;
+		armed.in_esc_calibration_mode = calibrating;
+		check(vehicle_pub.publish(vehicle) && armed_pub.publish(armed), "publish labeled synthetic local authority state");
+	};
+	auto idle = [](SlaapsOutputStatus status) {
+		return status == SlaapsOutputStatus::Inactive || status == SlaapsOutputStatus::Prepared
+		       || status == SlaapsOutputStatus::Inhibited;
+	};
+
+	publishState(false, false);
+
+	// The first inventory precedes function resolution (ready=0); the next is due 100 ms later.
+	for (unsigned i = 0; i < 15; ++i) { main.pump(); aux.pump(); px4_usleep(20000); publishState(false, false); }
+
+	check(idle(aux.mixing().slaapsOutputStatus()) && aux.writes() >= 2 && aux.nonzeroWrites() == 0
+	      && near(aux.lastOutput(3), 0.F), "idle disarmed DShot EDF bank streams only the disarm frame");
+	check(main.writes() == 0, "idle PWM canard bank still writes nothing");
+
+	publishState(false, true);
+	const unsigned before_calibration = aux.writes();
+
+	for (unsigned i = 0; i < 3; ++i) { aux.pump(); px4_usleep(20000); }
+
+	check(aux.writes() == before_calibration, "ESC calibration suppresses the idle disarm frame");
+
+	publishState(false, false);
+	aux.pump();
+	check(aux.writes() == before_calibration + 1 && aux.nonzeroWrites() == 0, "idle disarm frame resumes after calibration ends");
+
+	px4_usleep(1100000);
+	const unsigned before_stale = aux.writes();
+	aux.pump();
+	check(aux.writes() == before_stale, "stale local authority suppresses the idle disarm frame");
+
+	// Arming without a prepared session latches the bank's own fault; the idle frame must stop at once either way.
+	publishState(true, false);
+	const unsigned before_armed = aux.writes();
+	aux.pump(); aux.pump();
+	check(aux.writes() == before_armed && aux.nonzeroWrites() == 0, "armed authority suppresses the idle disarm frame");
+
+	publishState(false, false);
+	aux.pump();
+	PX4_INFO("SLAAPS_IDLE_DISARM_FRAME_TEST_PASS checks=%u synthetic_authority=1 physical_outputs=0", checks);
+	return 0;
+}
+
 static int nativeMixingCommand(const char *operation)
 {
 	// Intentionally retained for process lifetime so stopping a scheduled fixture
@@ -12914,7 +12978,10 @@ int slaaps_control_test_main(int argc, char *argv[])
 
 	if (argc == 3 && strcmp(argv[1], "mixing") == 0) { return nativeMixingCommand(argv[2]); }
 
-	if (argc == 2 && strcmp(argv[1], "output") == 0) { return nativeMixingOutputTests(); }
+	if (argc == 2 && strcmp(argv[1], "output") == 0) {
+		const int output = nativeMixingOutputTests();
+		return output ? output : nativeIdleDisarmFrameTests();
+	}
 
 	if (argc == 2 && strcmp(argv[1], "supervisor") == 0) { return nativeSupervisorOrchestrationTests(); }
 

@@ -354,6 +354,7 @@ private:
 	SlaapsOutputPreparation *_slaaps_preparation{};
 	void initializeSlaapsPreparation();
 	bool updateSlaapsPreparation();
+	void writeSlaapsIdleDisarmFrame(const actuator_armed_s &armed, bool armed_known);
 	bool slaapsLocallyReady() const;
 	bool _slaaps_inventory_invalidated{};
 	bool _slaaps_bank_excluded{};

@@ -1173,6 +1173,9 @@ def main():
         output_match = re.search(r"SLAAPS_MIXING_OUTPUT_TEST_PASS checks=(\d+)", control_output)
         assert output_match, "Real mixer output path regression missing"
         result["native_mixer_output_checks"] = int(output_match.group(1))
+        idle_frame_match = re.search(r"SLAAPS_IDLE_DISARM_FRAME_TEST_PASS checks=(\d+)", control_output)
+        assert idle_frame_match, "Idle DShot disarm frame regression missing"
+        result["native_idle_disarm_frame_checks"] = int(idle_frame_match.group(1))
         result["native_supervisor_checks"] = supervisor_result["checks"]
         result["native_supervisor_isolated_process"] = True
         result["native_supervisor_scope"] = "actual_source_synthetic_authority_capture_only_no_hardware"
