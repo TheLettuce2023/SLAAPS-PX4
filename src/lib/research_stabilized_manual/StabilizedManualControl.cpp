@@ -102,9 +102,13 @@ Status StabilizedManualControl::configure(const Configuration &configuration)
 	return Status::Ok;
 }
 
-Status StabilizedManualControl::validateState(TimeUs now, const StateSample &sample, Quaternion &attitude) const
+// Every controller path accepts an estimator attitude reset within the same source epoch. Only inspect() holds a
+// reference across samples, so only it re-bases; the other paths capture the current attitude themselves.
+Status StabilizedManualControl::validateState(TimeUs now, const StateSample &sample, Quaternion &attitude,
+		bool &attitude_reset) const
 {
-	return validateStabilizedState(now, sample, _configuration, _last_cycle_us ? &_last_sample : nullptr, attitude);
+	return validateStabilizedState(now, sample, _configuration, _last_cycle_us ? &_last_sample : nullptr, attitude,
+				       &attitude_reset);
 }
 
 Status StabilizedManualControl::reject(Status reason)
@@ -121,7 +125,8 @@ Status StabilizedManualControl::enable(TimeUs now, const ManualSample &manual, c
 	if (now == 0) { return reject(Status::InvalidTime); }
 
 	Quaternion attitude;
-	const Status status = validateState(now, sample, attitude);
+	bool attitude_reset{};
+	const Status status = validateState(now, sample, attitude, attitude_reset);
 
 	if (status != Status::Ok) { return reject(status); }
 
@@ -172,7 +177,8 @@ Status StabilizedManualControl::inspect(TimeUs now, const ManualSample &manual, 
 
 	if (now < _last_observed_us || now - _last_cycle_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
 
-	const Status status = validateState(now, sample, attitude);
+	bool attitude_reset{};
+	const Status status = validateState(now, sample, attitude, attitude_reset);
 
 	if (status != Status::Ok) { return reject(status); }
 
@@ -180,6 +186,15 @@ Status StabilizedManualControl::inspect(TimeUs now, const ManualSample &manual, 
 	research_actuator_command::ManualControlReport input_report{};
 
 	if (!_hold_only && _manual.evaluate(now, manual, discarded, input_report) != research_actuator_command::ManualControlStatus::Ok) { return reject(Status::InputRejected); }
+
+	// An estimator attitude reset moves the estimate, not the vehicle. Carry the hold error across it: the error
+	// previous^-1 * reference is kept, so the reset commands no correction. The vehicle's own motion during that one
+	// sample period is dropped from the error (rate x period: about 0.003 rad at 0.8 rad/s and 4 ms). In Rate the
+	// reference is unused and re-captured on release.
+	if (attitude_reset) {
+		const Quaternion previous = Quaternion(_last_sample.attitude).normalized();
+		_reference = (attitude * (previous.inversed() * _reference)).normalized();
+	}
 
 	_last_sample = sample;
 	_last_observed_us = now;
@@ -205,7 +220,8 @@ Status StabilizedManualControl::resetHistory(TimeUs now, const StateSample &samp
 	if (now <= _last_cycle_us || now < _last_observed_us || now - _last_cycle_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
 
 	Quaternion attitude;
-	const Status status = validateState(now, sample, attitude);
+	bool attitude_reset{};
+	const Status status = validateState(now, sample, attitude, attitude_reset);
 
 	if (status != Status::Ok) { return reject(status); }
 
@@ -228,7 +244,8 @@ Status StabilizedManualControl::holdCurrent(TimeUs now, const StateSample &sampl
 	if (now < _last_observed_us || now - _last_cycle_us > _configuration.maximum_cycle_us) { return reject(Status::InvalidTime); }
 
 	Quaternion attitude;
-	const Status status = validateState(now, sample, attitude);
+	bool attitude_reset{};
+	const Status status = validateState(now, sample, attitude, attitude_reset);
 
 	if (status != Status::Ok) { return reject(status); }
 
@@ -255,7 +272,8 @@ Status StabilizedManualControl::enableHoldFromHandled(TimeUs now, const StateSam
 	}
 
 	Quaternion attitude;
-	const Status status = validateState(now, sample, attitude);
+	bool attitude_reset{};
+	const Status status = validateState(now, sample, attitude, attitude_reset);
 
 	if (status != Status::Ok) { return reject(status); }
 

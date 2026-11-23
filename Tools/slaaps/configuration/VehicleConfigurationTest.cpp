@@ -3034,7 +3034,8 @@ static void manualWorkerTests()
 
 		case 2: state.source_epoch++; break;
 
-		case 3: state.attitude_reset_counter++; break;
+		// An estimator attitude reset alone is accepted (below); with a new estimator epoch it still rejects.
+		case 3: state.attitude_reset_counter++; state.source_epoch++; break;
 
 		case 4: state.valid = false; break;
 
@@ -3058,6 +3059,26 @@ static void manualWorkerTests()
 		      "either subsystem failure prevents combined output");
 		check(edf.sample(5000, p).disposition != EdfDisposition::Command, "attitude or propulsion failure revokes shared owner");
 		check(w.cycle(5001, p, manual, state, output, binding) == ManualWorkerStatus::Inactive, "worker failure latches");
+	}
+
+	{
+		// Board soak 2026-11-23: an EKF2 attitude reset within the same estimator epoch faulted the worker (core line 241).
+		EdfOwner edf;
+		ManualWorker w(edf);
+		manual.axes[0] = 0.F;
+		manual.axes[3] = -1.F;
+		state.source_epoch = 1;
+		state.attitude_reset_counter = 0;
+		state.valid = true;
+		stamp(1000);
+		check(w.begin(1000, c, p, manual, state, binding) == ManualWorkerStatus::Ready, "worker reset fixture entry");
+		stamp(5000);
+		state.attitude_reset_counter = 1;
+		output.sequence = 99;
+		check(w.cycle(5000, p, manual, state, output, binding) == ManualWorkerStatus::Command && output.sequence != 99,
+		      "an estimator attitude reset within the same epoch keeps the Manual worker commanding");
+		check(edf.sample(5000, p).disposition == EdfDisposition::Command, "the reset leaves the shared EDF owner commanding");
+		state.attitude_reset_counter = 0;
 	}
 
 	for (unsigned fault = 0; fault < 17; ++fault) {
@@ -9736,6 +9757,7 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 	unsigned power_scenario{};
 	float condition_airspeed = 20.F;
 	float roll = 0.F, throttle = -1.F;
+	uint8_t attitude_reset_counter{}; // vehicle_attitude.quat_reset_counter: an EKF2 attitude reset.
 	slaaps_status_s status{};
 	// Keep the first observable anomaly and preceding good evidence in this
 	// native fixture. No supervisor-private mutable state is read here, and no
@@ -9998,6 +10020,7 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 			sensor_selection_s selection{};
 			attitude.timestamp = attitude.timestamp_sample = rates.timestamp = rates.timestamp_sample = now;
 			attitude.q[0] = 1.F;
+			attitude.quat_reset_counter = attitude_reset_counter;
 			estimator.timestamp = flags.timestamp = selection.timestamp = now;
 			estimator.gyro_device_id = selection.gyro_device_id = 123;
 			estimator.accel_device_id = selection.accel_device_id = 456;
@@ -12097,6 +12120,23 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		wait([&]() { return status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING && status.manual_worker_active; },
 		500000, "Manual reaches Running after the Bench sessions without a restart");
 		report_entry("running");
+		// Board soak 2026-11-23: an EKF2 attitude reset (quat_reset_counter 2 to 3) while armed Manual was running faulted the
+		// worker (core line 241) and fired D3. A reset within the same estimator must leave the session running.
+		{
+			const auto reset_session = status.manual_preparation_session;
+			++attitude_reset_counter;
+			const uint64_t settle = hrt_absolute_time() + 300000;
+			bool stayed = true;
+
+			while (hrt_absolute_time() < settle) {
+				pump();
+				stayed &= status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING && status.manual_worker_active
+					  && status.manual_preparation_session == reset_session;
+				px4_usleep(1000);
+			}
+
+			check(stayed, "an estimator attitude reset leaves armed Manual running in the same session");
+		}
 		vehicle_armed = armed.armed = false;
 		wait([&]() { return !status.manual_worker_active; }, 1000000, "disarm ends the post-Bench Manual session");
 		SlaapsNativeTest::admitted.store(false);

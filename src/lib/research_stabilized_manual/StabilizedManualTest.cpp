@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
 #include <limits>
 
 using namespace research_stabilized_manual;
@@ -283,7 +284,11 @@ void faultTests()
 
 		case 8: fixture.sample.rate_sample_us = fixture.now - 8001; break;
 
-		case 9: fixture.sample.attitude_reset_counter = 1; break;
+		// An estimator attitude reset is accepted (resetTests), but it never excuses a sample-time regression.
+		case 9:
+			fixture.sample.attitude_reset_counter = 1;
+			fixture.sample.attitude_timestamp_us = fixture.sample.attitude_sample_us = fixture.now - kTickUs - 1;
+			break;
 
 		case 10: fixture.sample.source_epoch = 2; break;
 
@@ -382,6 +387,118 @@ float attitudeError(const Quaternion &actual, const Quaternion &reference)
 	return 2.0F * std::atan2(error.imag().norm(), std::fabs(error(0)));
 }
 
+// Board soak 2026-11-23: EKF2 reset its attitude (quat_reset_counter 2 to 3, a yaw step of about 3 degrees) when it
+// switched to 3D magnetometer fusion, and the reset was rejected as a changed source, which ended the session. An
+// estimator reset moves the estimate, not the vehicle (EKF2: q_new = delta_q * q_old in NED), so it must neither fault
+// nor command a correction.
+void resetTests()
+{
+	const Quaternion delta(matrix::AxisAnglef(0.0F, 0.0F, 0.0524F)); // 3 degree yaw step in NED.
+	const Quaternion initial(matrix::AxisAnglef(0.0F, 0.3F, 0.0F));  // Nose up, so the frame of the step matters.
+	const Quaternion disturbed = initial * Quaternion(matrix::AxisAnglef(0.02F, -0.03F, 0.04F));
+
+	// Hold: the same vehicle motion with and without a reset gives the same command.
+	Fixture plain, reset, jump;
+
+	for (Fixture *fixture : {&plain, &reset, &jump}) {
+		// Unbounded rate-reference slew, so each cycle's setpoint is its target and the comparisons below are exact.
+		fixture->configuration.maximum_rate_setpoint_accel_rad_s2 = Vector3f(1.0e4F, 1.0e4F, 1.0e4F);
+		fixture->sample.attitude = initial;
+		fixture->enable();
+		check(fixture->tick() == Status::Ok && fixture->report.state == State::Hold, "reset fixture holds");
+		fixture->sample.attitude = disturbed;
+		check(fixture->tick() == Status::Ok, "reset fixture sees a disturbance from its hold reference");
+	}
+
+	reset.sample.attitude = delta * disturbed;
+	reset.sample.attitude_reset_counter = 1;
+	jump.sample.attitude = delta * disturbed; // The same jump without a reset counter is real vehicle motion.
+	check(plain.tick() == Status::Ok, "no-reset reference cycle");
+	check(reset.tick() == Status::Ok && reset.control.eligible() && reset.report.state == State::Hold,
+	      "an estimator attitude reset in Hold is accepted");
+	check(jump.tick() == Status::Ok, "an unflagged attitude jump is accepted as motion");
+
+	for (unsigned axis = 0; axis < 3; ++axis) {
+		check(near(reset.report.rate_setpoint_rad_s(axis), plain.report.rate_setpoint_rad_s(axis), 1.0e-4F),
+		      "a reset carries the hold error unchanged: same rate setpoint as without it");
+	}
+
+	check(attitudeError(reset.report.hold_reference, delta * plain.report.hold_reference) < 1.0e-4F,
+	      "the hold reference moves with the estimate by the reset step");
+	check(std::fabs(jump.report.rate_setpoint_rad_s(2) - plain.report.rate_setpoint_rad_s(2)) > 0.01F,
+	      "without the reset flag the same step would command a yaw correction");
+
+	for (unsigned i = 0; i < 25; ++i) {
+		check(plain.tick() == Status::Ok && reset.tick() == Status::Ok, "control continues after a reset");
+	}
+
+	for (unsigned axis = 0; axis < 3; ++axis) {
+		check(near(reset.report.rate_setpoint_rad_s(axis), plain.report.rate_setpoint_rad_s(axis), 1.0e-4F),
+		      "the re-based hold tracks the no-reset hold over later cycles");
+	}
+
+	// monitor() (output acknowledgment pending) sees the reset first; the following cycle must not re-base again.
+	Fixture monitored, reference_run;
+
+	for (Fixture *fixture : {&monitored, &reference_run}) {
+		fixture->configuration.maximum_rate_setpoint_accel_rad_s2 = Vector3f(1.0e4F, 1.0e4F, 1.0e4F);
+		fixture->sample.attitude = initial;
+		fixture->enable();
+		check(fixture->tick() == Status::Ok, "monitor fixture holds");
+		fixture->sample.attitude = disturbed;
+		check(fixture->tick() == Status::Ok, "monitor fixture sees a disturbance");
+		fixture->now += kTickUs;
+		fixture->stamp();
+	}
+
+	monitored.sample.attitude = delta * disturbed;
+	monitored.sample.attitude_reset_counter = 1;
+	check(monitored.control.monitor(monitored.now, monitored.manual, monitored.sample) == Status::Ok
+	      && reference_run.control.monitor(reference_run.now, reference_run.manual, reference_run.sample) == Status::Ok,
+	      "monitor accepts a reset");
+	check(monitored.control.cycle(monitored.now, monitored.manual, monitored.sample, monitored.report) == Status::Ok
+	      && reference_run.control.cycle(reference_run.now, reference_run.manual, reference_run.sample, reference_run.report) == Status::Ok,
+	      "the cycle after a monitored reset succeeds");
+
+	for (unsigned axis = 0; axis < 3; ++axis) {
+		check(near(monitored.report.rate_setpoint_rad_s(axis), reference_run.report.rate_setpoint_rad_s(axis), 1.0e-4F),
+		      "a reset seen by monitor is applied once");
+	}
+
+	// Rate: stick deflected, the reset is accepted and the controller stays in Rate.
+	Fixture rate;
+	rate.enable();
+	rate.manual.axes[0] = 0.5F;
+	check(rate.tick() == Status::Ok && rate.report.state == State::Rate, "rate fixture in Rate");
+	rate.sample.attitude = delta * rate.sample.attitude;
+	rate.sample.attitude_reset_counter = 7;
+	check(rate.tick() == Status::Ok && rate.report.state == State::Rate, "a reset in Rate is accepted");
+
+	// D1 hold-only: the hold continues through a reset, and the counter may wrap.
+	Fixture held;
+	held.sample.attitude = initial;
+	held.sample.attitude_reset_counter = 255;
+	held.enable();
+	check(held.tick() == Status::Ok, "hold-only fixture runs");
+	held.now += kTickUs;
+	held.stamp();
+	check(held.control.holdCurrent(held.now, held.sample) == Status::Ok && held.control.holdOnly(), "D1 hold entered");
+	held.sample.attitude = delta * initial;
+	held.sample.attitude_reset_counter = 0;
+	check(held.tick() == Status::Ok && held.control.holdOnly(), "a wrapping reset during the D1 hold is accepted");
+
+	for (unsigned axis = 0; axis < 3; ++axis) {
+		check(std::fabs(held.report.rate_setpoint_rad_s(axis)) < 1.0e-3F, "the reset commands no correction during the D1 hold");
+	}
+
+	// A new estimator epoch is still a changed source, with or without a reset.
+	Fixture epoch;
+	epoch.enable();
+	epoch.sample.attitude_reset_counter = 1;
+	epoch.sample.source_epoch = 2;
+	check(epoch.tick() == Status::StateChanged && !epoch.control.eligible(), "a new source epoch still revokes");
+}
+
 void feedbackTests()
 {
 	// Host truth-feedback numerical fixture, deliberately not estimated-state SITL.
@@ -460,7 +577,7 @@ void feedbackTests()
 
 int main()
 {
-	handledEntryTests(); allocationTests(); referenceTests(); faultTests(); feedbackTests();
+	handledEntryTests(); allocationTests(); referenceTests(); faultTests(); resetTests(); feedbackTests();
 	std::printf("checks=%u failures=%u scope=host_truth_feedback_only\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

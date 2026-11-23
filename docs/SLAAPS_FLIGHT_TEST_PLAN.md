@@ -32,6 +32,12 @@ What the tunnel would have given, and what replaces it:
   state check treats any attitude reset as a changed source (`StabilizedInputValidation.cpp`, `StateChanged`), so the worker rejected
   the cycle (core line 241, worker status 6) and D3 fired. Pilot age 20 ms, state age 5 ms, margins normal. EKF2 resets like this
   also happen in flight, so this is a real defect, not a bench artifact. Not met: zero events needed.
+  Fixed 2026-11-23 (lead's decision): the Manual controller, including every D1 hold, accepts an attitude reset within the
+  same estimator epoch. It re-bases the hold reference so the hold error is unchanged and the reset commands no correction.
+  A new estimator epoch still faults. Acceleration mode, the companion link and the pre-arm check stay strict: the companion
+  sends attitude in the estimator's frame, so a reset there needs companion-side handling first. Native tests cover the
+  controller, the worker and an armed supervisor session. Next: a new image and another 30-minute soak, with a few
+  disarm/re-arm cycles for the timing windows.
 - [ ] Timing windows final and committed: `SLA_ACT_ACK_US`, `SLA_CYCLE_MAX`, `SLA_OUT_LEASE` (the board still carries temporary 120 ms / 200 ms / 200 ms).
   The armed-Manual bench test reports the real bank reply times (`activation flight reply main=... aux=...`). Soak 2026-11-23: one
   logged activation (the re-entry), MAIN 6.2 ms and AUX 3.3 ms against the 120 ms limit. The first entry came before the log started,

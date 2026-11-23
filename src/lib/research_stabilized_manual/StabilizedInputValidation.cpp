@@ -58,8 +58,10 @@ research_actuator_command::ManualControlStatus configureStabilizedManualInput(co
 }
 
 Status validateStabilizedState(TimeUs now, const StateSample &sample, const Configuration &configuration,
-			       const StateSample *previous, Quaternion &attitude)
+			       const StateSample *previous, Quaternion &attitude, bool *attitude_reset)
 {
+	if (attitude_reset != nullptr) { *attitude_reset = false; }
+
 	if (!sample.valid || sample.source_epoch == 0
 	    || !fresh(now, sample.attitude_timestamp_us, sample.attitude_sample_us, configuration.maximum_state_age_us)
 	    || !fresh(now, sample.rate_timestamp_us, sample.rate_sample_us, configuration.maximum_state_age_us)) { return Status::StateRejected; }
@@ -84,13 +86,19 @@ Status validateStabilizedState(TimeUs now, const StateSample &sample, const Conf
 	if (!std::isfinite(norm) || std::fabs(norm - 1.0) > static_cast<double>(configuration.quaternion_norm_tolerance)) { return Status::StateRejected; }
 
 	if (previous != nullptr) {
-		if (sample.source_epoch != previous->source_epoch || sample.attitude_reset_counter != previous->attitude_reset_counter) { return Status::StateChanged; }
+		if (sample.source_epoch != previous->source_epoch) { return Status::StateChanged; }
+
+		const bool reset = sample.attitude_reset_counter != previous->attitude_reset_counter;
+
+		if (reset && attitude_reset == nullptr) { return Status::StateChanged; }
 
 		if (sample.attitude_sample_us < previous->attitude_sample_us || sample.rate_sample_us < previous->rate_sample_us
 		    || sample.attitude_timestamp_us < previous->attitude_timestamp_us || sample.rate_timestamp_us < previous->rate_timestamp_us
 		    || (sample.attitude_sample_us == previous->attitude_sample_us && !same(sample.attitude, previous->attitude, 4))
 		    || (sample.rate_sample_us == previous->rate_sample_us && (!same(sample.rate_rad_s, previous->rate_rad_s, 3)
 				    || !same(sample.angular_accel_rad_s2, previous->angular_accel_rad_s2, 3)))) { return Status::StateRejected; }
+
+		if (reset) { *attitude_reset = true; }
 	}
 
 	for (unsigned i = 0; i < 4; ++i) { attitude(i) = static_cast<float>(static_cast<double>(sample.attitude(i)) / norm); }

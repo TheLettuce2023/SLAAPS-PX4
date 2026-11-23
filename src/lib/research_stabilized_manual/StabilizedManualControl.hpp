@@ -108,6 +108,8 @@ public:
 		     const ScheduledControlPoint &scheduled);
 	// Validate live input while output acknowledgment is pending, without
 	// integrating PID, changing hold reference or advancing allocation history.
+	// Exception: an estimator attitude reset (same source epoch, new reset counter) is accepted by every call that
+	// inspects state, and the hold reference is re-based by it so the hold error is unchanged. A new epoch still rejects.
 	Status monitor(TimeUs now, const ManualSample &manual, const StateSample &sample);
 	// Non-latching selected-input check for an eligible owner. A rejected sample
 	// changes no controller state, so the caller can choose the decided D1 hold.
@@ -135,7 +137,7 @@ private:
 	Status cycleImpl(TimeUs now, const ManualSample &manual, const StateSample &sample, Report &report,
 			 const ScheduledControlPoint *scheduled);
 	Status inspect(TimeUs now, const ManualSample &manual, const StateSample &sample, Quaternion &attitude);
-	Status validateState(TimeUs now, const StateSample &sample, Quaternion &attitude) const;
+	Status validateState(TimeUs now, const StateSample &sample, Quaternion &attitude, bool &attitude_reset) const;
 	Status reject(Status reason);
 	Configuration _configuration{};
 	research_actuator_command::ManualControlInput _manual{};
