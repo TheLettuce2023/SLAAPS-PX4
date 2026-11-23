@@ -1,5 +1,5 @@
 # SLAAPS inertia tensor (kg m^2) and 10S propulsion voltage range (SLA_PWR_VMIN 30 V = 3.0 V/cell, VMAX 42 V) at CG, body FRD (x forward, y right, z down), kg m^2.
-# Data sheet 2026-11-12 (CAD): mass 2.05 kg, CG 0.233 m from the tail end, IMU 0.268 m, canard COP 0.166 m forward of CG.
+# Data sheet 2026-11-12 (CAD), mass and CG confirmed by weighing 2026-11-23 (revision 7): mass 1.979 kg, CG 0.233 m from the tail end, IMU 0.268 m, canard COP 0.166 m forward of CG.
 # CAD MMOI (kg mm^2, at CG) rotated into body FRD. CAD frame (project lead, 2026-11-12): +Z forward; viewed from behind,
 # +Y between right and up (45 deg from right), +X between left and up (225 deg from down).
 # Load in QGC (Parameters > Tools > Load from file) while the SLAAPS configuration is disabled; edit any entry there.
@@ -123,7 +123,7 @@
 1	1	SLA_C3_DELAY	0.008	9
 1	1	SLA_C4_LAG	0.05	9
 1	1	SLA_C4_DELAY	0.008	9
-1	1	SLA_MASS	2.05	9
+1	1	SLA_MASS	1.979	9
 1	1	SLA_CG_Y	0	9
 1	1	SLA_CG_Z	0	9
 1	1	SLA_EDF_T0	0	9
@@ -250,12 +250,13 @@
 1	1	SLA_REC_HOLD	2.0	9
 1	1	SLA_REC_RAMP	0.5	9
 1	1	SLA_REC_THR	0.0	9
-# Data record 20261110 revision 3 (wind tunnel 18-40 m/s): modeled derivatives, moment scales and rate gains at 40 m/s.
+# Data record 20261110 revision 7: revision 3 (wind tunnel 18-40 m/s: modeled derivatives, moment scales and rate gains at 40 m/s)
+# with the weighed mass 1.979 kg (2026-11-23; was the CAD 2.05 kg). The CG 0.233 m was confirmed by the same check.
 # Incomplete until the project lead declares it Calibrated (SLA_DATA_STATE 1). Revision 2 (measured data) was declared
-# Calibrated by the project lead, Kael Spry, 2026-11-12; revision 3 changes only modeled values.
+# Calibrated by the project lead, Kael Spry, 2026-11-12; revision 3 changes only modeled values; revision 7 only SLA_MASS.
 # SLA_Cn_ZERO stay 0 here by the lead's choice; canards are trimmed manually on the board after loading this file.
 # Revision 1 was declared Calibrated by the project lead, Kael Spry, 2026-11-10.
 # See docs/SLAAPS_DATA_RECORD.md for what it covers; modeled values stay modeled.
 1	1	SLA_DATA_REC	20261110	6
-1	1	SLA_DATA_REV	3	6
+1	1	SLA_DATA_REV	7	6
 1	1	SLA_DATA_STATE	0	6

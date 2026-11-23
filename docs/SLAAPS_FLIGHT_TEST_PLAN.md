@@ -44,7 +44,8 @@ What the tunnel would have given, and what replaces it:
   site density. Zeroed the same day with `commander calibrate airspeed` at a sensor temperature of 33 C: `SENS_DPRES_OFF` 23.0085, and still
   air now reads -0.69 to +0.93 m/s. The value is in `Tools/slaaps/parameters/slaaps_sensor_cal.params`. The reference check is still open,
   and the zero is redone at the launch temperature.
-- [ ] CG and inertia checked against the data sheet.
+- [ ] CG and inertia checked against the data sheet. Mass and CG confirmed by the lead 2026-11-23: 1.979 kg (weighed; was 2.05 CAD)
+  and 0.233 m from the tail end. `SLA_MASS` updated in data revision 7 (base) and 8 (profile C). The inertia is still the CAD value.
 - [ ] Basis for `SLA_LAUNCH_AS` (20 m/s indicated, set by the lead 2026-11-21) recorded: canard authority with margin over stall, and the reaction torque it must beat.
 
 ## G2. Bench fault injection (EDF off first, then low throttle restrained)

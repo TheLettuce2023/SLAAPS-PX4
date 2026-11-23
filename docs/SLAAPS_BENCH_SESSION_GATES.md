@@ -16,7 +16,7 @@ not turn), intake and exhaust clear, a hand on the pack disconnect. Nothing here
 | Joystick rate | `uorb top manual_control_setpoint` for 10 s with the QGC joystick connected; note the rate | G0 joystick item, if the rate is well above 1 / `SLA_IN_AGE` (3.3 Hz) |
 | Airspeed instance and rate | `uorb top -1 airspeed` and `listener airspeed` | G3 `SLA_LAUNCH_AS_I` (the instance), `SLA_LAUNCH_AGE` (above the publish interval) |
 | Pitot zero | EDF off, pitot shielded from draughts, QGC airspeed calibration (sets `SENS_DPRES_OFF`); then `listener airspeed` reads about 0 | G1 pitot zero (the reference check stays open) |
-| Mass and CG | Weigh the vehicle as flown; find the balance point and measure it from the tail end | G1 CG and mass, against 2.05 kg and 0.233 m (`SLA_MASS`, `SLA_CG_X`) |
+| Mass and CG | Weigh the vehicle as flown; find the balance point and measure it from the tail end | G1 CG and mass. Done 2026-11-23: 1.979 kg and 0.233 m, from the data sheet (data revision 7) |
 
 ## 1. Armed Manual soak (G0 control-lost count and timing windows)
 

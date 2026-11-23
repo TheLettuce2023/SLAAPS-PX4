@@ -78,7 +78,7 @@ What the existing firmware does with that, from the parameter file:
   full throttle on release detection does not exist and would be new firmware (A4).
 
 Modeled consequences (estimates from the file values, not measurements):
-- Thrust to weight is about 1.9 (39.2 N against 2.05 kg x 9.81 m/s^2 = 20.1 N).
+- Thrust to weight is about 2.0 (39.2 N against 1.979 kg x 9.81 m/s^2 = 19.4 N; weighed 2026-11-23).
 - With the 0.4 s rise and a thrust-only estimate near 19 m/s^2, 12 m/s takes roughly 1 s. The canards are held at trim for that
   time because the gate is closed.
 - **The EDF reaction torque is unmeasured.** A full-throttle start with no canard authority could roll the vehicle before the gate

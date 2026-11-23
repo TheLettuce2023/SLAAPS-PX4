@@ -193,3 +193,22 @@ unchanged from revision 2. It selects the launcher stage (`SLA_FLT_STAGE` 2, `SL
 off, and the same q-scaling method as revision 3 at 25 m/s indicated: derivatives, `SLA_x_M_SCALE` and `SP_ACC` x 0.3906, `RATE_P` and `RATE_I` x 2.56.
 `SLA_LAUNCH_AS` is 20 m/s indicated, set by the lead on 2026-11-21 (basis not recorded here; model check: damping about 0.5 at that speed). The EDF is operator-stick triggered
 (`SLA_EDF_RISE` unchanged). It needs the lead's declaration before Manual can arm.
+
+## Revision 7 (base profile, weighed mass): pending the lead's declaration
+
+`Tools/slaaps/parameters/slaaps_vehicle.params`, 2026-11-23, `SLA_DATA_REV` 7, `SLA_DATA_STATE` 0. Revision 3 with one change:
+`SLA_MASS` 1.979 kg (was the CAD figure 2.05 kg). The project lead confirmed on 2026-11-23 that the data sheet's mass and CG match the
+real vehicle. The sheet's method for mass is "Scale", and the CG, 0.233 m from the tail end, is unchanged and now confirmed. Source:
+`src/lib/slaaps/Master_Vehicle_Data_Sheet_Slaaps.xlsx` (SHA-256 `80becc8eb47b7a1a05b9f3c59e025a3b1d8826c75bc5bbad435b62ee86b89376`;
+only cell B4 changed). In the firmware `SLA_MASS` scales Acceleration-mode force and is checked by the inertia validation. Manual
+attitude control does not use it. The inertia tensor is still the CAD value taken at the CAD mass (3.5% heavier) and was not
+re-measured.
+
+The tunnel overlays (revisions 4 and 5) set no mass. Loaded after this file, they would carry the weighed mass under their old revision
+numbers, so reissue them before they are used again.
+
+## Revision 8 (launch profile C): pending the lead's declaration
+
+`Tools/slaaps/parameters/slaaps_launch.params`, 2026-11-23, `SLA_DATA_REV` 8, `SLA_DATA_STATE` 0. Revision 6 with two changes:
+`SLA_LAUNCH_AGE` 250 ms (the DroneCAN pitot publishes at 10 Hz, so 100 ms failed for part of every period), and `SLA_MASS` 1.979 kg
+restated so that the load order does not matter. The gains are unchanged.

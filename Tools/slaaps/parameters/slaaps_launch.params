@@ -20,13 +20,15 @@
 # RATE_P and RATE_I are divided by 0.3906. Best single design speed for 18..40 m/s indicated in the stability analysis (Tools/slaaps/stability_margin.py):
 # stable from about 10 to 64 m/s indicated, worst-case damping 0.35 over 18..40. At the 20 m/s gate speed the modeled damping is about 0.5.
 # Model only; the real canard authority and the launch-speed range are unmeasured.
-# This file sets SLA_DATA_REV 6 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
+# Revision 8 (2026-11-23) = revision 6 with SLA_LAUNCH_AGE 250 ms and the weighed mass 1.979 kg, restated here so the load order does not matter.
+# This file sets SLA_DATA_REV 8 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
 1	1	SLA_FLT_STAGE	2	6
 1	1	SLA_LAUNCH_AS_I	0	6
 1	1	SLA_LAUNCH_AGE	250	6
 1	1	SLA_LAUNCH_AS	20	9
 1	1	SLA_SCH_EN	0	6
-1	1	SLA_DATA_REV	6	6
+1	1	SLA_MASS	1.979	9
+1	1	SLA_DATA_REV	8	6
 1	1	SLA_DATA_STATE	0	6
 1	1	SLA_AIRSPD	25	9
 1	1	SLA_C1_WASH	25	9

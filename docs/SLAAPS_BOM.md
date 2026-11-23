@@ -39,13 +39,13 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | Power module (PM08-CAN) POWER2 output | Servo power rail (4x EMAX ES3059MD) and Raspberry Pi 4B | Regulated supply | Stated by the project lead 2026-11-22. Same PM08-CAN as POWER1. How the rail is distributed to the servos is not recorded. |
 
 ## Known figures
-- All-up mass 1.9 kg (current, stated by the project lead 2026-11-22). This replaces the 3.04 kg assumed from the 2026-09-19 SDF model.
-  The vehicle parameter file carries `SLA_MASS 2.05` and the SDF model still uses the older figure; both need review. Not a weighed breakdown.
+- All-up mass 1.979 kg, weighed (data sheet, confirmed by the project lead 2026-11-23). It replaces the 1.9 kg stated 2026-11-22 and the
+  3.04 kg of the 2026-09-19 SDF model. `SLA_MASS` is 1.979 from data revision 7. The SDF model still uses the older figure.
 - CG on the centerline. IMU 10 mm up and 52.15 mm forward of the CG.
 
 ## Open items
-- Weigh each item and the assembled vehicle, then fill a mass column. Record how the 1.9 kg was measured (scale, configuration, battery fitted or not).
-- Update `SLA_MASS` (file value 2.05) and the inertia and CG data if the 1.9 kg is confirmed.
+- Weigh each item, then fill a mass column. The assembled vehicle is weighed (1.979 kg). Record whether the battery was fitted.
+- The inertia is still the CAD value; the CG (0.233 m) is confirmed.
 - Runtime: 1.3 Ah at the measured 70 A is about 67 s, and less with a usable-capacity limit (for example about 50 s at 80%). Confirm the burn rate on the bench
   and set the bench or flight time limits to match. 70 A is about 54C, inside the 130C rating.
 - Power budget (requirement `PWR-02`): one PM08-CAN carries everything. The battery stack feeds it, it passes the EDF current through to the ESC,
