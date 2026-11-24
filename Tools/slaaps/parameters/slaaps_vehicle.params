@@ -55,45 +55,45 @@
 1	1	SLA_C3_SLOPE	0.261799	9
 1	1	SLA_C4_SLOPE	-0.261799	9
 1	1	SLA_C1_DFX	0.00000	9
-1	1	SLA_C1_DFY	-3.71437	9
-1	1	SLA_C1_DFZ	-3.71437	9
-1	1	SLA_C1_DMR	-0.21012	9
-1	1	SLA_C1_DMP	0.61658	9
-1	1	SLA_C1_DMY	-0.61658	9
+1	1	SLA_C1_DFY	-8.54305	9
+1	1	SLA_C1_DFZ	-8.54305	9
+1	1	SLA_C1_DMR	-0.61985	9
+1	1	SLA_C1_DMP	1.41813	9
+1	1	SLA_C1_DMY	-1.41813	9
 1	1	SLA_C2_DFX	0.00000	9
-1	1	SLA_C2_DFY	-3.71437	9
-1	1	SLA_C2_DFZ	3.71437	9
-1	1	SLA_C2_DMR	0.21012	9
-1	1	SLA_C2_DMP	-0.61658	9
-1	1	SLA_C2_DMY	-0.61658	9
+1	1	SLA_C2_DFY	-8.54305	9
+1	1	SLA_C2_DFZ	8.54305	9
+1	1	SLA_C2_DMR	0.61985	9
+1	1	SLA_C2_DMP	-1.41813	9
+1	1	SLA_C2_DMY	-1.41813	9
 1	1	SLA_C3_DFX	0.00000	9
-1	1	SLA_C3_DFY	3.71437	9
-1	1	SLA_C3_DFZ	3.71437	9
-1	1	SLA_C3_DMR	-0.21012	9
-1	1	SLA_C3_DMP	-0.61658	9
-1	1	SLA_C3_DMY	0.61658	9
+1	1	SLA_C3_DFY	8.54305	9
+1	1	SLA_C3_DFZ	8.54305	9
+1	1	SLA_C3_DMR	-0.61985	9
+1	1	SLA_C3_DMP	-1.41813	9
+1	1	SLA_C3_DMY	1.41813	9
 1	1	SLA_C4_DFX	0.00000	9
-1	1	SLA_C4_DFY	3.71437	9
-1	1	SLA_C4_DFZ	-3.71437	9
-1	1	SLA_C4_DMR	0.21012	9
-1	1	SLA_C4_DMP	0.61658	9
-1	1	SLA_C4_DMY	0.61658	9
+1	1	SLA_C4_DFY	8.54305	9
+1	1	SLA_C4_DFZ	-8.54305	9
+1	1	SLA_C4_DMR	0.61985	9
+1	1	SLA_C4_DMP	1.41813	9
+1	1	SLA_C4_DMY	1.41813	9
 1	1	SLA_C1_SL_UNC	0.05	9
-1	1	SLA_C1_DUR	0.10506	9
-1	1	SLA_C1_DUP	0.30829	9
-1	1	SLA_C1_DUY	0.30829	9
+1	1	SLA_C1_DUR	0.30993	9
+1	1	SLA_C1_DUP	0.70907	9
+1	1	SLA_C1_DUY	0.70907	9
 1	1	SLA_C2_SL_UNC	0.05	9
-1	1	SLA_C2_DUR	0.10506	9
-1	1	SLA_C2_DUP	0.30829	9
-1	1	SLA_C2_DUY	0.30829	9
+1	1	SLA_C2_DUR	0.30993	9
+1	1	SLA_C2_DUP	0.70907	9
+1	1	SLA_C2_DUY	0.70907	9
 1	1	SLA_C3_SL_UNC	0.05	9
-1	1	SLA_C3_DUR	0.10506	9
-1	1	SLA_C3_DUP	0.30829	9
-1	1	SLA_C3_DUY	0.30829	9
+1	1	SLA_C3_DUR	0.30993	9
+1	1	SLA_C3_DUP	0.70907	9
+1	1	SLA_C3_DUY	0.70907	9
 1	1	SLA_C4_SL_UNC	0.05	9
-1	1	SLA_C4_DUR	0.10506	9
-1	1	SLA_C4_DUP	0.30829	9
-1	1	SLA_C4_DUY	0.30829	9
+1	1	SLA_C4_DUR	0.30993	9
+1	1	SLA_C4_DUP	0.70907	9
+1	1	SLA_C4_DUY	0.70907	9
 1	1	SLA_AIRSPD	40	9
 1	1	SLA_C1_TRIM	0	9
 1	1	SLA_C1_WASH	40	9
@@ -133,9 +133,9 @@
 1	1	SLA_EDF_T4	39.2266	9
 1	1	SLA_EDF_VOLT	42	9
 1	1	SLA_EDF_BMAX	1	9
-1	1	SLA_R_M_SCALE	0.176	9
-1	1	SLA_P_M_SCALE	0.5165	9
-1	1	SLA_Y_M_SCALE	0.5165	9
+1	1	SLA_R_M_SCALE	0.5192	9
+1	1	SLA_P_M_SCALE	1.18795	9
+1	1	SLA_Y_M_SCALE	1.18795	9
 1	1	SLA_CG_X	0.233	9
 1	1	SLA_R_INPUT	0	6
 1	1	SLA_P_INPUT	1	6
@@ -156,37 +156,37 @@
 1	1	EKF2_IMU_POS_Z	-0.01	9
 # Modeled starting values derived 2026-10-27 (rate loop from inertia and modeled canard authority, timing
 # from PX4 publication rates); see docs/PROJECT_CONTEXT.md. Pending project-lead review; not measured.
-1	1	SLA_R_RATE_P	0.0792	9
-1	1	SLA_R_RATE_I	0.0792	9
+1	1	SLA_R_RATE_P	0.02685	9
+1	1	SLA_R_RATE_I	0.02685	9
 1	1	SLA_R_RATE_D	0.0	9
 1	1	SLA_R_I_LIM	0.3	9
 1	1	SLA_R_M_LIM	1.0	9
 1	1	SLA_R_WEIGHT	1.0	9
 1	1	SLA_R_ATT_P	1.43	9
 1	1	SLA_R_RATE	2.0	9
-1	1	SLA_R_SP_ACC	44.2	9
+1	1	SLA_R_SP_ACC	130.39	9
 1	1	SLA_R_MEAS_R	15.0	9
 1	1	SLA_R_MEAS_A	1000.0	9
-1	1	SLA_P_RATE_P	0.261	9
-1	1	SLA_P_RATE_I	0.209	9
+1	1	SLA_P_RATE_P	0.11348	9
+1	1	SLA_P_RATE_I	0.09087	9
 1	1	SLA_P_RATE_D	0.0	9
 1	1	SLA_P_I_LIM	0.3	9
 1	1	SLA_P_M_LIM	1.0	9
 1	1	SLA_P_WEIGHT	1.0	9
 1	1	SLA_P_ATT_P	1.14	9
 1	1	SLA_P_RATE	1.0	9
-1	1	SLA_P_SP_ACC	10.7	9
+1	1	SLA_P_SP_ACC	24.61	9
 1	1	SLA_P_MEAS_R	15.0	9
 1	1	SLA_P_MEAS_A	1000.0	9
-1	1	SLA_Y_RATE_P	0.261	9
-1	1	SLA_Y_RATE_I	0.209	9
+1	1	SLA_Y_RATE_P	0.11348	9
+1	1	SLA_Y_RATE_I	0.09087	9
 1	1	SLA_Y_RATE_D	0.0	9
 1	1	SLA_Y_I_LIM	0.3	9
 1	1	SLA_Y_M_LIM	1.0	9
 1	1	SLA_Y_WEIGHT	1.0	9
 1	1	SLA_Y_ATT_P	1.14	9
 1	1	SLA_Y_RATE	1.0	9
-1	1	SLA_Y_SP_ACC	10.7	9
+1	1	SLA_Y_SP_ACC	24.61	9
 1	1	SLA_Y_MEAS_R	15.0	9
 1	1	SLA_Y_MEAS_A	1000.0	9
 1	1	SLA_IN_SOURCE	2	6
@@ -250,7 +250,10 @@
 1	1	SLA_REC_HOLD	2.0	9
 1	1	SLA_REC_RAMP	0.5	9
 1	1	SLA_REC_THR	0.0	9
-# Data record 20261110 revision 7: revision 3 (wind tunnel 18-40 m/s: modeled derivatives, moment scales and rate gains at 40 m/s)
+# Data record 20261110 revision 9 (2026-11-23): revision 7 with the body correction (modeled, slender-body theory, 85 mm body at the
+# canards): canard derivatives, their uncertainties, SLA_x_M_SCALE and SP_ACC x 2.30 in pitch and yaw and x 2.95 in roll; RATE_P and
+# RATE_I divided by the same factors, so the design crossover is kept for the stronger canards. Not measured. See SLAAPS_DATA_RECORD.md.
+# Revision 7: revision 3 (wind tunnel 18-40 m/s: modeled derivatives, moment scales and rate gains at 40 m/s)
 # with the weighed mass 1.979 kg (2026-11-23; was the CAD 2.05 kg). The CG 0.233 m was confirmed by the same check.
 # Incomplete until the project lead declares it Calibrated (SLA_DATA_STATE 1). Revision 2 (measured data) was declared
 # Calibrated by the project lead, Kael Spry, 2026-11-12; revision 3 changes only modeled values; revision 7 only SLA_MASS.
@@ -258,5 +261,5 @@
 # Revision 1 was declared Calibrated by the project lead, Kael Spry, 2026-11-10.
 # See docs/SLAAPS_DATA_RECORD.md for what it covers; modeled values stay modeled.
 1	1	SLA_DATA_REC	20261110	6
-1	1	SLA_DATA_REV	7	6
+1	1	SLA_DATA_REV	9	6
 1	1	SLA_DATA_STATE	0	6

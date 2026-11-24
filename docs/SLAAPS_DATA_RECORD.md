@@ -212,3 +212,30 @@ numbers, so reissue them before they are used again.
 `Tools/slaaps/parameters/slaaps_launch.params`, 2026-11-23, `SLA_DATA_REV` 8, `SLA_DATA_STATE` 0. Revision 6 with two changes:
 `SLA_LAUNCH_AGE` 250 ms (the DroneCAN pitot publishes at 10 Hz, so 100 ms failed for part of every period), and `SLA_MASS` 1.979 kg
 restated so that the load order does not matter. The gains are unchanged.
+
+## Revisions 9 (base) and 10 (launch profile C): body correction, modeled values only, pending the lead's declaration
+
+`slaaps_vehicle.params` (`SLA_DATA_REV` 9) and `slaaps_launch.params` (`SLA_DATA_REV` 10), 2026-11-23, both `SLA_DATA_STATE` 0. They are
+revisions 7 and 8 with the body included in the canard model, at the lead's direction (2026-11-23: account for body lift; body diameter
+85 mm at the canards). The derivatives of 2026-10-27 treated each canard as an isolated panel (aspect ratio 1.2, slope 1.742 /rad) with
+its force 40 mm from the axis. By slender-body theory (Pitts, Nielsen and Kaattari):
+
+| Effect | Pitch, yaw | Roll |
+| --- | --- | --- |
+| Body as a wall at the canard root: opposite canards act as one aspect-ratio-2.4 wing (slope 2.94 /rad) | x 1.69 | x 1.69 |
+| Body upwash on the canards plus lift carried onto the body: K_W(B) = 1.36 at a/s = 0.411 (radius 42.5 mm, span 60.8 mm) | x 1.36 | none |
+| Roll arm: force at 42.5 + 0.45 x 60.8 = 69.9 mm from the axis, not 40 mm | none | x 1.75 |
+| **Total, applied** | **x 2.30** | **x 2.95** |
+
+Body lift adds no roll: pressure on a round body acts through its axis, and the carried-over lift of an antisymmetric deflection cancels.
+Scaled by the factor: `SLA_Cn_DFY`, `DFZ`, `DMP`, `DMY`, `DUP`, `DUY` (x 2.30); `SLA_Cn_DMR`, `DUR` (x 2.95); `SLA_x_M_SCALE` and
+`SLA_x_SP_ACC` (x 2.30 pitch and yaw, x 2.95 roll); `SLA_x_RATE_P` and `RATE_I` divided by the same factors. The uncertainties stay 50%.
+`SLA_Cn_SL_UNC`, `ATT_P` and the stick rates are unchanged. The allocator effectiveness (derivative x slope / moment scale) is
+unchanged, so the net effect is rate gains lowered by 2.30 and 2.95: the design crossover is kept for canards that are that much
+stronger. If the factors are wrong high, the loop is that much softer than designed. With these values, roll authority is 0.130 N m at
+20 m/s and 0.203 N m at 25 m/s, against the measured 0.05 N m EDF reaction torque.
+
+Not included: the canards' trailing vortices on the rear fins (they oppose a canard roll command and can cancel much of it at low
+speed), the carried-over lift acting slightly aft of the canard, and any body or fin damping. The factors are modeled, not measured;
+roll doublets (flight-test plan G4) are the check. The tunnel overlays (revisions 4 and 5) keep the isolated-canard values and, loaded
+after the base file, would undo this correction under their old revision numbers.

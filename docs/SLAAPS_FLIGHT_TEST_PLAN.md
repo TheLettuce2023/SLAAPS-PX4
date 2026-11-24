@@ -72,14 +72,40 @@ What the tunnel would have given, and what replaces it:
 
 ## G1. Ground measurements
 - [ ] EDF thrust curve and **reaction torque** on a thrust stand with a torque arm, at several throttle values. Record the supply current against the power module limit.
-  Reaction torque measured 2026-11-23 (lead): **0.55 N m, constant across throttle**. The thrust curve and supply current are still open.
-  **This exceeds the modeled roll authority at every speed:** `SLA_R_M_SCALE` is 0.069 N m in profile C (25 m/s) and 0.176 N m at
-  40 m/s, so the measured torque is about 8 and 3 times larger. Modeled authority scales with the square of airspeed, so it would
-  reach 0.55 N m only near 71 m/s. Even the unconfirmed tunnel hint of up to 3 times the modeled authority (revision 5 record) puts
-  that near 41 m/s. The firmware carries no EDF reaction moment (`SLA_WR_EM_X` 0, and the moment model is per newton of thrust,
-  so a constant torque does not fit it). Until the torque is countered (stator vanes, a canard roll trim, or another means) or
-  the authority is shown larger, the vehicle cannot be expected to hold roll with the EDF running. Decision for the lead
-  before G3 with the EDF on and before any launch.
+  Reaction torque measured 2026-11-23 (lead): **0.05 N m in magnitude, constant across throttle** (first reported as 0.55, corrected
+  the same day). The thrust curve and supply current are still open.
+  Against the roll authority (`SLA_R_M_SCALE`, which scales with the square of airspeed), with isolated canards and with the
+  body included (below):
+
+  | Airspeed | 20 m/s (gate) | 25 m/s (profile C) | 32 m/s | 40 m/s |
+  | --- | --- | --- | --- | --- |
+  | Roll authority, isolated canards (revisions 7 and 8) | 0.044 N m | 0.069 N m | 0.113 N m | 0.176 N m |
+  | Torque as a share of it | 114% | 73% | 44% | 28% |
+  | Roll authority with the body (x 2.95, revisions 9 and 10) | 0.130 N m | 0.203 N m | 0.333 N m | 0.520 N m |
+  | Torque as a share of it | 38% | 25% | 15% | 10% |
+
+  The isolated-canard model reaches the torque only near 21.3 m/s; with the body, near 12.4 m/s.
+
+  **Body correction (2026-11-23, lead: account for body lift; body diameter 85 mm at the canards).** The derivatives of 2026-10-27
+  treat each canard as an isolated panel (aspect ratio 1.2, slope 1.742 /rad, `PROJECT_CONTEXT.md`) and put its force 40 mm from
+  the axis, which is about the body surface (42.5 mm). With the body, by slender-body theory (Pitts, Nielsen and Kaattari):
+  - The body is a wall at the canard root, so opposite canards act as one aspect-ratio-2.4 wing: slope 2.94 /rad, x 1.69 (all axes).
+  - Pitch and yaw: the body's upwash on the canards and the lift the canards carry onto the body give k_W(B) + k_B(W) = K_W(B) =
+    1.36 at a/s = 0.411 (radius 42.5 mm, canard span 60.8 mm). Total **x 2.30**, close to the unconfirmed tunnel hint of
+    about 3 (revision 5 record), which came from pitch.
+  - Roll: body lift adds nothing. Pressure on a round body acts through its axis, and the carried-over lift of an antisymmetric
+    deflection cancels. The wall effect does apply, and each canard's force acts near 42.5 + 0.45 x 60.8 = 69.9 mm from the axis, not
+    40 mm (x 1.75). Total **x 2.95**.
+  - Not included: the canards' trailing vortices on the rear fins, which roll the vehicle against a canard roll command and on
+    canard-controlled finned bodies can cancel much of it at low speed. Only a roll test settles this (G4 roll doublets).
+  These are modeled factors, not measurements. Drafted as data revisions 9 (base) and 10 (profile C), pending the lead's
+  declaration: derivatives and moment scales raised, rate gains lowered by the same factors (`SLAAPS_DATA_RECORD.md`).
+  With the gate closed the canards sit at trim, so the torque acts unopposed. With the
+  CAD `SLA_I_XX` 0.0027886 kg m^2 and no aerodynamic damping, that is 18 rad/s^2: about 18 rad/s and 9 rad of roll after the
+  roughly 1 s to the gate (an upper bound, unless the launcher restrains roll). The firmware carries no EDF reaction moment
+  (`SLA_WR_EM_X` 0, and the moment model is per newton of thrust, so a constant torque does not fit it exactly). Decision for the
+  lead before a launch: the torque's sign, how to counter it (a canard roll trim, stator vanes, a roll-restraining launcher) and
+  whether `SLA_LAUNCH_AS` 20 m/s stays.
 - [ ] Pitot zeroed at launch temperature and checked against a reference (fan and anemometer, or GPS speed on G4).
   2026-11-23: read 6.15 m/s indicated in still air (an offset of about 23 Pa). The true/indicated ratio 1.124 matches the 0.975 kg/m^3
   site density. Zeroed the same day with `commander calibrate airspeed` at a sensor temperature of 33 C: `SENS_DPRES_OFF` 23.0085, and still
@@ -88,7 +114,8 @@ What the tunnel would have given, and what replaces it:
 - [ ] CG and inertia checked against the data sheet. Mass and CG confirmed by the lead 2026-11-23: 1.979 kg (weighed; was 2.05 CAD)
   and 0.233 m from the tail end. `SLA_MASS` updated in data revision 7 (base) and 8 (profile C). The inertia is still the CAD value.
 - [ ] Basis for `SLA_LAUNCH_AS` (20 m/s indicated, set by the lead 2026-11-21) recorded: canard authority with margin over stall, and the reaction torque it must beat.
-  The torque is now known: 0.55 N m (above). Modeled roll authority at 20 m/s is about 0.044 N m.
+  The torque is now known: 0.05 N m (above). Roll authority at 20 m/s is 0.044 N m with isolated canards (break-even near
+  21.3 m/s), about 0.130 N m with the body included (break-even near 12.4 m/s, modeled, before any rear-fin interaction).
 
 ## G2. Bench fault injection (EDF off first, then low throttle restrained)
 Each decided response (docs/SLAAPS_RECOVERY_POLICY.md) is triggered on purpose and judged from the log:
