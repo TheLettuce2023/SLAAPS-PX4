@@ -38,14 +38,29 @@ What the tunnel would have given, and what replaces it:
   sends attitude in the estimator's frame, so a reset there needs companion-side handling first. Native tests cover the
   controller, the worker and an armed supervisor session. Next: a new image and another 30-minute soak, with a few
   disarm/re-arm cycles for the timing windows.
+  **Second soak, started 2026-11-23** (image 3d7c2a7e01, `log_62_2026-11-23-18-11-08.ulg`): disarmed after 2.7 armed Manual minutes,
+  so it does not count as the soak. No control-lost event. EKF2 reset the attitude at 44.5 s (`quat_reset_counter` 2 to 3) and Manual
+  kept running: the first board confirmation of the fix. The run stopped after a pilot-input loss (D1, see the joystick item), not a
+  control-lost fault. The 30-minute soak is still needed.
 - [ ] Timing windows final and committed: `SLA_ACT_ACK_US`, `SLA_CYCLE_MAX`, `SLA_OUT_LEASE` (the board still carries temporary 120 ms / 200 ms / 200 ms).
   The armed-Manual bench test reports the real bank reply times (`activation flight reply main=... aux=...`). Soak 2026-11-23: one
   logged activation (the re-entry), MAIN 6.2 ms and AUX 3.3 ms against the 120 ms limit. The first entry came before the log started,
-  so the sample is thin: disarm and re-arm a few times in the next run.
+  so the sample is thin: disarm and re-arm a few times in the next run. Log 62 adds two: MAIN 7.2 / AUX 10.7 ms at the first entry
+  and MAIN 8.6 / AUX 6.4 ms at the D5 re-entry. Largest so far: MAIN 8.6 ms, AUX 10.7 ms over three activations.
 - [ ] Joystick link fixed (observed 4.8 Hz) or the input age and activation reserve proven to cope with it. Likely closed: the 4.8 Hz
   matches the logger's 200 ms sampling of `manual_control_setpoint` (`logged_topics.cpp`, default profile), not the link. Confirm the
   live rate with `uorb top manual_control_setpoint`. Measured on the board 2026-11-23: 24 Hz (about 42 ms between samples), about
-  seven samples within `SLA_IN_AGE` 300 ms. Ready for the lead to close.
+  seven samples within `SLA_IN_AGE` 300 ms. **Reopened 2026-11-23: that rate was over USB.** In log 53, QGC was on the USB port
+  (MAVLink instance 2), with 41 ms between samples and a largest gap of 144 ms. In log 62 the joystick came over the SiK radio on
+  TELEM1 (57600 baud, instance 0): samples arrive in bursts, with 97 gaps over 150 ms and 10 over 200 ms (largest 240 ms) in 2.7
+  minutes. D1 fires about 280 ms after the last sample, so the margin is about 40 ms. At 124.3 s the input stopped for 5.0 s. Both
+  radios reported a strong link throughout (RSSI 118-166 at both ends, no receive errors, free transmit buffer), but QGC's
+  heartbeat and nearly all uplink bytes stopped. So the ground side (QGC or the laptop's USB link to the radio) stalled, not the
+  air link. The supervisor responded as designed: D1 hold 293 ms after the last sample, EDF already at the stop pulse, input back
+  at 129.27 s, D5 re-entry with a fresh session at 129.47 s. Commander also raised its RC-loss failsafe (`NAV_RCL_ACT` 2). On a
+  SLAAPS airframe that changes no mode (`Commander.cpp`, `failsafe_mode`), and the QGC indication stays on until disarm because PX4
+  clears that failsafe only on a mode change or disarm. **The flight pilot link is the SiK radio (lead, 2026-11-23).** To close: show
+  that the SiK joystick path has gaps well under 280 ms and no ground stalls over a full soak, or change `SLA_IN_AGE` [lead].
 - [ ] Logger stack warning removed; logging rates raised for the tests below (canard commands at 50 Hz or faster). Still seen
   2026-11-23: `log_writer_file low on stack! (296 bytes left)`. Soak 2026-11-23 on image 31706e0c6d (larger writer stack, 50 Hz evidence
   topics): no stack warning in 32 minutes, `actuator_outputs` at 50 Hz on both banks, 3 dropouts totalling 59 ms. Ready for the lead to close.
@@ -57,6 +72,14 @@ What the tunnel would have given, and what replaces it:
 
 ## G1. Ground measurements
 - [ ] EDF thrust curve and **reaction torque** on a thrust stand with a torque arm, at several throttle values. Record the supply current against the power module limit.
+  Reaction torque measured 2026-11-23 (lead): **0.55 N m, constant across throttle**. The thrust curve and supply current are still open.
+  **This exceeds the modeled roll authority at every speed:** `SLA_R_M_SCALE` is 0.069 N m in profile C (25 m/s) and 0.176 N m at
+  40 m/s, so the measured torque is about 8 and 3 times larger. Modeled authority scales with the square of airspeed, so it would
+  reach 0.55 N m only near 71 m/s. Even the unconfirmed tunnel hint of up to 3 times the modeled authority (revision 5 record) puts
+  that near 41 m/s. The firmware carries no EDF reaction moment (`SLA_WR_EM_X` 0, and the moment model is per newton of thrust,
+  so a constant torque does not fit it). Until the torque is countered (stator vanes, a canard roll trim, or another means) or
+  the authority is shown larger, the vehicle cannot be expected to hold roll with the EDF running. Decision for the lead
+  before G3 with the EDF on and before any launch.
 - [ ] Pitot zeroed at launch temperature and checked against a reference (fan and anemometer, or GPS speed on G4).
   2026-11-23: read 6.15 m/s indicated in still air (an offset of about 23 Pa). The true/indicated ratio 1.124 matches the 0.975 kg/m^3
   site density. Zeroed the same day with `commander calibrate airspeed` at a sensor temperature of 33 C: `SENS_DPRES_OFF` 23.0085, and still
@@ -65,10 +88,14 @@ What the tunnel would have given, and what replaces it:
 - [ ] CG and inertia checked against the data sheet. Mass and CG confirmed by the lead 2026-11-23: 1.979 kg (weighed; was 2.05 CAD)
   and 0.233 m from the tail end. `SLA_MASS` updated in data revision 7 (base) and 8 (profile C). The inertia is still the CAD value.
 - [ ] Basis for `SLA_LAUNCH_AS` (20 m/s indicated, set by the lead 2026-11-21) recorded: canard authority with margin over stall, and the reaction torque it must beat.
+  The torque is now known: 0.55 N m (above). Modeled roll authority at 20 m/s is about 0.044 N m.
 
 ## G2. Bench fault injection (EDF off first, then low throttle restrained)
 Each decided response (docs/SLAAPS_RECOVERY_POLICY.md) is triggered on purpose and judged from the log:
 - [ ] D1: pilot input removed with a healthy estimator: attitude hold, EDF hold then ramp (`recovery_state` 1).
+  Unplanned D1 then D5 on the board 2026-11-23 (log 62, a 5.0 s ground-side input stall): `recovery_state` 0 to 1 293 ms after the last
+  pilot sample (expected about 280 ms), canards held attitude, and D5 re-entered Manual 0.2 s after input returned. The EDF was already
+  at the stop pulse, so the hold-then-ramp was not exercised. The deliberate trigger is still needed.
 - [ ] D3: estimator or power lost, mode left, a core fault: canards frozen, EDF ramps off (`recovery_state` 2).
 - [ ] Bank loss, termination, kill and lockdown paths as defined.
 - Pass criteria: the response starts within [lead] ms and the log shows the expected states. Record the evidence per response.

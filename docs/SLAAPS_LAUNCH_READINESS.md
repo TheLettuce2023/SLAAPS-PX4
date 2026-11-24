@@ -36,7 +36,8 @@ verifier. Keep the existing captive behaviour unchanged and tested.
 - [ ] Pitot zero (`SENS_DPRES_OFF`) with the EDF off and the sensor shielded. The raw zero reads 3 to 7 m/s at rest and would open the gate early.
 - [ ] Gains at launch speed: the fixed 40 m/s gains give about 9% of design authority at 12 m/s. Either the schedule (after A2/A3, with a corner at or below the launch speed) or a launch-specific gain set.
 - [ ] Declare a data revision (rev 3 or later) as Calibrated: `SLA_DATA_STATE 1`, with its entry in `SLAAPS_DATA_RECORD.md`.
-- [ ] Measure the EDF reaction torque and take thrust data for the installed curve.
+- [ ] Measure the EDF reaction torque and take thrust data for the installed curve. Torque measured 2026-11-23: 0.55 N m, constant
+  across throttle, above the modeled roll authority at every speed (see section F and the flight-test plan, G1). Thrust data still open.
 
 ## C. Intended sequence (after A and B)
 
@@ -81,8 +82,9 @@ Modeled consequences (estimates from the file values, not measurements):
 - Thrust to weight is about 2.0 (39.2 N against 1.979 kg x 9.81 m/s^2 = 19.4 N; weighed 2026-11-23).
 - With the 0.4 s rise and a thrust-only estimate near 19 m/s^2, 12 m/s takes roughly 1 s. The canards are held at trim for that
   time because the gate is closed.
-- **The EDF reaction torque is unmeasured.** A full-throttle start with no canard authority could roll the vehicle before the gate
-  opens. This must be measured on the bench (restrained, thrust stand) before any launch.
+- **The EDF reaction torque is 0.55 N m, constant across throttle** (measured 2026-11-23). With the gate closed the canards sit at
+  trim, so this torque rolls the vehicle unopposed. With the gate open the modeled roll authority is only 0.069 N m at 25 m/s and
+  0.176 N m at 40 m/s. The torque has to be countered, or the authority shown larger, before any launch.
 - Loss of control while the gate is closed still ramps the EDF off at the recovery rate, which is slower than a step on.
 
 Open decisions: pilot-stick or automatic trigger, the `SLA_EDF_RISE` value, and the limit on the gate-closed time.
