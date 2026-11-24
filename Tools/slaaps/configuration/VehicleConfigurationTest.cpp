@@ -11526,6 +11526,60 @@ static int nativeSupervisorOrchestrationTests(bool signed_flight = false)
 		}, 200000, "D5: both banks handle frames of the fresh session");
 		check(reentered.session > held_session && reentered.edf <= reentry_profile.edf_entry_max + 1.e-6F,
 		      "D5: the fresh session is newer and entered at low throttle");
+
+		// Board log 63 (2026-11-23): a SiK gap starts D1 and the pilot returns centered a few ms into the hold. Two of
+		// three such holds stopped producing frames after the first hold frame and faulted on its output deadline
+		// (worker status 9, ManualWorker.hpp holdCycle). Each pass withholds input until the hold alarm, resumes it after
+		// a short delay, and requires the hold to run to D5 with no control-lost fault and no D3 recovery frame.
+		for (const unsigned resume_ms : {0U, 3U, 6U, 10U, 14U, 20U}) {
+			const auto session = status.manual_preparation_session;
+			const uint64_t pass_started = hrt_absolute_time();
+			publish_manual = false;
+			bool held = false;
+			wait([&]() {
+				mavlink_log_s log{};
+
+				for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+					held |= log.timestamp >= pass_started && std::strncmp(log.text, "SLAAPS: pilot input lost, holding attitude", 42) == 0;
+				}
+
+				return held;
+			}, 1000000, "short-return pass reaches the D1 hold alarm");
+			const uint64_t resume_at = hrt_absolute_time() + resume_ms * 1000;
+
+			while (hrt_absolute_time() < resume_at) { pump(); px4_usleep(500); }
+
+			publish_manual = true;
+			bool lost = false, back = false, recovery_frame = false;
+			slaaps_manual_command_s frame{};
+			char lost_text[sizeof(mavlink_log_s::text) + 1] {};
+			wait([&]() {
+				mavlink_log_s log{};
+
+				for (unsigned i = 0; i < mavlink_log_s::ORB_QUEUE_LENGTH && diagnostic_logs.update(&log); ++i) {
+					if (log.timestamp < pass_started) { continue; }
+
+					if (std::strncmp(log.text, "SLAAPS: control lost", 20) == 0 || std::strncmp(log.text, "SLAAPS: fault detail", 20) == 0) {
+						lost = true;
+						std::memcpy(lost_text, log.text, sizeof(lost_text) - 1);
+					}
+
+					back |= std::strncmp(log.text, "SLAAPS: pilot input back, re-entering Manual", 44) == 0;
+				}
+
+				recovery_frame |= command_sub.copy(&frame) && frame.session == session
+						  && frame.edf_disposition == slaaps_manual_command_s::EDF_RECOVERY;
+				return lost || (back && status.manual_preparation_session > session && status.manual_worker_active
+						&& status.manual_entry_status == slaaps_status_s::MANUAL_ENTRY_RUNNING);
+			}, 3000000, "short-return pass ends in D5 or a fault");
+
+			if (lost || recovery_frame) {
+				PX4_ERR("short-return pass resume=%u ms: lost=%d recovery_frame=%d last log '%s'", resume_ms, lost, recovery_frame, lost_text);
+			}
+
+			check(!lost && !recovery_frame && back, "a pilot returning early in a D1 hold reaches D5 without a control-lost fault");
+		}
+
 		vehicle_armed = armed.armed = false;
 		SlaapsNativeTest::admitted.store(false);
 		wait([&]() { return !status.manual_worker_active; }, 1000000, "disarm ends the re-entered session");
