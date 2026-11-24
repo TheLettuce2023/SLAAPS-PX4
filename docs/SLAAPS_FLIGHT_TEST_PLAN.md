@@ -17,16 +17,31 @@ What the tunnel would have given, and what replaces it:
 Only items that could lose the vehicle gate the first flight. Everything else below is deferred, not closed.
 
 Must close:
-1. **Hold-start fault (G0):** mitigated, not fixed, by `SLA_IN_AGE` 500 ms in profile C (data revision 11). The 33-minute SiK soak
-   would have had no holds; its largest gap was 336 ms against the new 480 ms trigger.
+1. **Hold-start fault (G0):** mitigated, not fixed, by `SLA_IN_AGE` 500 ms in profile C (data revision 11, kept in 12). The 33-minute
+   SiK soak would have had no holds; its largest gap was 336 ms against the new 480 ms trigger.
 2. **Final profile on the board:** `slaaps_vehicle.params` (revision 9, with the approved timing windows), then the canard trims, then
-   `slaaps_launch.params` (revision 11). Declare (`SLA_DATA_STATE 1`), raise `SLA_CFG_APPLY`, reboot. Always reboot after any Bench session.
+   `slaaps_launch.params` (revision 12). Declare (`SLA_DATA_STATE 1`), raise `SLA_CFG_APPLY`, reboot. Always reboot after any Bench session.
 3. **Closed-loop sign check:** armed in Manual, tilt the vehicle by hand in roll, pitch and yaw; the canards must deflect to oppose
    each tilt.
-4. **Airspeed gate:** arm in the launcher stage, push the pitot past 20 m/s with a fan, see "launch airspeed reached, attitude authority
+4. **Airspeed gate:** arm in the launcher stage, push the pitot past 18 m/s with a fan, see "launch airspeed reached, attitude authority
    on" and the canards respond. Zero the pitot on site first.
 5. **10-minute armed soak over SiK on the final profile:** zero holds and zero control-lost events (`bench_evidence.py`).
-6. **Lead's launch decisions:** launcher, release and abort criteria; net; range, wind and altitude limits; range-safety approval.
+6. **Lead's launch decisions, recorded 2026-11-23:**
+   - Launcher: static rails; the vehicle leaves on EDF thrust alone (operator stick to full, `SLA_EDF_RISE` 2.5 per second accepted, so
+     0.4 s to full command). The launcher restrains the EDF roll torque while on the rails. Thrust exceeded weight on the stand
+     (log 61: the vehicle lifted against its stop at full power).
+   - Gate: `SLA_LAUNCH_AS` 18 m/s indicated (revision 12).
+   - Range limit 40 m; a static net at the site. At about 20 m/s the whole flight lasts about 2 s.
+   - Wind (accepted): launch into the wind; steady wind up to 5 m/s, gusts up to 7 m/s, crosswind component up to 3 m/s, tailwind
+     component up to 2 m/s.
+   - Altitude: approvals met, ceiling 7000 ft. Proposed operating limit 40 m above the ground. Open: whether the ceiling is above
+     sea level (the site is about 5,000-5,200 ft) or above the ground.
+   - Abort: no firmware timer on the gate; the operator cuts the throttle. Outer limit 20 s (lead); suggested: also cut it if
+     "launch airspeed reached" is not seen within 3 s of full throttle.
+   - Still open: the rail length and angle. If the vehicle leaves the rails well below 18 m/s, the EDF torque acts unopposed until the
+     gate opens (up to 0.4 to 0.8 s from a 10 m/s exit). Long enough rails: about 8 m horizontal or 16 m vertical.
+   - Density altitude: the site is near 7,700 ft. Do not launch on a noticeably hotter day than the stand run without repeating the
+     stand lift check.
 
 Deferred, with the risk accepted for a short first flight in Manual: the hold-start root cause (a real dropout over 480 ms can still
 reach it); thrust curve and ESC endpoint calibration (full power at about 72% stick); barometer bias under power (height only);

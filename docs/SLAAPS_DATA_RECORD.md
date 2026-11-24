@@ -247,3 +247,11 @@ after the base file, would undo this correction under their old revision numbers
 280 ms D1 trigger (largest 336 ms), and two of the three holds faulted at their start (flight-test plan G0). At 500 ms, D1 starts 480 ms
 after the last pilot sample, and that soak would have had no holds. Effects: a lost pilot is detected 200 ms later, and a pilot EDF
 request lives 500 ms. The timing rules still hold (activation reserve 50 ms < 500 ms). Interim until the hold-start fault is fixed.
+
+## Revision 12 (launch profile C, gate speed): pending the lead's declaration
+
+`slaaps_launch.params`, 2026-11-23, `SLA_DATA_REV` 12, `SLA_DATA_STATE` 0. Revision 11 with one change, the lead's decision:
+`SLA_LAUNCH_AS` 18 m/s indicated (was 20). Basis: the data sheet's launch speed (Launch_Spd 18 m/s, minimum speed 16, airfoil minimum 13,
+all from aero tests). With the 40 m range limit, the gate opens about 4 m sooner. Modeled roll authority with the body is about 0.105 N m at
+18 m/s, 2.1 times the 0.05 N m EDF reaction torque (isolated canards: 0.036 N m, below it). 18 m/s is inside the stability analysis's
+18 to 40 m/s band (worst-case modeled damping 0.35). Indicated is about 0.89 times true at the site.

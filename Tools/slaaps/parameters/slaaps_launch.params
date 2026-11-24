@@ -28,15 +28,19 @@
 # Revision 11 (2026-11-23) = revision 10 with SLA_IN_AGE 500 ms for the SiK joystick link: in the 33-minute SiK soak (log 63) 4 gaps exceeded
 # the 280 ms D1 trigger of SLA_IN_AGE 300 (largest 336 ms) and two of the three holds faulted at their start. At 500 ms, D1 starts 480 ms
 # after the last pilot sample; that soak would have had none. A pilot EDF request now lives 500 ms. Interim until the hold-start fault is fixed.
-# This file sets SLA_DATA_REV 11 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
+# Revision 12 (2026-11-23) = revision 11 with SLA_LAUNCH_AS 18 m/s indicated (lead's decision; was 20): the data sheet's launch speed
+# (Launch_Spd 18, minimum speed 16, airfoil minimum 13). The gate opens about 4 m sooner of the 40 m range. Modeled roll authority with the body
+# is about 0.105 N m there, 2.1 times the 0.05 N m EDF reaction torque; with isolated canards it would be below the torque. Within the
+# stability analysis's 18..40 m/s band. The comments above that cite 20 m/s describe revisions 6 to 11.
+# This file sets SLA_DATA_REV 12 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
 1	1	SLA_IN_AGE	500	6
 1	1	SLA_FLT_STAGE	2	6
 1	1	SLA_LAUNCH_AS_I	0	6
 1	1	SLA_LAUNCH_AGE	250	6
-1	1	SLA_LAUNCH_AS	20	9
+1	1	SLA_LAUNCH_AS	18	9
 1	1	SLA_SCH_EN	0	6
 1	1	SLA_MASS	1.979	9
-1	1	SLA_DATA_REV	11	6
+1	1	SLA_DATA_REV	12	6
 1	1	SLA_DATA_STATE	0	6
 1	1	SLA_AIRSPD	25	9
 1	1	SLA_C1_WASH	25	9

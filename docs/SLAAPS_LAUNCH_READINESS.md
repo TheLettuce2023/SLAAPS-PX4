@@ -30,7 +30,7 @@ verifier. Keep the existing captive behaviour unchanged and tested.
 ## B. Parameters and data
 
 - [ ] `SLA_LAUNCH_AS_I`: the airspeed instance (the pitot published by the sensors module; confirm with `uorb top -1 airspeed`).
-- [x] `SLA_LAUNCH_AS`: 20 m/s indicated, set by the lead on 2026-11-21 (launch profile C). Record the measurement behind it: canard authority versus indicated
+- [x] `SLA_LAUNCH_AS`: 18 m/s indicated since 2026-11-23 (data revision 12, the data sheet's launch speed; was 20 from 2026-11-21). Record the measurement behind it: canard authority versus indicated
   airspeed with margin over stall, and the EDF reaction torque it must beat. The main file's 12 is an unused placeholder.
 - [ ] `SLA_LAUNCH_AGE`: confirm the pitot publish rate supports it.
 - [ ] Pitot zero (`SENS_DPRES_OFF`) with the EDF off and the sensor shielded. The raw zero reads 3 to 7 m/s at rest and would open the gate early.
@@ -53,8 +53,15 @@ verifier. Keep the existing captive behaviour unchanged and tested.
    Auto-disarm is disabled (`COM_DISARM_PRFLT -1`), so nothing disarms by timeout.
 6. After landing: disarm, then re-check the profile. The profile is restored after any disarm.
 
-## D. Not defined yet (project lead)
+## D. Launch decisions (project lead)
 
+Decided 2026-11-23, recorded in full in the flight-test plan's first-flight go/no-go: static rails, the vehicle leaving on EDF thrust
+alone, with the launcher restraining the EDF roll torque on the rails; `SLA_EDF_RISE` 2.5 per second accepted; `SLA_LAUNCH_AS` 18 m/s;
+range 40 m with a static net; wind into the wind, up to 5 m/s steady, 7 m/s gusts, 3 m/s crosswind and 2 m/s tailwind; approvals met with a
+7000 ft ceiling; abort by the operator (outer limit 20 s). Still open: rail length and angle, and whether the ceiling is above sea level or
+above the ground.
+
+Earlier open items:
 - The launcher mechanism, its release procedure and the abort criteria.
 - The `SLA_EDF_RISE` value for a harder step (section F).
 - Range, wind and altitude limits for a launch.
