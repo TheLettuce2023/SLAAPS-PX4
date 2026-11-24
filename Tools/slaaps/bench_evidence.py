@@ -27,7 +27,8 @@ FAULT_REASON = {0: "", 1: "mode left", 2: "power lost", 3: "condition lost"}
 ACTIVATION = {0: "inactive", 1: "waiting", 2: "ready", 3: "consumed", 4: "rejected"}
 REPLY = re.compile(r"activation (flight|bench) status=(\d+) reply main=(\d+) aux=(\d+) us banks=(\d+) received=(\d+) "
                    r"limit=(\d+) us")
-NOTABLE = re.compile(r"control lost|entry rejected|bank \d fault|fault detail|Disarmed by|Armed by|recovery|launch airspeed",
+NOTABLE = re.compile(r"control lost|entry rejected|bank \d fault|fault detail|Disarmed by|Armed by|recovery|launch airspeed"
+                     r"|pilot input|Failsafe",
                      re.IGNORECASE)
 
 
@@ -66,8 +67,10 @@ def rate(ulog, name, multi=0):
         return None
     t = data["timestamp"].astype("int64")
     span = (t[-1] - t[0]) / 1e6
-    gaps = (t[1:] - t[:-1]) / 1e3
-    return len(t) / span if span > 0 else 0.0, float(gaps.max())
+    # Gaps between distinct samples: a republished stale value is not a new sample.
+    sampled = sorted(set(data.get("timestamp_sample", data["timestamp"]).astype("int64").tolist()))
+    gaps = [(b - a) / 1e3 for a, b in zip(sampled, sampled[1:])] or [0.0]
+    return len(t) / span if span > 0 else 0.0, float(max(gaps))
 
 
 def report(path, args, totals):
@@ -118,9 +121,12 @@ def report(path, args, totals):
             t = seconds(ulog, t_us)
             line = f"  recovery {RECOVERY.get(previous, previous)} -> {RECOVERY.get(state, state)} at {t:8.2f}s"
             if manual is not None:
-                before = manual["timestamp"][manual["timestamp"] <= t_us]
-                if len(before):
-                    line += f"; last pilot sample {(t_us - int(before[-1])) / 1e3:.0f} ms before"
+                # Commander republishes the last pilot value until it declares the loss, so age is taken from the
+                # sample time, not the publication time.
+                published = manual["timestamp"] <= t_us
+                sampled = manual.get("timestamp_sample", manual["timestamp"])[published]
+                if len(sampled):
+                    line += f"; last pilot sample {(t_us - int(sampled.max())) / 1e3:.0f} ms before"
             if status is not None:
                 window = (status["timestamp"] > t_us - 2_000_000) & (status["timestamp"] <= t_us)
                 for j in [k for k in range(len(window)) if window[k]]:
