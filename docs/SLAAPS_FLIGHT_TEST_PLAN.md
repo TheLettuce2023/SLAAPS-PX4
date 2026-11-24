@@ -13,6 +13,26 @@ What the tunnel would have given, and what replaces it:
 | Closed-loop stability and tracking | SITL with the identified model, plus `Tools/slaaps/stability_margin.py`, plus doublets in G4 and G5 |
 | A free-pivot stability demonstration | Not replaced. The first launches carry this risk; keep gains conservative (G5) |
 
+## First-flight go/no-go (lead, 2026-11-23: fly within a day)
+Only items that could lose the vehicle gate the first flight. Everything else below is deferred, not closed.
+
+Must close:
+1. **Hold-start fault (G0):** mitigated, not fixed, by `SLA_IN_AGE` 500 ms in profile C (data revision 11). The 33-minute SiK soak
+   would have had no holds; its largest gap was 336 ms against the new 480 ms trigger.
+2. **Final profile on the board:** `slaaps_vehicle.params` (revision 9, with the approved timing windows), then the canard trims, then
+   `slaaps_launch.params` (revision 11). Declare (`SLA_DATA_STATE 1`), raise `SLA_CFG_APPLY`, reboot. Always reboot after any Bench session.
+3. **Closed-loop sign check:** armed in Manual, tilt the vehicle by hand in roll, pitch and yaw; the canards must deflect to oppose
+   each tilt.
+4. **Airspeed gate:** arm in the launcher stage, push the pitot past 20 m/s with a fan, see "launch airspeed reached, attitude authority
+   on" and the canards respond. Zero the pitot on site first.
+5. **10-minute armed soak over SiK on the final profile:** zero holds and zero control-lost events (`bench_evidence.py`).
+6. **Lead's launch decisions:** launcher, release and abort criteria; net; range, wind and altitude limits; range-safety approval.
+
+Deferred, with the risk accepted for a short first flight in Manual: the hold-start root cause (a real dropout over 480 ms can still
+reach it); thrust curve and ESC endpoint calibration (full power at about 72% stick); barometer bias under power (height only);
+inertia; pitot reference check; the deliberate G2 set (D1, D3 and D5 already seen on the board); the G4 road test; roll before the
+gate opens (no sustained spin on the stand).
+
 ## Progress 2026-11-23
 - EDF moved to PWM 400 Hz on AUX1 (1000-2000 us, zero throttle = stop); the Lucid never armed on DShot600 under the SLAAPS
   image. It now arms while disarmed (commits 29dd65208c, 0a911aa2e5).

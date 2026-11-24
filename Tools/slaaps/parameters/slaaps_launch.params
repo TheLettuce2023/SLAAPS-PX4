@@ -25,14 +25,18 @@
 # derivatives, their uncertainties, SLA_x_M_SCALE and SP_ACC x 2.30 in pitch and yaw and x 2.95 in roll; RATE_P and RATE_I divided by
 # the same factors. The isolated-canard values above (x 0.3906 of revision 3) are the starting point; the damping figures refer to them.
 # Roll authority at the 20 m/s gate is then about 0.130 N m against the measured 0.05 N m EDF reaction torque. Not measured.
-# This file sets SLA_DATA_REV 10 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
+# Revision 11 (2026-11-23) = revision 10 with SLA_IN_AGE 500 ms for the SiK joystick link: in the 33-minute SiK soak (log 63) 4 gaps exceeded
+# the 280 ms D1 trigger of SLA_IN_AGE 300 (largest 336 ms) and two of the three holds faulted at their start. At 500 ms, D1 starts 480 ms
+# after the last pilot sample; that soak would have had none. A pilot EDF request now lives 500 ms. Interim until the hold-start fault is fixed.
+# This file sets SLA_DATA_REV 11 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
+1	1	SLA_IN_AGE	500	6
 1	1	SLA_FLT_STAGE	2	6
 1	1	SLA_LAUNCH_AS_I	0	6
 1	1	SLA_LAUNCH_AGE	250	6
 1	1	SLA_LAUNCH_AS	20	9
 1	1	SLA_SCH_EN	0	6
 1	1	SLA_MASS	1.979	9
-1	1	SLA_DATA_REV	10	6
+1	1	SLA_DATA_REV	11	6
 1	1	SLA_DATA_STATE	0	6
 1	1	SLA_AIRSPD	25	9
 1	1	SLA_C1_WASH	25	9

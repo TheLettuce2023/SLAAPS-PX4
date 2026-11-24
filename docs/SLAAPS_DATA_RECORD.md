@@ -239,3 +239,11 @@ Not included: the canards' trailing vortices on the rear fins (they oppose a can
 speed), the carried-over lift acting slightly aft of the canard, and any body or fin damping. The factors are modeled, not measured;
 roll doublets (flight-test plan G4) are the check. The tunnel overlays (revisions 4 and 5) keep the isolated-canard values and, loaded
 after the base file, would undo this correction under their old revision numbers.
+
+## Revision 11 (launch profile C, SiK input age): pending the lead's declaration
+
+`slaaps_launch.params`, 2026-11-23, `SLA_DATA_REV` 11, `SLA_DATA_STATE` 0. Revision 10 with one change, at the lead's direction:
+`SLA_IN_AGE` 500 ms (base 300). The flight pilot link is the SiK radio. In its 33-minute soak (log 63), 4 input gaps exceeded the
+280 ms D1 trigger (largest 336 ms), and two of the three holds faulted at their start (flight-test plan G0). At 500 ms, D1 starts 480 ms
+after the last pilot sample, and that soak would have had no holds. Effects: a lost pilot is detected 200 ms later, and a pilot EDF
+request lives 500 ms. The timing rules still hold (activation reserve 50 ms < 500 ms). Interim until the hold-start fault is fixed.
