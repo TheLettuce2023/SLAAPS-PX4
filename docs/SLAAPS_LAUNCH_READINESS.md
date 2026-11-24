@@ -55,11 +55,11 @@ verifier. Keep the existing captive behaviour unchanged and tested.
 
 ## D. Launch decisions (project lead)
 
-Decided 2026-11-23, recorded in full in the flight-test plan's first-flight go/no-go: static rails, the vehicle leaving on EDF thrust
-alone, with the launcher restraining the EDF roll torque on the rails; `SLA_EDF_RISE` 2.5 per second accepted; `SLA_LAUNCH_AS` 18 m/s;
-range 40 m with a static net; wind into the wind, up to 5 m/s steady, 7 m/s gusts, 3 m/s crosswind and 2 m/s tailwind; approvals met with a
-7000 ft ceiling; abort by the operator (outer limit 20 s). Still open: rail length and angle, and whether the ceiling is above sea level or
-above the ground.
+Decided 2026-11-23, recorded in full in the flight-test plan's first-flight go/no-go: static vertical rails 3 ft long, the vehicle
+leaving on EDF thrust alone (thrust to weight 2.5), with the launcher restraining the EDF roll torque on the rails; `SLA_EDF_RISE` 2.5 per
+second accepted; `SLA_LAUNCH_AS` 18 m/s; burn limit 5 s (peak under about 460 m above the site); ceiling 7000 ft above sea level, approvals
+met; range 40 m with a static net; near-calm wind (at most 1 m/s, gusts 2 m/s); operator abort if the vehicle does not leave the rail or the
+gate does not open within 3 s.
 
 Earlier open items:
 - The launcher mechanism, its release procedure and the abort criteria.

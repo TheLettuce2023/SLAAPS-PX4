@@ -27,26 +27,32 @@ Must close:
    on" and the canards respond. Zero the pitot on site first.
 5. **10-minute armed soak over SiK on the final profile:** zero holds and zero control-lost events (`bench_evidence.py`).
 6. **Lead's launch decisions, recorded 2026-11-23:**
-   - Launcher: static rails; the vehicle leaves on EDF thrust alone (operator stick to full, `SLA_EDF_RISE` 2.5 per second accepted, so
-     0.4 s to full command). The launcher restrains the EDF roll torque while on the rails. Thrust exceeded weight on the stand
-     (log 61: the vehicle lifted against its stop at full power).
-   - Gate: `SLA_LAUNCH_AS` 18 m/s indicated (revision 12).
-   - Range limit 40 m; a static net at the site. At about 20 m/s the whole flight lasts about 2 s.
-   - Wind (accepted): launch into the wind; steady wind up to 5 m/s, gusts up to 7 m/s, crosswind component up to 3 m/s, tailwind
-     component up to 2 m/s.
-   - Altitude: approvals met, ceiling 7000 ft. Proposed operating limit 40 m above the ground. Open: whether the ceiling is above
-     sea level (the site is about 5,000-5,200 ft) or above the ground.
-   - Abort: no firmware timer on the gate; the operator cuts the throttle. Outer limit 20 s (lead); suggested: also cut it if
-     "launch airspeed reached" is not seen within 3 s of full throttle.
-   - Still open: the rail length and angle. If the vehicle leaves the rails well below 18 m/s, the EDF torque acts unopposed until the
-     gate opens (up to 0.4 to 0.8 s from a 10 m/s exit). Long enough rails: about 8 m horizontal or 16 m vertical.
-   - Density altitude: the site is near 7,700 ft. Do not launch on a noticeably hotter day than the stand run without repeating the
-     stand lift check.
+   - Launcher: static vertical rails, 3 ft (0.91 m); the vehicle leaves on EDF thrust alone (operator stick to full, `SLA_EDF_RISE`
+     2.5 per second accepted, so 0.4 s to full command). The launcher restrains the EDF roll torque while on the rails.
+   - Thrust to weight 2.5 (lead, 2026-11-23). Estimates without drag: net climb acceleration 14.7 m/s^2; the vehicle leaves the rail
+     after about 0.35 s at about 5.2 m/s; the 18 m/s gate opens about 0.9 s later, about 11 m above the launcher. Until then there is
+     no attitude control, and roll is unrestrained from rail exit (accepted).
+   - Gate: `SLA_LAUNCH_AS` 18 m/s indicated (revision 12), kept by the lead. Below about 12 m/s the canards cannot out-roll the torque
+     even in the body-corrected model.
+   - Burn limit 5 s from full stick (lead): the operator cuts the throttle at 5 s. Without drag that gives 73 m/s at burnout and a peak
+     of about 460 m above the site (184 m powered, 276 m coasting); drag makes both lower. This replaces the 40 m height proposal.
+   - Ceiling 7000 ft above sea level, approvals met. The site is about 5,000-5,200 ft above sea level, so the ceiling is about 580 m
+     above it; the 5 s burn stays under it even without drag.
+   - Range 40 m (horizontal); a static net at the site.
+   - Wind: near calm (lead). The vehicle leaves the rail at about 5 m/s, so a crosswind turns it into the wind before the gate opens:
+     1 m/s is about 11 degrees, 3 m/s about 30. Limit: wind at most 1 m/s (2 kt) and gusts at most 2 m/s at launcher height, judged over
+     the minute before launch. Estimating it on site, best first: a handheld anemometer at launcher height; otherwise a streamer
+     (surveyor's tape about 1 m long on a pole at launcher height) that hangs within about 20 degrees of vertical, smoke or dust that
+     rises nearly straight, and no wind felt on the face (Beaufort 0 to 1). The vehicle's pitot cannot measure it (about 0.5 Pa at
+     1 m/s, under its noise). Watch for a minute and launch in a lull; wind usually rises with height, so expect more above the rail.
+   - Abort: no firmware timer on the gate; the operator cuts the throttle. Cut it at once if the vehicle does not leave the rail, or if
+     "launch airspeed reached" is not seen within 3 s of full stick (expected about 1.5 s).
+   - Density altitude: the site is near 7,700 ft. Do not launch on a noticeably hotter day than the thrust measurement without repeating it.
 
 Deferred, with the risk accepted for a short first flight in Manual: the hold-start root cause (a real dropout over 480 ms can still
 reach it); thrust curve and ESC endpoint calibration (full power at about 72% stick); barometer bias under power (height only);
-inertia; pitot reference check; the deliberate G2 set (D1, D3 and D5 already seen on the board); the G4 road test; roll before the
-gate opens (no sustained spin on the stand).
+inertia; pitot reference check; the deliberate G2 set (D1, D3 and D5 already seen on the board); the G4 road test; the uncontrolled
+first second after rail exit, including roll (no sustained spin on the stand).
 
 ## Progress 2026-11-23
 - EDF moved to PWM 400 Hz on AUX1 (1000-2000 us, zero throttle = stop); the Lucid never armed on DShot600 under the SLAAPS
