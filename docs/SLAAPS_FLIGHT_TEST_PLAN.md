@@ -17,42 +17,97 @@ What the tunnel would have given, and what replaces it:
 Only items that could lose the vehicle gate the first flight. Everything else below is deferred, not closed.
 
 Must close:
-1. **Hold-start fault (G0):** mitigated, not fixed, by `SLA_IN_AGE` 500 ms in profile C (data revision 11, kept in 12). The 33-minute
+1. **Hold-start fault (G0):** mitigated, not fixed, by `SLA_IN_AGE` 500 ms in profile C (data revision 11, kept in 13 and 15). The 33-minute
    SiK soak would have had no holds; its largest gap was 336 ms against the new 480 ms trigger.
-2. **Final profile on the board:** `slaaps_vehicle.params` (revision 9, with the approved timing windows), then the canard trims, then
-   `slaaps_launch.params` (revision 12). Declare (`SLA_DATA_STATE 1`), raise `SLA_CFG_APPLY`, reboot. Always reboot after any Bench session.
+2. **Final profile on the board:** `slaaps_vehicle.params` (revision 14: new packs, mass 2.238 kg, new inertia, `BAT1_CAPACITY` 2200,
+   with the approved timing windows), then the canard trims, then `slaaps_launch.params` (revision 15). Declare (`SLA_DATA_STATE 1`),
+   raise `SLA_CFG_APPLY`, reboot. Always reboot after any Bench session.
 3. **Closed-loop sign check:** armed in Manual, tilt the vehicle by hand in roll, pitch and yaw; the canards must deflect to oppose
    each tilt.
-4. **Airspeed gate:** arm in the launcher stage, push the pitot past 18 m/s with a fan, see "launch airspeed reached, attitude authority
+4. **Airspeed gate:** arm in the launcher stage, push the pitot past 13 m/s with a fan, see "launch airspeed reached, attitude authority
    on" and the canards respond. Zero the pitot on site first.
 5. **10-minute armed soak over SiK on the final profile:** zero holds and zero control-lost events (`bench_evidence.py`).
-6. **Lead's launch decisions, recorded 2026-11-23:**
-   - Launcher: static vertical rails, 3 ft (0.91 m); the vehicle leaves on EDF thrust alone (operator stick to full, `SLA_EDF_RISE`
-     2.5 per second accepted, so 0.4 s to full command). The launcher restrains the EDF roll torque while on the rails.
-   - Thrust to weight 2.5 (lead, 2026-11-23). Estimates without drag: net climb acceleration 14.7 m/s^2; the vehicle leaves the rail
-     after about 0.35 s at about 5.2 m/s; the 18 m/s gate opens about 0.9 s later, about 11 m above the launcher. Until then there is
-     no attitude control, and roll is unrestrained from rail exit (accepted).
-   - Gate: `SLA_LAUNCH_AS` 18 m/s indicated (revision 12), kept by the lead. Below about 12 m/s the canards cannot out-roll the torque
-     even in the body-corrected model.
-   - Burn limit 5 s from full stick (lead): the operator cuts the throttle at 5 s. Without drag that gives 73 m/s at burnout and a peak
-     of about 460 m above the site (184 m powered, 276 m coasting); drag makes both lower. This replaces the 40 m height proposal.
+6. **Lead's launch decisions** (recorded 2026-11-23 and 11-24; launch method changed 2026-11-25):
+   - Launcher (lead, 2026-11-25; replaces the 3 ft vertical rail): **hand throw by an operator, shallow, about 30 to 45 degrees above
+     the horizon, with the EDF already at full before release.** The pilot pushes the stick to full on the thrower's call (`SLA_EDF_RISE`
+     2.5 per second, so the 0.4 s rise happens in the hand). The thrower holds the vehicle against about 43 N (4.4 kgf, about twice its
+     weight) and the EDF roll torque, then lets go. In the hand the gate is closed and the canards sit at trim. Thrower safety: hands and
+     sleeves clear of the intake, eye protection, a grip that cannot slip toward the intake, and the pilot ready on the kill switch
+     for a fumble.
+   - Thrust to weight 1.97 (data sheet 2026-11-25: 4.402 kg bench thrust on the new packs, 2.238 kg). Model: release at about 5 m/s
+     from about 1.8 m, full thrust, drag from the sheet's 76 m/s terminal speed, attitude held by inertia until the gate. The 13 m/s
+     indicated gate (14.6 m/s true) opens about 0.6 s after release at 30 degrees (about 6 m downrange, 3 m up) and about 0.7 s at
+     45 degrees (6 m downrange, 5 m up). At 30 degrees the thrust only just balances gravity vertically, so the vehicle barely climbs
+     before the gate; much below 30 degrees it sinks. Until the gate there is no attitude control.
+   - Gate: `SLA_LAUNCH_AS` 13 m/s indicated (revision 13, lead's decision; was 18). Authority there is small but helps deflect: modeled
+     roll authority with the body is 1.1 times the EDF torque (break-even about 12.4 m/s), pitch and yaw about 0.27 of design. Expect a
+     slow, lightly damped response until speed builds. In the hand, the EDF alone made the pitot read up to 5.9 m/s on the stand and
+     the throw adds the release speed, so a few m/s of margin remain; if the gate opens in the hand, attitude control simply starts early.
+   - Burn limit 3 s (lead, 2026-11-24), now counted from release; kept with the hand throw once the range limit was dropped
+     (2026-11-25). Model, 30 / 45 degrees: with no pitch input, burnout at 50 / 43 m/s true (44 / 38 indicated), peak 8 / 38 m, down
+     154 / 219 m out at 4.5 / 7.2 s and 46 / 40 m/s. With the pilot pitching up toward vertical at the 1 rad/s stick limit from the
+     gate: burnout at about 30 m/s (27 indicated), peak 48 / 69 m at about 5 s, down 160 / 143 m out at 8.2 / 9.3 s and 34 / 37 m/s.
+     **At 30 degrees without pitch input the vehicle crosses 84 m of ground only about 8 m up at up to 50 m/s:** throw nearer 45 degrees
+     and pitch up once the gate opens. Every case stays inside the fixed gains' analysed stable range (about 10 to 64 m/s indicated).
    - Ceiling 7000 ft above sea level, approvals met. The site is about 5,000-5,200 ft above sea level, so the ceiling is about 580 m
-     above it; the 5 s burn stays under it even without drag.
-   - Range 40 m (horizontal); a static net at the site.
-   - Wind: near calm (lead). The vehicle leaves the rail at about 5 m/s, so a crosswind turns it into the wind before the gate opens:
-     1 m/s is about 11 degrees, 3 m/s about 30. Limit: wind at most 1 m/s (2 kt) and gusts at most 2 m/s at launcher height, judged over
-     the minute before launch. Estimating it on site, best first: a handheld anemometer at launcher height; otherwise a streamer
-     (surveyor's tape about 1 m long on a pole at launcher height) that hangs within about 20 degrees of vertical, smoke or dust that
+     above it; every case above peaks far below it.
+   - Range: the 40 m limit is dropped (lead, 2026-11-25). The vehicle comes down about 140 to 220 m downrange along the throw line, so
+     clear that corridor (about 250 m, plus margin either side for wind and steering) of people and property.
+   - Recovery (lead, 2026-11-25): **the static net stands downrange** on the throw line; the pilot steers toward it on the descent. The
+     planned profile (45 degrees, pitch-up after the gate) comes down about 140 to 160 m out at about 34 to 37 m/s (1.3 to 1.5 kJ at
+     2.238 kg); without the pitch-up it lands up to about 220 m out at up to 46 m/s (2.3 kJ). So place the net near 150 m on the throw
+     line and rate it for at least 2.3 kJ. Optional: on site, set `SLA_NET_EN` 1 and the net's `SLA_NET_N` / `SLA_NET_E` from the ground
+     station (QGC streaming its position) so a recovery alarm reports distance and bearing to the net. A hold or control-lost freezes the
+     canards.
+   - Mission timeline (from release): pilot to full stick on the thrower's call (0.4 s rise in the hand); 0 release at about 5 m/s;
+     0.6 to 0.7 s gate opens ("launch airspeed reached"), pilot pitches up; 3 s throttle cut (timer caller); about 5 s peak; about
+     8 to 9 s down 140 to 160 m out (4.5 to 7 s and up to 220 m with no pitch input). Roles: thrower, pilot (sticks and throttle),
+     timer caller, range-safety watcher.
+   - Wind: near calm (lead). The vehicle leaves the hand at about 5 m/s, so a crosswind turns it before the gate opens: 1 m/s is about
+     11 degrees, 3 m/s about 31. Limit: wind at most 1 m/s (2 kt) and gusts at most 2 m/s at release height, judged over
+     the minute before launch. Estimating it on site, best first: a handheld anemometer at release height; otherwise a streamer
+     (surveyor's tape about 1 m long on a pole at release height) that hangs within about 20 degrees of vertical, smoke or dust that
      rises nearly straight, and no wind felt on the face (Beaufort 0 to 1). The vehicle's pitot cannot measure it (about 0.5 Pa at
-     1 m/s, under its noise). Watch for a minute and launch in a lull; wind usually rises with height, so expect more above the rail.
-   - Abort: no firmware timer on the gate; the operator cuts the throttle. Cut it at once if the vehicle does not leave the rail, or if
-     "launch airspeed reached" is not seen within 3 s of full stick (expected about 1.5 s).
+     1 m/s, under its noise). Watch for a minute and launch in a lull; wind usually rises with height. Throw into any residual wind.
+   - Abort: no firmware timer on the gate; the pilot cuts the throttle (kill switch if needed) at once if the vehicle is fumbled or
+     dropped, sinks toward the ground after release, rolls visibly before the gate, or "launch airspeed reached" is not seen within
+     about 1.5 s of release (expected 0.6 to 0.7 s).
    - Density altitude: the site is near 7,700 ft. Do not launch on a noticeably hotter day than the thrust measurement without repeating it.
+7. **Roll before the gate (log 66): vanes added 2026-11-25, not yet verified.** In the first flight the vehicle rolled up at 19 to
+   20 rad/s^2 from the moment it cleared the rail, as modeled for the 0.05 N m EDF torque with nothing opposing it, and the 15 rad/s
+   state limit (`SLA_R_MEAS_R`) cut the EDF 0.9 s later. The lead has since added exhaust vanes to counter the torque; they have not
+   been run at full throttle with the vehicle free to roll. With the hand throw the thrower restrains roll until release and the gate
+   opens about 0.6 to 0.7 s later. Without the vanes, the torque at the new roll inertia (16 rad/s^2) would reach about 10 to 11 rad/s by
+   the gate: under the 15 rad/s cut, but far beyond what the canards can stop (roll authority at 13 m/s about 0.055 N m, barely above
+   the bare torque). Raising `SLA_R_MEAS_R` would only move the cut. To close: a logged EDF Bench run at full throttle with the vehicle
+   free to roll about its axis (on an axle or rollers, thrust taken by an axial stop), and a residual roll acceleration well under the
+   canards' authority at the gate. Proposed pass [lead]: under 3 rad/s^2 (about 0.01 N m, a fifth of the bare torque, about 2 rad/s
+   at the gate), in either direction, since vanes can over-correct. The thrower's grip at full throttle is a qualitative check only.
+8. **Post-crash re-entry (log 66).** After the impact the supervisor re-entered Manual twice (D5) while the vehicle lay on the ground,
+   the impact made the pitot read 18 to 20 m/s and opened the launch gate, and the EDF ran to full command for about 0.4 s from the
+   throttle stick (15.7 to 16.2 s) with the vehicle on its side. It stayed armed 8.6 s after impact. Procedure from now on: on any
+   "control lost" or at impact, throttle to the bottom and disarm from QGC at once (kill switch if needed); approach only when disarmed.
+   Firmware option for the lead: no D5 re-entry after a state-rejection fault in the launcher stage (stay in D3 until disarm).
 
 Deferred, with the risk accepted for a short first flight in Manual: the hold-start root cause (a real dropout over 480 ms can still
 reach it); thrust curve and ESC endpoint calibration (full power at about 72% stick); barometer bias under power (height only);
-inertia; pitot reference check; the deliberate G2 set (D1, D3 and D5 already seen on the board); the G4 road test; the uncontrolled
-first second after rail exit, including roll (no sustained spin on the stand).
+inertia (CAD, re-rotated for the 2026-11-25 sheet); pitot reference check; the deliberate G2 set (D1, D3 and D5 already seen on the
+board); the G4 road test; the low-authority seconds over the peak.
+
+## First flight 2026-11-24 (log 66): crashed at rail exit
+`test_data/Logs/Flight Testing/log_66_2026-11-24-15-25-46.ulg`, profile C revision 13 declared, old 10S packs. Times are log time.
+- 9.75 s full stick; EDF at 2000 us by 10.25 s, 45 A. The pack fell from 41.8 to 36.7 V.
+- **Thrust about 21 N, thrust to weight 1.07** (specific force along the thrust axis 10.5 m/s^2 after rail exit, against 9.82 at
+  rest). The vehicle took about 1.9 s to climb the 0.91 m rail, about 1 m/s. Cause (lead, 2026-11-25): pack voltage sag; packs replaced.
+- About 11.7 s, clear of the rail: roll acceleration 19 to 20 rad/s^2 (EDF torque, canards at trim) and a tip from vertical to
+  horizontal in 0.9 s. Peak height about 1.6 m (IMU integration). Indicated airspeed never above 6 m/s, so the gate stayed closed.
+- 12.64 s: roll rate 15.1 rad/s above `SLA_R_MEAS_R` 15. The state check rejected the sample (worker status 6, `ManualWorker.hpp`
+  line 241, `validateStabilizedState`), "control lost": canards held, EDF to stop within 100 ms. The pilot's throttle cut came at 13.15 s.
+- 13.20 s: impact about 7 m east-south-east of the launcher at about 9 m/s (7 m/s horizontal, 5.8 m/s down), at least 27 g.
+- After impact: item 8 above.
+- Also seen: a "control lost" at 0.25 s, just after arming, on the ground (worker status 9, line 217, `now >= _deadline` in the
+  ordinary cycle, 7 ms late; re-entered at 0.45 s). Same timing family as the hold-start fault (G0); likely the logger opening its file
+  at arm. Not catastrophic, but each arm can start with a D3.
 
 ## Progress 2026-11-23
 - EDF moved to PWM 400 Hz on AUX1 (1000-2000 us, zero throttle = stop); the Lucid never armed on DShot600 under the SLAAPS
@@ -199,6 +254,8 @@ first second after rail exit, including roll (no sustained spin on the stand).
   and the zero is redone at the launch temperature.
 - [ ] CG and inertia checked against the data sheet. Mass and CG confirmed by the lead 2026-11-23: 1.979 kg (weighed; was 2.05 CAD)
   and 0.233 m from the tail end. `SLA_MASS` updated in data revision 7 (base) and 8 (profile C). The inertia is still the CAD value.
+  New packs 2026-11-25 (two Tattu 5S 2200 mAh in series): sheet mass 2.238 kg, CG 0.268 m, IMU 0.260 m, CAD inertia updated
+  (roll 0.0031219, pitch 0.0431789, yaw 0.0432646 kg m^2), bench thrust 4.402 kg. Applied in data revisions 14 (base) and 15 (profile C).
 - [ ] Basis for `SLA_LAUNCH_AS` (20 m/s indicated, set by the lead 2026-11-21) recorded: canard authority with margin over stall, and the reaction torque it must beat.
   The torque is now known: 0.05 N m (above). Roll authority at 20 m/s is 0.044 N m with isolated canards (break-even near
   21.3 m/s), about 0.130 N m with the body included (break-even near 12.4 m/s, modeled, before any rear-fin interaction).

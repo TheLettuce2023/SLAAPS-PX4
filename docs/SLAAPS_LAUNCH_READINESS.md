@@ -30,7 +30,7 @@ verifier. Keep the existing captive behaviour unchanged and tested.
 ## B. Parameters and data
 
 - [ ] `SLA_LAUNCH_AS_I`: the airspeed instance (the pitot published by the sensors module; confirm with `uorb top -1 airspeed`).
-- [x] `SLA_LAUNCH_AS`: 18 m/s indicated since 2026-11-23 (data revision 12, the data sheet's launch speed; was 20 from 2026-11-21). Record the measurement behind it: canard authority versus indicated
+- [x] `SLA_LAUNCH_AS`: 13 m/s indicated since 2026-11-23 (data revision 13, lead's decision for the 3 ft vertical rail; 18 in revision 12, 20 from 2026-11-21). Record the measurement behind it: canard authority versus indicated
   airspeed with margin over stall, and the EDF reaction torque it must beat. The main file's 12 is an unused placeholder.
 - [ ] `SLA_LAUNCH_AGE`: confirm the pitot publish rate supports it.
 - [ ] Pitot zero (`SENS_DPRES_OFF`) with the EDF off and the sensor shielded. The raw zero reads 3 to 7 m/s at rest and would open the gate early.
@@ -55,11 +55,18 @@ verifier. Keep the existing captive behaviour unchanged and tested.
 
 ## D. Launch decisions (project lead)
 
-Decided 2026-11-23, recorded in full in the flight-test plan's first-flight go/no-go: static vertical rails 3 ft long, the vehicle
-leaving on EDF thrust alone (thrust to weight 2.5), with the launcher restraining the EDF roll torque on the rails; `SLA_EDF_RISE` 2.5 per
-second accepted; `SLA_LAUNCH_AS` 18 m/s; burn limit 5 s (peak under about 460 m above the site); ceiling 7000 ft above sea level, approvals
-met; range 40 m with a static net; near-calm wind (at most 1 m/s, gusts 2 m/s); operator abort if the vehicle does not leave the rail or the
-gate does not open within 3 s.
+Recorded in full in the flight-test plan's first-flight go/no-go. Since 2026-11-25 (lead): **hand throw by an operator, shallow (about
+30 to 45 degrees; nearer 45 is safer, see the flight-test plan), EDF at full before release**, replacing the 3 ft vertical rail of 2026-11-23;
+exhaust vanes added against the EDF roll torque. Unchanged: thrust to weight 1.97 (new packs, data sheet 2026-11-25); `SLA_EDF_RISE` 2.5 per second; `SLA_LAUNCH_AS` 13 m/s (opens about
+0.6 to 0.7 s after release in the model); burn limit 3 s from release; ceiling 7000 ft above sea level, approvals met; the 40 m range limit
+dropped (2026-11-25): the vehicle comes down about 140 to 220 m downrange along the throw line, and the static net stands downrange there
+(near 150 m, rated for at least 2.3 kJ), the pilot steering toward it; near-calm wind (at most 1 m/s, gusts 2 m/s).
+Abort: the pilot cuts the throttle on a fumble, a sink after release, visible roll before the gate, or no gate within about 1.5 s of release.
+No parameter changes: the launcher stage and gate work the same for a throw.
+
+**Open (2026-11-25):**
+- Vanes: verify at full throttle with the vehicle free to roll (flight-test plan, go/no-go item 7).
+- The supervisor re-entered Manual after the log 66 crash (item 8).
 
 Earlier open items:
 - The launcher mechanism, its release procedure and the abort criteria.
@@ -77,7 +84,7 @@ Earlier open items:
 ## F. EDF launch command (defined by the project lead, 2026-11-18)
 
 **Definition: the EDF goes to full throttle at launch, not a gradual spool.** Full is normalized command 1.0 (`SLA_EDF_BMAX 1`,
-the thrust curve's top point 39.2266 N at 42 V).
+the thrust curve's top point 43.1689 N at 42 V since data revision 14; 39.2266 N before).
 
 What the existing firmware does with that, from the parameter file:
 - **Entry and arming.** Manual entry needs the throttle at low (`SLA_EDF_ENTRY 0.05`), so the EDF starts at 0. A step to full has to come after arming.
@@ -88,12 +95,14 @@ What the existing firmware does with that, from the parameter file:
   full throttle on release detection does not exist and would be new firmware (A4).
 
 Modeled consequences (estimates from the file values, not measurements):
-- Thrust to weight is about 2.0 (39.2 N against 1.979 kg x 9.81 m/s^2 = 19.4 N; weighed 2026-11-23).
-- With the 0.4 s rise and a thrust-only estimate near 19 m/s^2, 12 m/s takes roughly 1 s. The canards are held at trim for that
-  time because the gate is closed.
+- Thrust to weight is about 1.97 (43.2 N against 2.238 kg x 9.81 m/s^2 = 22.0 N; data sheet 2026-11-25, new packs). It was about 2.0
+  on the old sheet (39.2 N, 1.979 kg), but the first flight (log 66) made only about 21 N as the old packs sagged.
+- With the 0.4 s rise and a net climb acceleration near 9.5 m/s^2, the 13 m/s indicated gate opens about 1.85 s after full stick
+  (1.1 s after rail exit). The canards are held at trim for that time because the gate is closed.
 - **The EDF reaction torque is 0.05 N m in magnitude, constant across throttle** (measured 2026-11-23). With the gate closed the
-  canards sit at trim, so this torque rolls the vehicle unopposed: with the CAD roll inertia and no damping, up to about 18 rad/s
-  after 1 s. With the gate open the roll authority with isolated canards (revisions 7 and 8) is 0.044 N m at the 20 m/s gate (below the torque),
+  canards sit at trim, so this torque rolls the vehicle unopposed: with the CAD roll inertia (0.0031219 kg m^2 since revision 14) and no
+  damping, 16 rad/s^2, which reaches the 15 rad/s state limit about 0.94 s after rail exit. Log 66 confirmed it: 19 to 20 rad/s^2 from
+  rail exit and a cut at 15.1 rad/s. With the gate open the roll authority with isolated canards (revisions 7 and 8) is 0.044 N m at the 20 m/s gate (below the torque),
   0.069 N m at 25 m/s and 0.176 N m at 40 m/s. With the body included (85 mm diameter, modeled x 2.95 in roll) it is about
   0.130, 0.203 and 0.520 N m, before any loss to rear-fin interaction. Countering it (sign, roll trim or vanes, launcher roll restraint) and the gate speed are decisions for
   the lead before any launch.
