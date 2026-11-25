@@ -1,15 +1,16 @@
 # SLAAPS inertia tensor (kg m^2) and 10S propulsion voltage range (SLA_PWR_VMIN 30 V = 3.0 V/cell, VMAX 42 V) at CG, body FRD (x forward, y right, z down), kg m^2.
-# Data sheet 2026-11-12 (CAD), mass and CG confirmed by weighing 2026-11-23 (revision 7): mass 1.979 kg, CG 0.233 m from the tail end, IMU 0.268 m, canard COP 0.166 m forward of CG.
+# Data sheet 2026-11-25 (revision 14): two Tattu R-Line 5.0 5S 2200 mAh 150C packs in series (10S, same 30-42 V range): mass 2.238 kg,
+# CG 0.268 m from the tail end, IMU 0.260 m, canard COP 0.16373 m forward of CG, bench thrust 4.402 kg. Was 1.979 kg, CG 0.233 m, IMU 0.268 m, 0.166 m.
 # CAD MMOI (kg mm^2, at CG) rotated into body FRD. CAD frame (project lead, 2026-11-12): +Z forward; viewed from behind,
 # +Y between right and up (45 deg from right), +X between left and up (225 deg from down).
 # Load in QGC (Parameters > Tools > Load from file) while the SLAAPS configuration is disabled; edit any entry there.
 # Vehicle-Id	Component-Id	Name	Value	Type
-1	1	SLA_I_XX	0.0027886	9
-1	1	SLA_I_YY	0.0337643	9
-1	1	SLA_I_ZZ	0.0337507	9
-1	1	SLA_I_XY	0.0000084	9
-1	1	SLA_I_XZ	0.0000847	9
-1	1	SLA_I_YZ	-0.0000077	9
+1	1	SLA_I_XX	0.0031219	9
+1	1	SLA_I_YY	0.0431789	9
+1	1	SLA_I_ZZ	0.0432646	9
+1	1	SLA_I_XY	0.0000837	9
+1	1	SLA_I_XZ	0.0000097	9
+1	1	SLA_I_YZ	-0.0000318	9
 1	1	SLA_PWR_VMIN	30	9
 1	1	SLA_PWR_VMAX	42	9
 1	1	SLA_EDF_RISE	2.5	9
@@ -58,42 +59,42 @@
 1	1	SLA_C1_DFY	-8.54305	9
 1	1	SLA_C1_DFZ	-8.54305	9
 1	1	SLA_C1_DMR	-0.61985	9
-1	1	SLA_C1_DMP	1.41813	9
-1	1	SLA_C1_DMY	-1.41813	9
+1	1	SLA_C1_DMP	1.39874	9
+1	1	SLA_C1_DMY	-1.39874	9
 1	1	SLA_C2_DFX	0.00000	9
 1	1	SLA_C2_DFY	-8.54305	9
 1	1	SLA_C2_DFZ	8.54305	9
 1	1	SLA_C2_DMR	0.61985	9
-1	1	SLA_C2_DMP	-1.41813	9
-1	1	SLA_C2_DMY	-1.41813	9
+1	1	SLA_C2_DMP	-1.39874	9
+1	1	SLA_C2_DMY	-1.39874	9
 1	1	SLA_C3_DFX	0.00000	9
 1	1	SLA_C3_DFY	8.54305	9
 1	1	SLA_C3_DFZ	8.54305	9
 1	1	SLA_C3_DMR	-0.61985	9
-1	1	SLA_C3_DMP	-1.41813	9
-1	1	SLA_C3_DMY	1.41813	9
+1	1	SLA_C3_DMP	-1.39874	9
+1	1	SLA_C3_DMY	1.39874	9
 1	1	SLA_C4_DFX	0.00000	9
 1	1	SLA_C4_DFY	8.54305	9
 1	1	SLA_C4_DFZ	-8.54305	9
 1	1	SLA_C4_DMR	0.61985	9
-1	1	SLA_C4_DMP	1.41813	9
-1	1	SLA_C4_DMY	1.41813	9
+1	1	SLA_C4_DMP	1.39874	9
+1	1	SLA_C4_DMY	1.39874	9
 1	1	SLA_C1_SL_UNC	0.05	9
 1	1	SLA_C1_DUR	0.30993	9
-1	1	SLA_C1_DUP	0.70907	9
-1	1	SLA_C1_DUY	0.70907	9
+1	1	SLA_C1_DUP	0.69937	9
+1	1	SLA_C1_DUY	0.69937	9
 1	1	SLA_C2_SL_UNC	0.05	9
 1	1	SLA_C2_DUR	0.30993	9
-1	1	SLA_C2_DUP	0.70907	9
-1	1	SLA_C2_DUY	0.70907	9
+1	1	SLA_C2_DUP	0.69937	9
+1	1	SLA_C2_DUY	0.69937	9
 1	1	SLA_C3_SL_UNC	0.05	9
 1	1	SLA_C3_DUR	0.30993	9
-1	1	SLA_C3_DUP	0.70907	9
-1	1	SLA_C3_DUY	0.70907	9
+1	1	SLA_C3_DUP	0.69937	9
+1	1	SLA_C3_DUY	0.69937	9
 1	1	SLA_C4_SL_UNC	0.05	9
 1	1	SLA_C4_DUR	0.30993	9
-1	1	SLA_C4_DUP	0.70907	9
-1	1	SLA_C4_DUY	0.70907	9
+1	1	SLA_C4_DUP	0.69937	9
+1	1	SLA_C4_DUY	0.69937	9
 1	1	SLA_AIRSPD	40	9
 1	1	SLA_C1_TRIM	0	9
 1	1	SLA_C1_WASH	40	9
@@ -123,20 +124,20 @@
 1	1	SLA_C3_DELAY	0.008	9
 1	1	SLA_C4_LAG	0.05	9
 1	1	SLA_C4_DELAY	0.008	9
-1	1	SLA_MASS	1.979	9
+1	1	SLA_MASS	2.238	9
 1	1	SLA_CG_Y	0	9
 1	1	SLA_CG_Z	0	9
 1	1	SLA_EDF_T0	0	9
-1	1	SLA_EDF_T1	9.8067	9
-1	1	SLA_EDF_T2	19.6133	9
-1	1	SLA_EDF_T3	29.42	9
-1	1	SLA_EDF_T4	39.2266	9
+1	1	SLA_EDF_T1	10.7922	9
+1	1	SLA_EDF_T2	21.5844	9
+1	1	SLA_EDF_T3	32.3767	9
+1	1	SLA_EDF_T4	43.1689	9
 1	1	SLA_EDF_VOLT	42	9
 1	1	SLA_EDF_BMAX	1	9
 1	1	SLA_R_M_SCALE	0.5192	9
-1	1	SLA_P_M_SCALE	1.18795	9
-1	1	SLA_Y_M_SCALE	1.18795	9
-1	1	SLA_CG_X	0.233	9
+1	1	SLA_P_M_SCALE	1.17171	9
+1	1	SLA_Y_M_SCALE	1.17171	9
+1	1	SLA_CG_X	0.268	9
 1	1	SLA_R_INPUT	0	6
 1	1	SLA_P_INPUT	1	6
 1	1	SLA_Y_INPUT	2	6
@@ -151,42 +152,42 @@
 1	1	EKF2_MULTI_MAG	0	6
 1	1	SENS_IMU_MODE	1	6
 1	1	SENS_MAG_MODE	1	6
-1	1	EKF2_IMU_POS_X	0.035	9
+1	1	EKF2_IMU_POS_X	-0.008	9
 1	1	EKF2_IMU_POS_Y	0	9
 1	1	EKF2_IMU_POS_Z	-0.01	9
 # Modeled starting values derived 2026-10-27 (rate loop from inertia and modeled canard authority, timing
 # from PX4 publication rates); see docs/PROJECT_CONTEXT.md. Pending project-lead review; not measured.
-1	1	SLA_R_RATE_P	0.02685	9
-1	1	SLA_R_RATE_I	0.02685	9
+1	1	SLA_R_RATE_P	0.03006	9
+1	1	SLA_R_RATE_I	0.03006	9
 1	1	SLA_R_RATE_D	0.0	9
 1	1	SLA_R_I_LIM	0.3	9
 1	1	SLA_R_M_LIM	1.0	9
 1	1	SLA_R_WEIGHT	1.0	9
 1	1	SLA_R_ATT_P	1.43	9
 1	1	SLA_R_RATE	2.0	9
-1	1	SLA_R_SP_ACC	130.39	9
+1	1	SLA_R_SP_ACC	116.47025	9
 1	1	SLA_R_MEAS_R	15.0	9
 1	1	SLA_R_MEAS_A	1000.0	9
-1	1	SLA_P_RATE_P	0.11348	9
-1	1	SLA_P_RATE_I	0.09087	9
+1	1	SLA_P_RATE_P	0.14713	9
+1	1	SLA_P_RATE_I	0.11782	9
 1	1	SLA_P_RATE_D	0.0	9
 1	1	SLA_P_I_LIM	0.3	9
 1	1	SLA_P_M_LIM	1.0	9
 1	1	SLA_P_WEIGHT	1.0	9
 1	1	SLA_P_ATT_P	1.14	9
 1	1	SLA_P_RATE	1.0	9
-1	1	SLA_P_SP_ACC	24.61	9
+1	1	SLA_P_SP_ACC	18.98094	9
 1	1	SLA_P_MEAS_R	15.0	9
 1	1	SLA_P_MEAS_A	1000.0	9
-1	1	SLA_Y_RATE_P	0.11348	9
-1	1	SLA_Y_RATE_I	0.09087	9
+1	1	SLA_Y_RATE_P	0.14749	9
+1	1	SLA_Y_RATE_I	0.1181	9
 1	1	SLA_Y_RATE_D	0.0	9
 1	1	SLA_Y_I_LIM	0.3	9
 1	1	SLA_Y_M_LIM	1.0	9
 1	1	SLA_Y_WEIGHT	1.0	9
 1	1	SLA_Y_ATT_P	1.14	9
 1	1	SLA_Y_RATE	1.0	9
-1	1	SLA_Y_SP_ACC	24.61	9
+1	1	SLA_Y_SP_ACC	18.93572	9
 1	1	SLA_Y_MEAS_R	15.0	9
 1	1	SLA_Y_MEAS_A	1000.0	9
 1	1	SLA_IN_SOURCE	2	6
@@ -240,6 +241,9 @@
 1	1	UAVCAN_ENABLE	2	6
 1	1	UAVCAN_SUB_BAT	2	6
 1	1	BAT1_SOURCE	1	6
+# Pack capacity for the remaining-charge estimate (2026-11-25: 2200 mAh; the board had 1300 from the old packs, which would raise a
+# low-battery warning, and drop SLAAPS power-ready, well before the real pack is low). Cells stay 10 (BAT1_N_CELLS).
+1	1	BAT1_CAPACITY	2200	9
 1	1	UAVCAN_SUB_DPRES	1	6
 # No auto-disarm for a vehicle that has not taken off (lead, 2026-11-17): the wind tunnel run is armed and held, never launched.
 # A negative value disables it; the 10 s default disarmed every armed Manual run on the bench.
@@ -250,6 +254,11 @@
 1	1	SLA_REC_HOLD	2.0	9
 1	1	SLA_REC_RAMP	0.5	9
 1	1	SLA_REC_THR	0.0	9
+# Data record 20261110 revision 14 (2026-11-25): revision 9 with the data sheet of 2026-11-25 (new packs, see the top of the file).
+# SLA_MASS, SLA_CG_X, EKF2_IMU_POS_X (IMU 8 mm aft of the CG) and SLA_I_* (CAD, rotated as before) from the sheet; SLA_EDF_T1..T4 linear to
+# the bench 4.402 kg (43.17 N) at 42 V. Pitch and yaw moment derivatives, uncertainties and M_SCALE x 0.98633 (canard arm 0.16373 / 0.166);
+# RATE_P and RATE_I x I_new / I_old / that factor and SP_ACC x the inverse, so every loop keeps its design crossover (roll I x 1.1195,
+# pitch x 1.2788, yaw x 1.2819). Roll moments and all forces do not depend on the CG and are unchanged. Not measured. See SLAAPS_DATA_RECORD.md.
 # Data record 20261110 revision 9 (2026-11-23): revision 7 with the body correction (modeled, slender-body theory, 85 mm body at the
 # canards): canard derivatives, their uncertainties, SLA_x_M_SCALE and SP_ACC x 2.30 in pitch and yaw and x 2.95 in roll; RATE_P and
 # RATE_I divided by the same factors, so the design crossover is kept for the stronger canards. Not measured. See SLAAPS_DATA_RECORD.md.
@@ -261,5 +270,5 @@
 # Revision 1 was declared Calibrated by the project lead, Kael Spry, 2026-11-10.
 # See docs/SLAAPS_DATA_RECORD.md for what it covers; modeled values stay modeled.
 1	1	SLA_DATA_REC	20261110	6
-1	1	SLA_DATA_REV	9	6
+1	1	SLA_DATA_REV	14	6
 1	1	SLA_DATA_STATE	0	6

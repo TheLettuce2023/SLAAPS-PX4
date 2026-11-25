@@ -32,15 +32,28 @@
 # (Launch_Spd 18, minimum speed 16, airfoil minimum 13). The gate opens about 4 m sooner of the 40 m range. Modeled roll authority with the body
 # is about 0.105 N m there, 2.1 times the 0.05 N m EDF reaction torque; with isolated canards it would be below the torque. Within the
 # stability analysis's 18..40 m/s band. The comments above that cite 20 m/s describe revisions 6 to 11.
-# This file sets SLA_DATA_REV 12 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
+# Revision 13 (2026-11-23) = revision 12 with SLA_LAUNCH_AS 13 m/s indicated (lead's decision; was 18): on the 3 ft vertical rail the vehicle
+# leaves at about 5 m/s, so the gate now opens about 0.5 s after rail exit and about 6 m up instead of 0.9 s and 11 m. Authority is small
+# (lead: enough to help deflect): modeled roll authority with the body about 0.055 N m, 1.1 times the 0.05 N m EDF torque; with isolated
+# canards about 0.019 N m. 13 m/s is the data sheet's airfoil minimum speed and the bottom of the stability analysis's stable range (about 10).
+# The EDF alone made the pitot read up to 5.9 m/s on the stand (log 61), so the gate does not open on the rail.
+# Revision 15 (2026-11-25) = revision 13 with the data sheet of 2026-11-25 (two 5S 2200 mAh packs in series; base revision 14): SLA_MASS
+# 2.238 kg; pitch and yaw derivatives and M_SCALE x 0.98633 (canard arm 0.16373 m); RATE_P/RATE_I and SP_ACC rescaled for the new inertia
+# (roll x 1.1195, pitch x 1.2788, yaw x 1.2819) so each loop keeps its design crossover. Thrust to weight is now 1.97 (4.402 kg bench thrust),
+# not 2.5: the vehicle leaves the rail about 0.74 s after full stick at about 4 m/s and reaches the 13 m/s gate about 1.1 s later, 11 m up.
+# The EDF torque (16 rad/s^2 at the new roll inertia) reaches the 15 rad/s state limit about 0.94 s after rail exit, before the gate: see the
+# flight-test plan (log 66).
+# Launch method changed 2026-11-25 (lead), with no value changed: a shallow hand throw (30 to 45 degrees) with the EDF at full before release,
+# and exhaust vanes against the roll torque. The gate then opens about 0.6 to 0.7 s after release (modeled).
+# This file sets SLA_DATA_REV 15 and SLA_DATA_STATE 0: the lead must declare it (SLA_DATA_STATE 1) before Manual can arm.
 1	1	SLA_IN_AGE	500	6
 1	1	SLA_FLT_STAGE	2	6
 1	1	SLA_LAUNCH_AS_I	0	6
 1	1	SLA_LAUNCH_AGE	250	6
-1	1	SLA_LAUNCH_AS	18	9
+1	1	SLA_LAUNCH_AS	13	9
 1	1	SLA_SCH_EN	0	6
-1	1	SLA_MASS	1.979	9
-1	1	SLA_DATA_REV	12	6
+1	1	SLA_MASS	2.238	9
+1	1	SLA_DATA_REV	15	6
 1	1	SLA_DATA_STATE	0	6
 1	1	SLA_AIRSPD	25	9
 1	1	SLA_C1_WASH	25	9
@@ -48,53 +61,53 @@
 1	1	SLA_C1_DFY	-3.33714	9
 1	1	SLA_C1_DFZ	-3.33714	9
 1	1	SLA_C1_DMR	-0.24214	9
-1	1	SLA_C1_DMP	0.55395	9
-1	1	SLA_C1_DMY	-0.55395	9
+1	1	SLA_C1_DMP	0.54637	9
+1	1	SLA_C1_DMY	-0.54637	9
 1	1	SLA_C1_DUR	0.12107	9
-1	1	SLA_C1_DUP	0.27699	9
-1	1	SLA_C1_DUY	0.27699	9
+1	1	SLA_C1_DUP	0.2732	9
+1	1	SLA_C1_DUY	0.2732	9
 1	1	SLA_C2_WASH	25	9
 1	1	SLA_C2_DFX	0	9
 1	1	SLA_C2_DFY	-3.33714	9
 1	1	SLA_C2_DFZ	3.33714	9
 1	1	SLA_C2_DMR	0.24214	9
-1	1	SLA_C2_DMP	-0.55395	9
-1	1	SLA_C2_DMY	-0.55395	9
+1	1	SLA_C2_DMP	-0.54637	9
+1	1	SLA_C2_DMY	-0.54637	9
 1	1	SLA_C2_DUR	0.12107	9
-1	1	SLA_C2_DUP	0.27699	9
-1	1	SLA_C2_DUY	0.27699	9
+1	1	SLA_C2_DUP	0.2732	9
+1	1	SLA_C2_DUY	0.2732	9
 1	1	SLA_C3_WASH	25	9
 1	1	SLA_C3_DFX	0	9
 1	1	SLA_C3_DFY	3.33714	9
 1	1	SLA_C3_DFZ	3.33714	9
 1	1	SLA_C3_DMR	-0.24214	9
-1	1	SLA_C3_DMP	-0.55395	9
-1	1	SLA_C3_DMY	0.55395	9
+1	1	SLA_C3_DMP	-0.54637	9
+1	1	SLA_C3_DMY	0.54637	9
 1	1	SLA_C3_DUR	0.12107	9
-1	1	SLA_C3_DUP	0.27699	9
-1	1	SLA_C3_DUY	0.27699	9
+1	1	SLA_C3_DUP	0.2732	9
+1	1	SLA_C3_DUY	0.2732	9
 1	1	SLA_C4_WASH	25	9
 1	1	SLA_C4_DFX	0	9
 1	1	SLA_C4_DFY	3.33714	9
 1	1	SLA_C4_DFZ	-3.33714	9
 1	1	SLA_C4_DMR	0.24214	9
-1	1	SLA_C4_DMP	0.55395	9
-1	1	SLA_C4_DMY	0.55395	9
+1	1	SLA_C4_DMP	0.54637	9
+1	1	SLA_C4_DMY	0.54637	9
 1	1	SLA_C4_DUR	0.12107	9
-1	1	SLA_C4_DUP	0.27699	9
-1	1	SLA_C4_DUY	0.27699	9
+1	1	SLA_C4_DUP	0.2732	9
+1	1	SLA_C4_DUY	0.2732	9
 1	1	SLA_R_M_SCALE	0.20281	9
-1	1	SLA_R_RATE_P	0.06873	9
-1	1	SLA_R_RATE_I	0.06873	9
+1	1	SLA_R_RATE_P	0.07694	9
+1	1	SLA_R_RATE_I	0.07694	9
 1	1	SLA_R_RATE_D	0	9
-1	1	SLA_R_SP_ACC	50.93358	9
-1	1	SLA_P_M_SCALE	0.46405	9
-1	1	SLA_P_RATE_P	0.2905	9
-1	1	SLA_P_RATE_I	0.23263	9
+1	1	SLA_R_SP_ACC	45.49618	9
+1	1	SLA_P_M_SCALE	0.4577	9
+1	1	SLA_P_RATE_P	0.37665	9
+1	1	SLA_P_RATE_I	0.30162	9
 1	1	SLA_P_RATE_D	0	9
-1	1	SLA_P_SP_ACC	9.61329	9
-1	1	SLA_Y_M_SCALE	0.46405	9
-1	1	SLA_Y_RATE_P	0.2905	9
-1	1	SLA_Y_RATE_I	0.23263	9
+1	1	SLA_P_SP_ACC	7.41444	9
+1	1	SLA_Y_M_SCALE	0.4577	9
+1	1	SLA_Y_RATE_P	0.37755	9
+1	1	SLA_Y_RATE_I	0.30234	9
 1	1	SLA_Y_RATE_D	0	9
-1	1	SLA_Y_SP_ACC	9.61329	9
+1	1	SLA_Y_SP_ACC	7.39677	9

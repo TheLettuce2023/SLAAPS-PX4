@@ -255,3 +255,67 @@ request lives 500 ms. The timing rules still hold (activation reserve 50 ms < 50
 all from aero tests). With the 40 m range limit, the gate opens about 4 m sooner. Modeled roll authority with the body is about 0.105 N m at
 18 m/s, 2.1 times the 0.05 N m EDF reaction torque (isolated canards: 0.036 N m, below it). 18 m/s is inside the stability analysis's
 18 to 40 m/s band (worst-case modeled damping 0.35). Indicated is about 0.89 times true at the site.
+
+## Revision 13 (launch profile C, low gate): pending the lead's declaration
+
+`slaaps_launch.params`, 2026-11-23, `SLA_DATA_REV` 13, `SLA_DATA_STATE` 0. Revision 12 with one change, the lead's decision:
+`SLA_LAUNCH_AS` 13 m/s indicated (was 18). Reason: the launcher is a 3 ft vertical rail and the vehicle leaves it at about 5 m/s
+(thrust to weight 2.5), so at 18 m/s it flew about 0.9 s and 11 m without attitude control. At 13 m/s the gate opens about 0.5 s after rail
+exit, about 6 m up. Authority there is small, accepted by the lead as enough to help deflect: modeled roll authority with the body about
+0.055 N m (1.1 times the 0.05 N m EDF torque), about 0.019 N m with isolated canards; pitch and yaw scale the same way, (13/25)^2 = 0.27 of
+profile C's design authority. 13 m/s is the data sheet's airfoil minimum speed and inside the stability analysis's stable range (from about
+10 m/s), near its low end, so expect a slow, lightly damped response. The EDF alone made the pitot read up to 5.9 m/s on the stand (log 61),
+so the gate does not open on the rail.
+
+## Revisions 14 (base) and 15 (launch profile C): new battery packs, pending the lead's declaration
+
+`slaaps_vehicle.params` (`SLA_DATA_REV` 14) and `slaaps_launch.params` (`SLA_DATA_REV` 15), 2026-11-25, both `SLA_DATA_STATE` 0. They are
+revisions 9 and 13 with the data sheet of 2026-11-25. Reason (lead): voltage sag on the old packs cut the EDF's thrust in the first flight
+(log 66: about 21 N in flight, thrust to weight 1.07, pack 41.8 V falling to 36.7 V at 45 A). The vehicle now flies two Tattu R-Line 5.0
+5S 2200 mAh 150C packs in series: 10S, so the voltage range (30 to 42 V), `SLA_EDF_VOLT` 42 and `BAT1_N_CELLS` 10 are unchanged.
+Source: `src/lib/slaaps/Master_Vehicle_Data_Sheet_Slaaps.xlsx` (SHA-256 `3c84b8d93fef4c837804f869d9fbc2610b605cbccd07c9d2e36fb9127d99de77`).
+
+| Quantity (sheet cell) | Revisions 9 and 13 | Revisions 14 and 15 | Parameter |
+| --- | --- | --- | --- |
+| Mass (B4, scale) | 1.979 kg | 2.238 kg | `SLA_MASS` |
+| Thrust (C4, bench test) | 4.0 kg | 4.402 kg (43.17 N) | `SLA_EDF_T1..T4`, linear at 42 V |
+| Length (D4) | 0.49 m | 0.5218 m | none |
+| CG from the tail end (E4) | 0.233 m | 0.268 m | `SLA_CG_X` |
+| Canard COP forward of CG (F4) | 0.166 m | 0.16373 m | pitch and yaw derivatives |
+| IMU from the tail end (G4) | 0.268 m | 0.260 m | `EKF2_IMU_POS_X` -0.008 (was 0.035) |
+| Rear fin COP aft of CG (H4) | 0.164 m | 0.170 m | fin model (not implemented) |
+| Roll inertia (CAD Izz) | 0.0027886 | 0.0031219 kg m^2 | `SLA_I_XX` |
+| Pitch, yaw inertia | 0.0337643 / 0.0337507 | 0.0431789 / 0.0432646 kg m^2 | `SLA_I_YY` / `SLA_I_ZZ` |
+| Products of inertia | 8.4e-6 / 8.47e-5 / -7.7e-6 | 8.37e-5 / 9.7e-6 / -3.18e-5 kg m^2 | `SLA_I_XY/XZ/YZ` |
+| Pack capacity | 1300 mAh (board, not in a file) | 2200 mAh | `BAT1_CAPACITY`, now in `slaaps_vehicle.params` |
+
+The inertia is the CAD tensor rotated into body FRD as in revision 2 (same frame mapping; the rotation reproduces revision 2's values
+from the old sheet exactly). Derived values, scaled from what each file carried (same method as revisions 2, 3 and 9; modeled, not measured):
+- **Pitch and yaw canard moments:** `SLA_Cn_DMP`, `DMY`, `DUP`, `DUY` and `SLA_P,Y_M_SCALE` x 0.98633 (arm 0.16373 / 0.166). Forces and
+  roll moments do not depend on the CG and are unchanged.
+- **Rate loops:** `RATE_P` and `RATE_I` x I_new / I_old divided by the authority factor, and `SP_ACC` (0.7 x M_SCALE / I) x the inverse:
+  roll x 1.1195, pitch x 1.2966 (1.2788 / 0.98633), yaw x 1.2997 (1.2819 / 0.98633) on the gains. Every loop keeps its design crossover
+  and the integral ratio; `Tools/slaaps/stability_margin.py` (inputs updated) gives the same margins. `ATT_P` and the stick rates are unchanged.
+
+| Value | Base revision 9 | Base revision 14 | Profile C revision 13 | Profile C revision 15 |
+| --- | --- | --- | --- | --- |
+| `SLA_Cn_DMP` / `DMY` | +-1.41813 | +-1.39874 | +-0.55395 | +-0.54637 N m/rad |
+| `SLA_P,Y_M_SCALE` | 1.18795 | 1.17171 | 0.46405 | 0.4577 N m |
+| `SLA_R_RATE_P` / `RATE_I` / `SP_ACC` | 0.02685 / 0.02685 / 130.39 | 0.03006 / 0.03006 / 116.47 | 0.06873 / 0.06873 / 50.93 | 0.07694 / 0.07694 / 45.50 |
+| `SLA_P_RATE_P` / `RATE_I` / `SP_ACC` | 0.11348 / 0.09087 / 24.61 | 0.14713 / 0.11782 / 18.98 | 0.2905 / 0.23263 / 9.613 | 0.37665 / 0.30162 / 7.414 |
+| `SLA_Y_RATE_P` / `RATE_I` / `SP_ACC` | 0.11348 / 0.09087 / 24.61 | 0.14749 / 0.1181 / 18.94 | 0.2905 / 0.23263 / 9.613 | 0.37755 / 0.30234 / 7.397 |
+
+Both files pass the firmware's profile validators (`slaaps_profile_check` on the merged load order vehicle, trims, outputs, profile C):
+Manual flight profile complete, as before.
+
+Consequences for the launch (modeled, no drag unless stated): thrust to weight is **1.97**, not the 2.5 recorded on 2026-11-23. With the
+0.4 s EDF rise, the vehicle leaves the 0.91 m rail about 0.74 s after full stick at about 4.1 m/s, and the 13 m/s indicated gate (14.6 m/s
+true) opens about 1.85 s after full stick, 11 m up. The 0.05 N m EDF torque on the new roll inertia gives 16 rad/s^2, which reaches the
+15 rad/s state limit (`SLA_R_MEAS_R`) about 0.94 s after rail exit, before the gate opens 1.1 s after rail exit (flight-test plan, log 66).
+
+The ESC endpoint (full power by about 1720 us, log 61) is not resolved by this revision; the linear curve still assumes full thrust at
+full command. The tunnel overlays (revisions 4 and 5) carry the old arm and inertia as well; reissue them before they are used again.
+
+Launch method changed 2026-11-25 (lead): a shallow hand throw (about 30 to 45 degrees) with the EDF at full before release, and exhaust
+vanes against the roll torque. No parameter changes: the launcher stage and the 13 m/s gate work the same for a throw. The rail
+figures above describe revision 15 as written; the throw figures are in the flight-test plan.

@@ -10,7 +10,7 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | Propulsion | EDF unit | 1 | EJets Jetfan 90 | Measured thrust 0 to 39.2 N (about 4.0 kgf) at 42 V and about 70 A (about 2.9 kW). Earlier user estimate 5.5 kgf. |
 | Propulsion | EDF motor | 1 | Hacker E50-M 2.5D | |
 | Propulsion | EDF ESC | 1 | TBS Lucid 12S 90A | PWM 400 Hz on AUX1, 1000-2000 us (moved from DShot600 on AUX5 on 2026-11-22: it never armed on DShot under the SLAAPS image). The pack is 10S and the measured draw is about 70 A. |
-| Power | Battery packs | 2 | Ovonic Rebel 5S 1300 mAh 18.5 V 130C LiPo, XT90 | Two in series for 10S (`SLA_PWR_VMIN` 30 V, `SLA_PWR_VMAX` 42 V). In series the capacity stays 1.3 Ah. |
+| Power | Battery packs | 2 | Tattu R-Line 5.0 5S 2200 mAh 18.5 V 150C LiPo | Since 2026-11-25. Two in series for 10S (`SLA_PWR_VMIN` 30 V, `SLA_PWR_VMAX` 42 V), 2.2 Ah (`BAT1_CAPACITY` 2200). Replaced the Ovonic Rebel 5S 1300 mAh 130C packs, whose voltage sag (41.8 to 36.7 V at 45 A) halved the EDF thrust in the first flight (log 66). |
 | Power | Power module (`POWER1`) | 1 | Holybro PM08-CAN | Measures the EDF pack. Written "PMO8-CAN" in the request; assumed PM08-CAN. |
 | Actuation | Canard servos | 4 | EMAX ES3059MD | Identical. 500 to 2500 us (+-90 deg), 333 Hz, slew 0.11 s per 60 deg. MAIN1 to MAIN4. |
 | Aero | Canards | 4 | In-house, NACA 0012 | X layout, 40 mm from the centerline, +-15 deg vehicle limit, 12 deg aerodynamic limit. |
@@ -39,15 +39,17 @@ Status: draft, 2026-11-22. Part identities were given by the project lead on 202
 | Power module (PM08-CAN) POWER2 output | Servo power rail (4x EMAX ES3059MD) and Raspberry Pi 4B | Regulated supply | Stated by the project lead 2026-11-22. Same PM08-CAN as POWER1. How the rail is distributed to the servos is not recorded. |
 
 ## Known figures
-- All-up mass 1.979 kg, weighed (data sheet, confirmed by the project lead 2026-11-23). It replaces the 1.9 kg stated 2026-11-22 and the
-  3.04 kg of the 2026-09-19 SDF model. `SLA_MASS` is 1.979 from data revision 7. The SDF model still uses the older figure.
-- CG on the centerline. IMU 10 mm up and 52.15 mm forward of the CG.
+- All-up mass 2.238 kg with the Tattu packs (data sheet 2026-11-25, `SLA_MASS` from data revision 14). Before: 1.979 kg, weighed
+  (confirmed by the project lead 2026-11-23), which replaced the 1.9 kg stated 2026-11-22 and the 3.04 kg of the 2026-09-19 SDF model.
+  The SDF model still uses the older figure.
+- Bench thrust 4.402 kg (43.2 N) on the Tattu packs (data sheet 2026-11-25): thrust to weight 1.97.
+- CG on the centerline, 0.268 m from the tail end. IMU 0.260 m from the tail end (8 mm aft of the CG, `EKF2_IMU_POS_X` -0.008) and 10 mm up.
 
 ## Open items
-- Weigh each item, then fill a mass column. The assembled vehicle is weighed (1.979 kg). Record whether the battery was fitted.
-- The inertia is still the CAD value; the CG (0.233 m) is confirmed.
-- Runtime: 1.3 Ah at the measured 70 A is about 67 s, and less with a usable-capacity limit (for example about 50 s at 80%). Confirm the burn rate on the bench
-  and set the bench or flight time limits to match. 70 A is about 54C, inside the 130C rating.
+- Weigh each item, then fill a mass column. The assembled vehicle is 2.238 kg on the 2026-11-25 sheet. Record whether the battery was fitted.
+- The inertia is still the CAD value (updated for the new packs on the 2026-11-25 sheet).
+- Runtime: 2.2 Ah at the measured 70 A is about 113 s, and less with a usable-capacity limit (for example about 90 s at 80%). Confirm the burn rate on the bench
+  and set the bench or flight time limits to match. 70 A is about 32C, inside the 150C rating.
 - Power budget (requirement `PWR-02`): one PM08-CAN carries everything. The battery stack feeds it, it passes the EDF current through to the ESC,
   and its POWER1 output feeds the flight controller while POWER2 feeds the servo rail and the Raspberry Pi.
   Check the module's pass-through current rating (about 70 A average, peak unmeasured) and its regulated output voltage and current against the servo supply

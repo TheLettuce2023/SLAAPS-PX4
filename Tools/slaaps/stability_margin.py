@@ -33,10 +33,12 @@ def metrics(k, b, Kp, Ki, att, tau, T):
     slow = max(p.real for p in r if abs(p) < 60.0)
     return True, slow, z
 
-AXES = {  # name: (M_SCALE, inertia, Kp, Ki, ATT_P) at the revision-3 design, 40 m/s
-    "roll":  (0.176, 0.0027886, 0.0792, 0.0792, 1.43),
-    "pitch": (0.5165, 0.0337643, 0.261, 0.209, 1.14),
-    "yaw":   (0.5165, 0.0337507, 0.261, 0.209, 1.14),
+AXES = {  # name: (M_SCALE, inertia, Kp, Ki, ATT_P) at the revision-3 design, 40 m/s, isolated canards
+    # Inertia and canard arm from the data sheet of 2026-11-25 (revision 14); gains rescaled with them, so b * Kp and the results
+    # are those of the 2026-11-12 sheet (roll 0.176 / 0.0027886 / 0.0792; pitch, yaw 0.5165 / 0.03376 / 0.261 / 0.209).
+    "roll":  (0.176, 0.0031219, 0.08867, 0.08867, 1.43),
+    "pitch": (0.50944, 0.0431789, 0.33841, 0.27099, 1.14),
+    "yaw":   (0.50944, 0.0432646, 0.33975, 0.27206, 1.14),
 }
 TAU = 0.05  # SLA_Cn_LAG, measured loaded servo lag
 
